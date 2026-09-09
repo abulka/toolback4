@@ -1,0 +1,16 @@
+{
+  "name": "toolback4",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "pnpm --filter @toolback/editor dev",
+    "build": "pnpm -r build",
+    "test": "vitest run",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "happy-dom": "^15.11.7",
+    "typescript": "~5.6.3",
+    "vitest": "^2.1.8"
+  }
+}
