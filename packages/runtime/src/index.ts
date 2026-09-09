@@ -5,6 +5,13 @@ import { stylesCss } from './styles'
 export type { Breakpoint, Rect } from '@toolback/format'
 export { snap, snapRect, resizeRect, GRID, MIN_SIZE } from './design'
 export type { HandleDir, DesignController } from './design'
+export {
+  runBook,
+  stopRun,
+  createStore,
+  extractFunctionNames,
+} from './player'
+export type { ToolbackStore, ControlApi, RunHandle } from './player'
 export type { EditorToCanvasMessage, CanvasToEditorMessage, CanvasMessageSender } from './editorLink'
 export { listenForEditor } from './editorLink'
 

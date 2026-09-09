@@ -5,6 +5,7 @@ import { wireCanvas } from './canvasClient'
 import { startPaletteDrag } from './paletteDrag'
 import { useBookStore } from './stores/book'
 import PropertiesPanel from './components/PropertiesPanel.vue'
+import ScriptEditor from './components/ScriptEditor.vue'
 
 const store = useBookStore()
 const iframe = ref<HTMLIFrameElement | null>(null)
@@ -25,9 +26,16 @@ function onPaletteDown(kind: ControlKind, e: PointerEvent): void {
     <header class="topbar">
       <div class="brand">
         <span class="logo">toolback</span>
-        <span class="badge">v4 · M1 authoring</span>
+        <span class="badge">v4 · M2 scripting</span>
       </div>
-      <button class="run" disabled title="Run mode lands in M2">Run</button>
+      <button
+        class="run"
+        :class="{ running: store.isRunning }"
+        title="Toggle run mode"
+        @click="store.toggleRun()"
+      >
+        {{ store.isRunning ? 'Stop' : 'Run' }}
+      </button>
     </header>
 
     <aside class="palette">
@@ -61,6 +69,17 @@ function onPaletteDown(kind: ControlKind, e: PointerEvent): void {
         <input :value="store.activePage.name" disabled />
       </div>
 
+      <h2>Page script</h2>
+      <p class="hint mono-hint">
+        Shared functions + <code>pageEnter()</code>. Object scripts can call these directly.
+      </p>
+      <ScriptEditor
+        editor-class="page-script"
+        :model-value="store.activePage.script"
+        height="190px"
+        @update:model-value="store.setPageScript"
+      />
+
       <h2>Selection</h2>
       <PropertiesPanel />
 
@@ -84,7 +103,9 @@ function onPaletteDown(kind: ControlKind, e: PointerEvent): void {
       </template>
       <template v-else-if="store.canvasReady">
         <span class="ok">● canvas ready</span>
+        <span class="mode" :class="{ running: store.isRunning }">{{ store.isRunning ? 'RUNNING' : 'design' }}</span>
         <span>{{ store.objectCount }} objects · book "{{ store.book.title }}" · page "{{ store.activePage.name }}"</span>
+        <span v-if="store.scriptError" class="err">script: {{ store.scriptError }}</span>
       </template>
       <template v-else>
         <span>waiting for canvas…</span>
@@ -137,7 +158,7 @@ body.tb-palette-dragging * {
 .shell {
   display: grid;
   grid-template-rows: 48px 1fr 28px;
-  grid-template-columns: 220px 1fr 280px;
+  grid-template-columns: 220px 1fr 330px;
   grid-template-areas:
     'top top top'
     'palette canvas props'
@@ -182,8 +203,21 @@ body.tb-palette-dragging * {
   border: none;
   border-radius: 8px;
   padding: 8px 18px;
-  opacity: 0.45;
-  cursor: not-allowed;
+  cursor: pointer;
+  min-width: 76px;
+}
+
+.run.running {
+  background: #059669;
+}
+
+.mono-hint {
+  margin: 0 0 6px;
+}
+
+.mono-hint code {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  color: var(--ed-accent);
 }
 
 .palette {
@@ -339,6 +373,19 @@ h2:first-child {
 
 .ok {
   color: var(--ed-ok);
+}
+
+.mode {
+  border: 1px solid var(--ed-border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10px;
+  letter-spacing: 0.8px;
+}
+
+.mode.running {
+  color: #059669;
+  border-color: #059669;
 }
 
 .err {

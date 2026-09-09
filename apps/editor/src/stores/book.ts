@@ -32,6 +32,8 @@ export const useBookStore = defineStore('book', () => {
   const rects = ref<ObjectRects>({})
   const error = ref('')
   const dragOverCanvas = ref(false)
+  const isRunning = ref(false)
+  const scriptError = ref('')
 
   const activePage = computed(() => book.value.pages[0]!)
   const objectCount = computed(() => Object.keys(rects.value).length)
@@ -45,9 +47,28 @@ export const useBookStore = defineStore('book', () => {
       type: 'toolback:load',
       book: JSON.parse(JSON.stringify(book.value)),
       breakpoint: breakpoint.value,
-      design: true,
+      design: !isRunning.value,
       selection: selectionId.value,
     })
+  }
+
+  function toggleRun(): void {
+    isRunning.value = !isRunning.value
+    if (isRunning.value) scriptError.value = ''
+    sync()
+  }
+
+  function setEventScript(id: string, event: string, code: string): void {
+    const obj = activePage.value.objects.find((o) => o.id === id)
+    if (!obj) return
+    if (code.trim()) obj.on[event] = code
+    else delete obj.on[event]
+    sync()
+  }
+
+  function setPageScript(code: string): void {
+    activePage.value.script = code
+    sync()
   }
 
   function uniqueName(control: ControlKind): string {
@@ -105,10 +126,15 @@ export const useBookStore = defineStore('book', () => {
     rects,
     error,
     dragOverCanvas,
+    isRunning,
+    scriptError,
     activePage,
     objectCount,
     selectedObject,
     sync,
+    toggleRun,
+    setEventScript,
+    setPageScript,
     addObject,
     applyRect,
     updateProps,

@@ -9,7 +9,7 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
       type: 'toolback:load',
       book: JSON.parse(JSON.stringify(store.book)),
       breakpoint: store.breakpoint,
-      design: true,
+      design: !store.isRunning,
       selection: store.selectionId,
     }
     iframe.contentWindow?.postMessage(msg, '*')
@@ -33,6 +33,9 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
         break
       case 'toolback:commit':
         store.applyRect(msg.id, msg.rect)
+        break
+      case 'toolback:scriptError':
+        store.scriptError = msg.message
         break
       case 'toolback:error':
         store.error = msg.message

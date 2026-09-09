@@ -1,6 +1,7 @@
 import type { Book, Breakpoint, Rect } from '@toolback/format'
 import { getObjectRects, renderBook } from './index'
 import { createDesignController, type DesignOutMessage } from './design'
+import { runBook, stopRun } from './player'
 import type { ObjectRects } from './index'
 
 export type EditorToCanvasMessage = {
@@ -16,6 +17,7 @@ export type CanvasToEditorMessage =
   | { type: 'toolback:rects'; rects: ObjectRects }
   | { type: 'toolback:selection'; id: string | null }
   | { type: 'toolback:commit'; kind: 'move' | 'resize'; id: string; rect: Rect }
+  | { type: 'toolback:scriptError'; message: string }
   | { type: 'toolback:error'; message: string }
 
 export type CanvasMessageSender = (msg: CanvasToEditorMessage) => void
@@ -46,11 +48,21 @@ export function listenForEditor(
     if (!data || data.type !== 'toolback:load') return
     try {
       ensureStructure()
-      renderBook(data.book, holder!, data.breakpoint ?? 'desktop')
-      const pageRoot = holder!.querySelector<HTMLElement>('.tb-page')
-      send({ type: 'toolback:rects', rects: pageRoot ? getObjectRects(pageRoot) : {} })
-      design.setEnabled(data.design ?? false)
-      if (data.design) design.onRendered(data.selection ?? null)
+      if (data.design) {
+        stopRun()
+        renderBook(data.book, holder!, data.breakpoint ?? 'desktop')
+        const pageRoot = holder!.querySelector<HTMLElement>('.tb-page')
+        send({ type: 'toolback:rects', rects: pageRoot ? getObjectRects(pageRoot) : {} })
+        design.setEnabled(true)
+        design.onRendered(data.selection ?? null)
+      } else {
+        design.setEnabled(false)
+        runBook(data.book, holder!, data.breakpoint ?? 'desktop', (message) =>
+          send({ type: 'toolback:scriptError', message }),
+        )
+        const pageRoot = holder!.querySelector<HTMLElement>('.tb-page')
+        send({ type: 'toolback:rects', rects: pageRoot ? getObjectRects(pageRoot) : {} })
+      }
     } catch (err) {
       send({ type: 'toolback:error', message: String(err) })
     }

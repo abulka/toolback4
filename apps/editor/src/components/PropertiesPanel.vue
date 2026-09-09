@@ -1,13 +1,22 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Rect } from '@toolback/format'
 import { useBookStore } from '../stores/book'
+import ScriptEditor from './ScriptEditor.vue'
 
 const store = useBookStore()
 const sel = computed(() => store.selectedObject)
 const rect = computed<Rect | null>(() =>
   sel.value ? (sel.value.rects[store.breakpoint] ?? sel.value.rects.desktop) : null,
 )
+
+const EVENTS = ['click', 'dblclick', 'change', 'mouseenter', 'mouseleave'] as const
+const currentEvent = ref<(typeof EVENTS)[number]>('click')
+const eventScript = computed(() => sel.value?.on[currentEvent.value] ?? '')
+
+function onScript(code: string): void {
+  if (sel.value) store.setEventScript(sel.value.id, currentEvent.value, code)
+}
 
 const textFields = computed(() => {
   if (!sel.value) return []
@@ -65,6 +74,20 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
       <input :value="propValue(f.key)" @input="onProp(f.key, $event)" />
     </div>
     <p v-if="textFields.length === 0" class="hint">No content properties.</p>
+
+    <h2>Script</h2>
+    <div class="event-row">
+      <label>Event</label>
+      <select v-model="currentEvent">
+        <option v-for="e in EVENTS" :key="e" :value="e">{{ e }}</option>
+      </select>
+    </div>
+    <ScriptEditor
+      editor-class="obj-script"
+      :model-value="eventScript"
+      height="150px"
+      @update:model-value="onScript"
+    />
 
     <h2>Geometry · desktop</h2>
     <div class="geo">
@@ -174,5 +197,27 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
   font-size: 11px;
   color: var(--ed-text-dim);
   margin: 4px 0 0;
+}
+
+.event-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.event-row label {
+  font-size: 11px;
+  color: var(--ed-text-dim);
+}
+
+.event-row select {
+  flex: 1;
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  color: var(--ed-text);
+  padding: 5px 8px;
+  font: inherit;
 }
 </style>

@@ -5,7 +5,7 @@ scripted in plain JavaScript. Fourth attempt — informed by the post-mortem of
 `../pyinvent`, `../toolback`, `../toolback-lite`, `../toolback-lite-vue3`
 (those folders are archived reference material; salvage ideas, not code).
 
-**Status: M0 + M1 complete — M2 (scripting) is next**
+**Status: M0 + M1 + M2 complete — M3 (book) is next**
 (see [Milestones](#milestones) and [Progress log](#progress-log)).
 
 ---
@@ -98,10 +98,12 @@ Each milestone ends with a demo you actually build *in* the tool.
 - [x] Demo: built a sign-up form layout by hand (card + label + input + button)
 
 ### M2 — Scripting
-- [ ] Monaco script editor (object events + page script)
-- [ ] Run/design toggle (F3-style) in iframe; scripts via `new Function`
-- [ ] `controls.<name>` API, `store`, function-name sugar, `{{key}}` labels
-- [ ] Demo: counter button + live label
+- [x] Monaco script editor (object events dropdown + page script) with syntax highlighting
+- [x] Run/design toggle (F3-style, same iframe); scripts via `new Function` in the sandbox
+- [x] `controls.<name>` API (text/value/visible/enabled/on), reactive `store`, `{{key}}` dynamic labels
+- [x] Page-script shared functions callable directly from object scripts (function-name sugar via regex scan)
+- [x] `pageEnter()` lifecycle hook; script errors surfaced in the editor status bar
+- [x] Demo: counter — pageEnter seeds 100, button increments, label shows `Count: {{count}}` live
 
 ### M3 — Book
 - [ ] Page navigator, add/remove/duplicate pages
@@ -132,3 +134,8 @@ reusable widget/component library, version history, AI helpers, analytics.
   1. **iframe event boundary**: pointermove/pointerup over the canvas dispatch inside the iframe document, so editor-side window listeners never fire. Fixed with `setPointerCapture` on the palette element (`apps/editor/src/paletteDrag.ts`) — capture retargets events across the boundary; this is the trick that makes custom (library-free) drag work.
   2. **Architecture validated**: the design controller lives inside the canvas (`packages/runtime/src/design.ts`), the editor stays the single source of truth, and the only sync message is `toolback:load` (full book + selection). Move/resize commits flow canvas→store→sync-back (idempotent). No coordinate conversion, no scale math, no library internals — the failure mode that killed attempts #3 and #3.5 did not recur.
   Known micro-risk: an editor sync arriving mid-drag would break the drag (acceptable; syncs happen only on commit). Next: M2 scripting (Monaco, run/design toggle, `controls.` API, store, function-name sugar).
+- **2026-09-09** — **M2 complete.** The tool now runs real JavaScript. Verified in-browser (screenshot: `doco/m2-demo.png`): attached `store.set("count", …)` to a button's click via the Monaco event editor, bound a label with `Count: {{count}}`, added `pageEnter()` in the page script, hit Run — label showed `Count: 100` immediately, incremented on every click, Stop returned to design with the selection chrome intact. Script errors surface in the status bar. 30/30 vitest, typecheck + build clean; Monaco lazy-loads on first editor mount. Design notes:
+  - Object scripts live in `on[event]` (per-event dropdown); page script holds shared `function name()` definitions that object scripts call directly — the toolback-lite pattern that validated, now with proper multi-event support.
+  - Run mode = same iframe, `design:false` in the load message: player compiles scripts (`new Function`, injected `api`), wires events, resolves `{{key}}` labels against the reactive store, and unwinds everything on stop.
+  - Two bugs found and fixed by the acceptance run: (1) `canvasClient.sendLoad` hardcoded `design:true` from M1 — the store's sync flag was dead code; (2) Monaco auto-bracket-pairing + scripted blind typing produced a stray `}` (a human watching the screen wouldn't hit it; kept auto-pairing, adjusted the test).
+  Next: M3 — page navigator, `page.go()`, save/open `.toolbook.json`, autosave.
