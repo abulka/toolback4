@@ -104,7 +104,7 @@ describe('player', () => {
     root.remove()
   })
 
-  it('reports script errors through onError and keeps running', () => {
+  it('reports script errors through onError and keeps running', async () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
     const errors: string[] = []
@@ -113,10 +113,64 @@ describe('player', () => {
     })
     const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
     root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
+    await new Promise((r) => setTimeout(r, 40))
     expect(errors[0]).toContain('boom')
 
     handle.stop()
     root.remove()
+  })
+
+  it('supports await in object event scripts', async () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const book = makeBook({
+      objects: [
+        {
+          name: 'btn',
+          control: 'button',
+          on: { click: `await new Promise((r) => setTimeout(r, 20)); store.set('done', true)` },
+        },
+      ],
+    })
+    const handle = runBook(book, root, 'desktop')
+    root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
+    expect(handle.store.get('done')).toBeUndefined()
+    await new Promise((r) => setTimeout(r, 80))
+    expect(handle.store.get('done')).toBe(true)
+    handle.stop()
+    root.remove()
+  })
+
+  it('reports async errors from event scripts', async () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = makeBook({
+      objects: [
+        {
+          name: 'btn',
+          control: 'button',
+          on: { click: `await Promise.resolve(); throw new Error('async boom')` },
+        },
+      ],
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
+    await new Promise((r) => setTimeout(r, 40))
+    expect(errors[0]).toContain('async boom')
+    handle.stop()
+    root.remove()
+  })
+
+  it('reports async pageEnter errors', async () => {
+    const root = document.createElement('div')
+    const errors: string[] = []
+    const book = makeBook({
+      pageScript: `async function pageEnter() { throw new Error('enter failed') }`,
+    })
+    runBook(book, root, 'desktop', (m) => errors.push(m))
+    await new Promise((r) => setTimeout(r, 40))
+    expect(errors[0]).toContain('enter failed')
   })
 
   it('stop unwires listeners', () => {

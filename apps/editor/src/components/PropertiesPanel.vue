@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import type { Rect } from '@toolback/format'
 import { useBookStore } from '../stores/book'
 import ScriptEditor from './ScriptEditor.vue'
+import HelpButton from './HelpButton.vue'
 
 const store = useBookStore()
 const sel = computed(() => store.selectedObject)
@@ -10,7 +11,7 @@ const rect = computed<Rect | null>(() =>
   sel.value ? (sel.value.rects[store.breakpoint] ?? sel.value.rects.desktop) : null,
 )
 
-const EVENTS = ['click', 'dblclick', 'change', 'mouseenter', 'mouseleave'] as const
+const EVENTS = ['click', 'dblclick', 'change', 'input', 'mouseenter', 'mouseleave'] as const
 const currentEvent = ref<(typeof EVENTS)[number]>('click')
 const eventScript = computed(() => sel.value?.on[currentEvent.value] ?? '')
 
@@ -75,7 +76,10 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
     </div>
     <p v-if="textFields.length === 0" class="hint">No content properties.</p>
 
-    <h2>Script</h2>
+    <div class="row">
+      <h2>Script</h2>
+      <HelpButton anchor="object-scripts" />
+    </div>
     <div class="event-row">
       <label>Event</label>
       <select v-model="currentEvent">
@@ -197,6 +201,16 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
   font-size: 11px;
   color: var(--ed-text-dim);
   margin: 4px 0 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.row h2 {
+  margin-bottom: 4px;
 }
 
 .event-row {

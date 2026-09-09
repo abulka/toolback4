@@ -53,6 +53,15 @@ PageObject {
 
 Schema is stable from day one; renderers for the 6 controls fill in across milestones.
 
+## Documentation conventions
+
+- **`docs/scripting-guide.md` is the canonical scripting reference** — the in-app `?` buttons
+  (next to "Page script" and "Script") open it rendered as HTML, jumping to the relevant
+  section. It is imported into the editor via Vite `?raw`, so the file in `docs/` is the
+  single source to edit.
+- **Keep it current**: any change to the scripting API (`store`, `controls`, `page`, events,
+  dynamic labels) must update the guide in the same milestone.
+
 ### Runtime & scripting
 
 - Scripts run via `new Function` inside the canvas iframe with an injected API:
@@ -109,6 +118,7 @@ Each milestone ends with a demo you actually build *in* the tool.
 - [ ] Page navigator, add/remove/duplicate pages
 - [ ] `page.go('name')`, onPageEnter/Leave
 - [ ] Save/open `.toolbook.json` (File System Access), IndexedDB autosave, recent books
+- [ ] Update `docs/scripting-guide.md`: pages, `page.go()`, page lifecycle events
 - [ ] Demo: 2-page quiz with score
 
 ### M4 — Publish
@@ -139,3 +149,4 @@ reusable widget/component library, version history, AI helpers, analytics.
   - Run mode = same iframe, `design:false` in the load message: player compiles scripts (`new Function`, injected `api`), wires events, resolves `{{key}}` labels against the reactive store, and unwinds everything on stop.
   - Two bugs found and fixed by the acceptance run: (1) `canvasClient.sendLoad` hardcoded `design:true` from M1 — the store's sync flag was dead code; (2) Monaco auto-bracket-pairing + scripted blind typing produced a stray `}` (a human watching the screen wouldn't hit it; kept auto-pairing, adjusted the test).
   Next: M3 — page navigator, `page.go()`, save/open `.toolbook.json`, autosave.
+- **2026-09-09** — **Scripting guide + in-app help shipped.** `docs/scripting-guide.md` is the canonical reference (API: `store` / `controls.<name>` / `page` / `event`, object vs page scripts, `{{key}}` labels, six copy-paste recipes, debugging, sandbox notes, and an honest "pages are coming in M3" stub). `?` buttons next to "Page script" and "Script" open the guide rendered as HTML (imported via Vite `?raw`, rendered with `marked`, heading anchors scroll to the right section). Enabling improvements made while documenting: object event scripts and `pageEnter()` are now async — `await fetch(...)` works directly in any script (`player.ts`, +3 tests); `async function` declarations are recognized by the function-name sugar (regex bug found by the new tests); `input` (per-keystroke) added to the event dropdown. Verified in-browser: both `?` buttons open/scroll/close correctly, and the guide's "echo an input as you type" recipe works verbatim when built through the UI (screenshot: `doco/scripting-guide-popup.png`). 33/33 vitest, typecheck + build clean.

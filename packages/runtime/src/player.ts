@@ -34,7 +34,7 @@ export interface ControlApi {
 }
 
 export function extractFunctionNames(source: string): string[] {
-  const re = /(?:^|\n)\s*function\s+([A-Za-z_$][\w$]*)\s*\(/g
+  const re = /(?:^|\n)\s*(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/g
   return [...source.matchAll(re)].map((m) => m[1]!)
 }
 
@@ -186,10 +186,14 @@ export function runBook(
           'api',
           ...fnNames,
           'event',
-          `"use strict";\nconst { page, controls, store } = api;\n${script}`,
+          `"use strict";\nconst { page, controls, store } = api;\nreturn (async () => {\n${script}\n})();`,
         )
         const handler = (e: Event) => {
-          safe(`${obj.name}.${eventName}`, () => factory(api, ...fnValues, e))
+          safe(`${obj.name}.${eventName}`, () => {
+            Promise.resolve(factory(api, ...fnValues, e)).catch((err) =>
+              onError?.(`${obj.name}.${eventName}: ${String(err)}`),
+            )
+          })
         }
         ctl.el.addEventListener(eventName, handler)
         listeners.push(() => ctl.el.removeEventListener(eventName, handler))
@@ -203,7 +207,9 @@ export function runBook(
 
   const pageEnter = pageFns['pageEnter']
   if (typeof pageEnter === 'function') {
-    safe('pageEnter', () => pageEnter())
+    safe('pageEnter', () => {
+      Promise.resolve(pageEnter()).catch((err) => onError?.(`pageEnter: ${String(err)}`))
+    })
   }
 
   active = {

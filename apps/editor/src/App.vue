@@ -6,6 +6,7 @@ import { startPaletteDrag } from './paletteDrag'
 import { useBookStore } from './stores/book'
 import PropertiesPanel from './components/PropertiesPanel.vue'
 import ScriptEditor from './components/ScriptEditor.vue'
+import HelpButton from './components/HelpButton.vue'
 
 const store = useBookStore()
 const iframe = ref<HTMLIFrameElement | null>(null)
@@ -69,7 +70,10 @@ function onPaletteDown(kind: ControlKind, e: PointerEvent): void {
         <input :value="store.activePage.name" disabled />
       </div>
 
-      <h2>Page script</h2>
+      <div class="row">
+        <h2>Page script</h2>
+        <HelpButton anchor="page-script" />
+      </div>
       <p class="hint mono-hint">
         Shared functions + <code>pageEnter()</code>. Object scripts can call these directly.
       </p>
@@ -213,6 +217,16 @@ body.tb-palette-dragging * {
 
 .mono-hint {
   margin: 0 0 6px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.row h2 {
+  margin-bottom: 4px;
 }
 
 .mono-hint code {
