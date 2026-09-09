@@ -24,12 +24,12 @@ describe('runtime', () => {
 
   it('renders a placeholder for controls without renderers', () => {
     const root = document.createElement('div')
-    const pageRoot = renderObjectInto(
-      root,
-      createObject('image', 'pic', { desktop: { x: 0, y: 0, w: 100, h: 100 } }),
-      'desktop',
-    )
-    expect(pageRoot.querySelector('.tb-missing')?.textContent).toContain('image')
+    const unregistered = {
+      ...createObject('image', 'pic', { desktop: { x: 0, y: 0, w: 100, h: 100 } }),
+      control: 'wombat',
+    } as never
+    const pageRoot = renderObjectInto(root, unregistered, 'desktop')
+    expect(pageRoot.querySelector('.tb-missing')?.textContent).toContain('wombat')
   })
 
   it('collects object rects relative to the page root', () => {
@@ -50,13 +50,18 @@ describe('runtime', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
 
-    listenForEditor(root, send)
-    expect(sent[0]).toEqual({ type: 'toolback:ready' })
+    const cleanup = listenForEditor(root, send)
+    try {
+      expect(sent[0]).toEqual({ type: 'toolback:ready' })
 
-    window.dispatchEvent(
-      new MessageEvent('message', { data: { type: 'toolback:load', book: sampleBook() } }),
-    )
-    expect(root.querySelector('button.tb-button')).not.toBeNull()
-    expect(sent.some((m) => m.type === 'toolback:rects')).toBe(true)
+      window.dispatchEvent(
+        new MessageEvent('message', { data: { type: 'toolback:load', book: sampleBook() } }),
+      )
+      expect(root.querySelector('button.tb-button')).not.toBeNull()
+      expect(sent.some((m) => m.type === 'toolback:rects')).toBe(true)
+    } finally {
+      cleanup()
+      root.remove()
+    }
   })
 })

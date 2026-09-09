@@ -5,7 +5,7 @@ scripted in plain JavaScript. Fourth attempt — informed by the post-mortem of
 `../pyinvent`, `../toolback`, `../toolback-lite`, `../toolback-lite-vue3`
 (those folders are archived reference material; salvage ideas, not code).
 
-**Status: M0 complete — M1 (authoring loop) is next**
+**Status: M0 + M1 complete — M2 (scripting) is next**
 (see [Milestones](#milestones) and [Progress log](#progress-log)).
 
 ---
@@ -91,11 +91,11 @@ Each milestone ends with a demo you actually build *in* the tool.
 - [x] Demo: "hello world" button + label render in iframe from JSON
 
 ### M1 — Authoring loop
-- [ ] Custom drag layer: palette → canvas drop, move, 8px-grid snap
-- [ ] Selection overlay + resize handles (editor-side, pointer capture)
-- [ ] Property panel (text, position/size per breakpoint)
-- [ ] Remaining control renderers: input, image, card, container
-- [ ] Demo: build a form layout by hand
+- [x] Custom drag layer: palette → canvas drop, move, 8px-grid snap
+- [x] Selection overlay + resize handles (in-canvas design controller, pointer capture)
+- [x] Property panel (content props + X/Y/W/H per object, delete)
+- [x] Remaining control renderers: input, image, card, container
+- [x] Demo: built a sign-up form layout by hand (card + label + input + button)
 
 ### M2 — Scripting
 - [ ] Monaco script editor (object events + page script)
@@ -128,3 +128,7 @@ reusable widget/component library, version history, AI helpers, analytics.
 
 - **2026-09-09** — Post-mortem of all four prior attempts completed; plan written; M0 scaffolded and verified.
 - **2026-09-09** — **M0 complete.** Monorepo + format/controls/runtime/editor all green: 9/9 vitest, tsc + vue-tsc clean, vite production build ok. Editor↔canvas handshake verified in a real browser (screenshot: `doco/m0-demo.png`). One lesson captured: Pinia reactive proxies are not structured-cloneable — book crosses the iframe boundary as a plain JSON copy (`apps/editor/src/canvasClient.ts`). Next: M1 authoring loop (drag layer, selection, properties).
+- **2026-09-09** — **M1 complete.** Full authoring loop verified interactively in a browser (screenshot: `doco/m1-demo.png`): palette→canvas drag-drop with 8px snap, click-to-select across the iframe boundary, live property editing, drag-move, SE-handle resize (min-size clamp), delete, auto-naming (`button1`, `card1`…), z-order via object order. 22/22 vitest, typecheck + build clean. Two lessons captured:
+  1. **iframe event boundary**: pointermove/pointerup over the canvas dispatch inside the iframe document, so editor-side window listeners never fire. Fixed with `setPointerCapture` on the palette element (`apps/editor/src/paletteDrag.ts`) — capture retargets events across the boundary; this is the trick that makes custom (library-free) drag work.
+  2. **Architecture validated**: the design controller lives inside the canvas (`packages/runtime/src/design.ts`), the editor stays the single source of truth, and the only sync message is `toolback:load` (full book + selection). Move/resize commits flow canvas→store→sync-back (idempotent). No coordinate conversion, no scale math, no library internals — the failure mode that killed attempts #3 and #3.5 did not recur.
+  Known micro-risk: an editor sync arriving mid-drag would break the drag (acceptable; syncs happen only on commit). Next: M2 scripting (Monaco, run/design toggle, `controls.` API, store, function-name sugar).

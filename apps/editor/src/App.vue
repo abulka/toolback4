@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import type { ControlKind } from '@toolback/format'
 import { wireCanvas } from './canvasClient'
+import { startPaletteDrag } from './paletteDrag'
 import { useBookStore } from './stores/book'
+import PropertiesPanel from './components/PropertiesPanel.vue'
 
 const store = useBookStore()
 const iframe = ref<HTMLIFrameElement | null>(null)
@@ -10,14 +13,11 @@ onMounted(() => {
   if (iframe.value) wireCanvas(iframe.value)
 })
 
-const palette = [
-  { kind: 'button', ready: true },
-  { kind: 'label', ready: true },
-  { kind: 'input', ready: false },
-  { kind: 'image', ready: false },
-  { kind: 'card', ready: false },
-  { kind: 'container', ready: false },
-]
+const palette: ControlKind[] = ['button', 'label', 'input', 'image', 'card', 'container']
+
+function onPaletteDown(kind: ControlKind, e: PointerEvent): void {
+  if (iframe.value) startPaletteDrag(e, kind, iframe.value)
+}
 </script>
 
 <template>
@@ -25,7 +25,7 @@ const palette = [
     <header class="topbar">
       <div class="brand">
         <span class="logo">toolback</span>
-        <span class="badge">v4 · M0 skeleton</span>
+        <span class="badge">v4 · M1 authoring</span>
       </div>
       <button class="run" disabled title="Run mode lands in M2">Run</button>
     </header>
@@ -33,16 +33,15 @@ const palette = [
     <aside class="palette">
       <h2>Palette</h2>
       <ul>
-        <li v-for="item in palette" :key="item.kind" :class="{ off: !item.ready }">
-          <span class="swatch" :data-kind="item.kind"></span>
-          <span class="name">{{ item.kind }}</span>
-          <span v-if="!item.ready" class="chip">M1</span>
+        <li v-for="kind in palette" :key="kind" @pointerdown="onPaletteDown(kind, $event)">
+          <span class="swatch"></span>
+          <span class="name">{{ kind }}</span>
         </li>
       </ul>
-      <p class="hint">Drag onto canvas arrives in M1.</p>
+      <p class="hint">Drag onto the canvas →</p>
     </aside>
 
-    <main class="canvas-area">
+    <main class="canvas-area" :class="{ active: store.dragOverCanvas }">
       <iframe
         ref="iframe"
         class="canvas"
@@ -62,14 +61,21 @@ const palette = [
         <input :value="store.activePage.name" disabled />
       </div>
 
+      <h2>Selection</h2>
+      <PropertiesPanel />
+
       <h2>Objects</h2>
       <ul class="objects">
-        <li v-for="obj in store.activePage.objects" :key="obj.id">
+        <li
+          v-for="obj in store.activePage.objects"
+          :key="obj.id"
+          :class="{ selected: obj.id === store.selectionId }"
+          @click="store.setSelection(obj.id)"
+        >
           <span class="obj-kind">{{ obj.control }}</span>
           <span class="obj-name">{{ obj.name }}</span>
         </li>
       </ul>
-      <p class="hint">Selection & editing land in M1.</p>
     </aside>
 
     <footer class="status">
@@ -108,6 +114,24 @@ body {
   font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--ed-text);
   background: var(--ed-bg);
+}
+
+body.tb-palette-dragging,
+body.tb-palette-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+.tb-drag-ghost {
+  position: fixed;
+  z-index: 999;
+  pointer-events: none;
+  font: 600 12px/1 system-ui, sans-serif;
+  color: #fff;
+  background: var(--ed-accent);
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
 }
 
 .shell {
@@ -209,10 +233,11 @@ h2:first-child {
   border: 1px solid var(--ed-border);
   border-radius: 8px;
   background: var(--ed-bg);
+  cursor: grab;
 }
 
-.palette li.off {
-  opacity: 0.45;
+.palette li:hover {
+  border-color: var(--ed-accent);
 }
 
 .swatch {
@@ -220,15 +245,6 @@ h2:first-child {
   height: 14px;
   border-radius: 4px;
   background: var(--ed-accent);
-}
-
-.chip {
-  margin-left: auto;
-  font-size: 10px;
-  color: var(--ed-text-dim);
-  border: 1px solid var(--ed-border);
-  border-radius: 999px;
-  padding: 1px 6px;
 }
 
 .field {
@@ -260,6 +276,11 @@ h2:first-child {
   border: 1px solid var(--ed-border);
   border-radius: 8px;
   background: var(--ed-bg);
+  cursor: pointer;
+}
+
+.objects li.selected {
+  border-color: var(--ed-accent);
 }
 
 .obj-kind {
@@ -290,12 +311,18 @@ h2:first-child {
 }
 
 .canvas {
-  width: 1320px;
-  height: 840px;
-  border: 1px solid var(--ed-border);
-  border-radius: 8px;
+  width: 1280px;
+  height: 800px;
   background: #fff;
+  border: none;
+  outline: 1px solid var(--ed-border);
+  outline-offset: -1px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.canvas-area.active .canvas {
+  outline: 2px solid var(--ed-accent);
+  outline-offset: -2px;
 }
 
 .status {

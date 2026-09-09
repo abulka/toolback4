@@ -1,8 +1,12 @@
 import type { Book, Breakpoint, Page, PageObject, Rect } from '@toolback/format'
-import { registerBasics, renderObject } from '@toolback/controls'
+import { registerControls, renderObject } from '@toolback/controls'
 import { stylesCss } from './styles'
 
-export type { Breakpoint, Rect }
+export type { Breakpoint, Rect } from '@toolback/format'
+export { snap, snapRect, resizeRect, GRID, MIN_SIZE } from './design'
+export type { HandleDir, DesignController } from './design'
+export type { EditorToCanvasMessage, CanvasToEditorMessage, CanvasMessageSender } from './editorLink'
+export { listenForEditor } from './editorLink'
 
 let stylesInjected = false
 
@@ -90,33 +94,4 @@ export function getObjectRects(pageRoot: HTMLElement): ObjectRects {
   return out
 }
 
-export type EditorToCanvasMessage =
-  | { type: 'toolback:load'; book: Book; breakpoint?: Breakpoint }
-
-export type CanvasToEditorMessage =
-  | { type: 'toolback:ready' }
-  | { type: 'toolback:rects'; rects: ObjectRects }
-  | { type: 'toolback:error'; message: string }
-
-export function listenForEditor(
-  root: HTMLElement = document.body,
-  send: (msg: CanvasToEditorMessage) => void = (m) => window.parent.postMessage(m, '*'),
-): void {
-  window.addEventListener('message', (e: MessageEvent) => {
-    const data = e.data as EditorToCanvasMessage | undefined
-    if (!data || data.type !== 'toolback:load') return
-    try {
-      renderBook(data.book, root, data.breakpoint ?? 'desktop')
-      const pageRoot = root.querySelector<HTMLElement>('.tb-page')
-      send({
-        type: 'toolback:rects',
-        rects: pageRoot ? getObjectRects(pageRoot) : {},
-      })
-    } catch (err) {
-      send({ type: 'toolback:error', message: String(err) })
-    }
-  })
-  send({ type: 'toolback:ready' })
-}
-
-registerBasics()
+registerControls()

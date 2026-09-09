@@ -19,8 +19,8 @@ export function renderObject(obj: PageObject): HTMLElement {
   return render(obj)
 }
 
-export function textProp(obj: PageObject, fallback = ''): string {
-  const v = obj.props['text']
+export function textProp(obj: PageObject, key = 'text', fallback = ''): string {
+  const v = obj.props[key]
   return typeof v === 'string' ? v : fallback
 }
 
@@ -28,18 +28,66 @@ export function renderButton(obj: PageObject): HTMLElement {
   const el = document.createElement('button')
   el.type = 'button'
   el.className = 'tb-button'
-  el.textContent = textProp(obj, 'Button')
+  el.textContent = textProp(obj, 'text', 'Button')
   return el
 }
 
 export function renderLabel(obj: PageObject): HTMLElement {
   const el = document.createElement('div')
   el.className = 'tb-label'
-  el.textContent = textProp(obj, 'Label')
+  el.textContent = textProp(obj, 'text', 'Label')
   return el
 }
 
-export function registerBasics(): void {
+export function renderInput(obj: PageObject): HTMLElement {
+  const el = document.createElement('input')
+  el.type = 'text'
+  el.className = 'tb-input'
+  el.placeholder = textProp(obj, 'placeholder', 'Type here')
+  return el
+}
+
+export function renderImage(obj: PageObject): HTMLElement {
+  const src = textProp(obj, 'src')
+  if (!src) {
+    const el = document.createElement('div')
+    el.className = 'tb-image-empty'
+    el.textContent = '🖼'
+    el.title = textProp(obj, 'alt', 'No image URL set')
+    return el
+  }
+  const el = document.createElement('img')
+  el.className = 'tb-image'
+  el.src = src
+  el.alt = textProp(obj, 'alt')
+  return el
+}
+
+export function renderCard(obj: PageObject): HTMLElement {
+  const el = document.createElement('div')
+  el.className = 'tb-card'
+  const title = document.createElement('div')
+  title.className = 'tb-card-title'
+  title.textContent = textProp(obj, 'title', 'Card')
+  const body = document.createElement('div')
+  body.className = 'tb-card-body'
+  body.textContent = textProp(obj, 'text')
+  el.appendChild(title)
+  el.appendChild(body)
+  return el
+}
+
+export function renderContainer(obj: PageObject): HTMLElement {
+  const el = document.createElement('div')
+  el.className = 'tb-container'
+  return el
+}
+
+export function registerControls(): void {
   registerControl('button', renderButton)
   registerControl('label', renderLabel)
+  registerControl('input', renderInput)
+  registerControl('image', renderImage)
+  registerControl('card', renderCard)
+  registerControl('container', renderContainer)
 }

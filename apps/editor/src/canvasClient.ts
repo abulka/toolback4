@@ -1,32 +1,42 @@
-import type { EditorToCanvasMessage } from '@toolback/runtime'
-import { useBookStore } from './stores/book'
+import type { CanvasToEditorMessage, EditorToCanvasMessage } from '@toolback/runtime'
+import { setSyncSender, useBookStore } from './stores/book'
 
 export function wireCanvas(iframe: HTMLIFrameElement): void {
   const store = useBookStore()
 
+  const sendLoad = (): void => {
+    const msg: EditorToCanvasMessage = {
+      type: 'toolback:load',
+      book: JSON.parse(JSON.stringify(store.book)),
+      breakpoint: store.breakpoint,
+      design: true,
+      selection: store.selectionId,
+    }
+    iframe.contentWindow?.postMessage(msg, '*')
+  }
+  setSyncSender(sendLoad)
+
   window.addEventListener('message', (e: MessageEvent) => {
-    const msg = e.data as { type?: string } | null
+    const msg = e.data as CanvasToEditorMessage | undefined
     if (!msg?.type?.startsWith('toolback:')) return
 
     switch (msg.type) {
-      case 'toolback:ready': {
-        // Reactive proxies are not structured-cloneable; send a plain JSON copy.
-        const load: EditorToCanvasMessage = {
-          type: 'toolback:load',
-          book: JSON.parse(JSON.stringify(store.book)),
-        }
-        iframe.contentWindow?.postMessage(load, '*')
+      case 'toolback:ready':
+        sendLoad()
         break
-      }
-      case 'toolback:rects': {
-        store.rects = (msg as { rects: typeof store.rects }).rects
+      case 'toolback:rects':
+        store.rects = msg.rects
         store.canvasReady = true
         break
-      }
-      case 'toolback:error': {
-        store.error = (msg as { message: string }).message
+      case 'toolback:selection':
+        store.applySelection(msg.id)
         break
-      }
+      case 'toolback:commit':
+        store.applyRect(msg.id, msg.rect)
+        break
+      case 'toolback:error':
+        store.error = msg.message
+        break
     }
   })
 }

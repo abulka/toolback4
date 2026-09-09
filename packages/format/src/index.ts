@@ -67,6 +67,15 @@ export function parseBook(data: unknown): Book {
   return BookSchema.parse(data)
 }
 
+export const DEFAULT_SIZES: Record<ControlKind, { w: number; h: number }> = {
+  button: { w: 176, h: 48 },
+  label: { w: 240, h: 40 },
+  input: { w: 280, h: 44 },
+  image: { w: 280, h: 200 },
+  card: { w: 360, h: 220 },
+  container: { w: 400, h: 280 },
+}
+
 export function safeParseBook(data: unknown) {
   return BookSchema.safeParse(data)
 }

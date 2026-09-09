@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CONTROL_KINDS,
+  DEFAULT_SIZES,
   createBook,
   createObject,
   parseBook,
@@ -8,6 +10,11 @@ import {
 import { sampleBook } from './sample'
 
 describe('format', () => {
+  it('has a default size for every control kind', () => {
+    for (const kind of CONTROL_KINDS) {
+      expect(DEFAULT_SIZES[kind]).toBeDefined()
+    }
+  })
   it('parses the sample book and applies defaults', () => {
     const book = parseBook(structuredClone(sampleBook()))
     expect(book.title).toBe('Hello Toolbook')
