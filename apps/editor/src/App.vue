@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import type { ControlKind } from '@toolback/format'
 import { wireCanvas } from './canvasClient'
 import { startPaletteDrag } from './paletteDrag'
 import { useBookStore } from './stores/book'
-import { openBookFile, saveBookFile } from './files'
+import { openBookFile, saveBookFile, saveTextFile } from './files'
+import { buildStandaloneHtml, standaloneFileName } from './publish'
 import PropertiesPanel from './components/PropertiesPanel.vue'
 import ScriptEditor from './components/ScriptEditor.vue'
 import HelpButton from './components/HelpButton.vue'
@@ -58,24 +59,74 @@ async function onRecent(e: Event): Promise<void> {
   ;(e.target as HTMLSelectElement).value = ''
   if (id) await store.openRecent(id)
 }
+
+const BREAKPOINTS = ['desktop', 'tablet', 'mobile'] as const
+
+async function onPublish(): Promise<void> {
+  try {
+    const player = await fetch('/toolback-player.js').then((r) => r.text())
+    const html = buildStandaloneHtml(store.book, player)
+    const result = await saveTextFile(standaloneFileName(store.book), html, 'text/html')
+    store.fileNote = result === 'saved' ? 'published to file' : 'published (downloaded)'
+  } catch (err) {
+    if (!(err instanceof DOMException && err.name === 'AbortError')) {
+      store.error = `Publish failed: ${String(err)}`
+    }
+  }
+}
+
+const canvasStyle = computed(() => {
+  const size = store.book.canvas[store.breakpoint] ?? store.book.canvas.desktop
+  return { width: `${size.width}px`, height: `${size.height}px` }
+})
+
+function startSplitDrag(e: PointerEvent): void {
+  const startX = e.clientX
+  const startW = store.propsWidth
+  const target = e.currentTarget as HTMLElement
+  target.setPointerCapture(e.pointerId)
+  const move = (ev: PointerEvent): void => {
+    const w = Math.round(Math.min(640, Math.max(260, startW - (ev.clientX - startX))))
+    store.propsWidth = w
+  }
+  const up = (): void => {
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', up)
+    store.savePropsWidth()
+  }
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', up)
+}
 </script>
 
 <template>
-  <div class="shell">
+  <div class="shell" :style="{ gridTemplateColumns: `220px 1fr 6px ${store.propsWidth}px` }">
     <header class="topbar">
       <div class="left-group">
         <div class="brand">
           <span class="logo">toolback</span>
-          <span class="badge">v4 · M3 book</span>
+          <span class="badge">v4 · M4 publish</span>
         </div>
         <div class="filebar">
           <button @click="onNew">New</button>
           <button @click="onOpen">Open…</button>
           <button @click="onSave">Save</button>
+          <button class="publish" @click="onPublish">Publish</button>
           <select v-if="store.recents.length" class="recents" @change="onRecent">
             <option value="">Recent…</option>
             <option v-for="r in store.recents" :key="r.id" :value="r.id">{{ r.title }}</option>
           </select>
+        </div>
+        <div class="bp-switch" title="Preview breakpoint">
+          <button
+            v-for="bp in BREAKPOINTS"
+            :key="bp"
+            :class="{ on: store.breakpoint === bp }"
+            :disabled="store.isRunning"
+            @click="store.setBreakpoint(bp)"
+          >
+            {{ bp[0]!.toUpperCase() + bp.slice(1, 3) }}
+          </button>
         </div>
       </div>
       <button
@@ -104,10 +155,18 @@ async function onRecent(e: Event): Promise<void> {
       <iframe
         ref="iframe"
         class="canvas"
+        :style="canvasStyle"
         src="/canvas.html"
         title="toolback canvas"
       ></iframe>
     </main>
+
+    <div
+      class="splitter"
+      title="Drag to resize · double-click to reset"
+      @pointerdown="startSplitDrag"
+      @dblclick="store.resetPropsWidth()"
+    ></div>
 
     <aside class="properties">
       <h2>Page</h2>
@@ -214,12 +273,24 @@ body.tb-palette-dragging * {
 .shell {
   display: grid;
   grid-template-rows: 48px 1fr 28px;
-  grid-template-columns: 220px 1fr 330px;
+  grid-template-columns: 220px 1fr 6px 330px;
   grid-template-areas:
-    'top top top'
-    'palette canvas props'
-    'status status status';
+    'top top top top'
+    'palette canvas split props'
+    'status status status status';
   height: 100vh;
+}
+
+.splitter {
+  grid-area: split;
+  cursor: col-resize;
+  background: var(--ed-border);
+  touch-action: none;
+  user-select: none;
+}
+
+.splitter:hover {
+  background: var(--ed-accent);
 }
 
 .topbar {
@@ -267,6 +338,45 @@ body.tb-palette-dragging * {
   color: var(--ed-text-dim);
   padding: 6px 6px;
   font: 500 12px/1 system-ui, sans-serif;
+}
+
+.publish {
+  border-color: var(--ed-accent) !important;
+  color: #c7d2fe !important;
+}
+
+.publish:hover {
+  background: var(--ed-accent) !important;
+  color: #fff !important;
+}
+
+.bp-switch {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  padding: 2px;
+  background: var(--ed-bg);
+}
+
+.bp-switch button {
+  font: 500 11px/1 system-ui, sans-serif;
+  color: var(--ed-text-dim);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.bp-switch button.on {
+  color: #fff;
+  background: var(--ed-accent);
+}
+
+.bp-switch button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .dim {
@@ -453,8 +563,6 @@ h2:first-child {
 }
 
 .canvas {
-  width: 1280px;
-  height: 800px;
   background: #fff;
   border: none;
   outline: 1px solid var(--ed-border);

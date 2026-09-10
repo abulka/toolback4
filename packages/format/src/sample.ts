@@ -4,7 +4,11 @@ export function sampleBook(): Book {
   return {
     id: newId('book'),
     title: 'Hello Toolbook',
-    canvas: { desktop: { width: 1280, height: 800 } },
+    canvas: {
+      desktop: { width: 1280, height: 800 },
+      tablet: { width: 768, height: 1024 },
+      mobile: { width: 390, height: 844 },
+    },
     pages: [
       {
         id: newId('page'),

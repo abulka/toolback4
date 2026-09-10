@@ -42,6 +42,32 @@ function downloadJson(name: string, json: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 5000)
 }
 
+export async function saveTextFile(
+  name: string,
+  text: string,
+  mime = 'text/plain',
+): Promise<'saved' | 'downloaded'> {
+  if (typeof window.showSaveFilePicker === 'function') {
+    const handle = await window.showSaveFilePicker({ suggestedName: name })
+    const writable = await handle.createWritable()
+    await writable.write(text)
+    await writable.close()
+    return 'saved'
+  }
+  downloadText(name, text, mime)
+  return 'downloaded'
+}
+
+function downloadText(name: string, text: string, mime: string): void {
+  const blob = new Blob([text], { type: mime })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 5000)
+}
+
 export async function saveBookFile(book: Book): Promise<'saved' | 'downloaded'> {
   const json = JSON.stringify(book, null, 2)
   if (typeof window.showSaveFilePicker === 'function') {

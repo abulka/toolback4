@@ -43,6 +43,9 @@ export const useBookStore = defineStore('book', () => {
   const recents = ref<RecentEntry[]>([])
   const autosaveAt = ref<number | null>(null)
   const fileNote = ref('')
+  const propsWidth = ref<number>(
+    Number(localStorage.getItem('toolback.propsWidth')) || 330,
+  )
 
   const activePage = computed(
     () => book.value.pages[currentPageIndex.value] ?? book.value.pages[0]!,
@@ -114,6 +117,34 @@ export const useBookStore = defineStore('book', () => {
     const trimmed = name.trim()
     if (trimmed) page.name = trimmed
     sync()
+  }
+
+  function setBreakpoint(bp: Breakpoint): void {
+    if (isRunning.value) return
+    // upgrade pre-M4 books that only have a desktop canvas size
+    if (!book.value.canvas[bp]) {
+      book.value.canvas[bp] =
+        bp === 'mobile'
+          ? { width: 390, height: 844 }
+          : bp === 'tablet'
+            ? { width: 768, height: 1024 }
+            : { width: 1280, height: 800 }
+    }
+    breakpoint.value = bp
+    sync()
+  }
+
+  function setPropsWidth(w: number): void {
+    propsWidth.value = w
+  }
+
+  function savePropsWidth(): void {
+    localStorage.setItem('toolback.propsWidth', String(propsWidth.value))
+  }
+
+  function resetPropsWidth(): void {
+    propsWidth.value = 330
+    savePropsWidth()
   }
 
   function newBook(): void {
@@ -247,11 +278,16 @@ export const useBookStore = defineStore('book', () => {
     recents,
     autosaveAt,
     fileNote,
+    propsWidth,
     activePage,
     objectCount,
     selectedObject,
     sync,
     toggleRun,
+    setBreakpoint,
+    setPropsWidth,
+    savePropsWidth,
+    resetPropsWidth,
     setEventScript,
     setPageScript,
     selectPage,

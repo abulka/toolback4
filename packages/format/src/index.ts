@@ -126,6 +126,11 @@ export function createBook(title: string): Book {
   return BookSchema.parse({
     id: newId('book'),
     title,
+    canvas: {
+      desktop: { width: 1280, height: 800 },
+      tablet: { width: 768, height: 1024 },
+      mobile: { width: 390, height: 844 },
+    },
     pages: [createPage('Page 1')],
   })
 }
