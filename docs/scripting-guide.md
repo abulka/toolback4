@@ -196,14 +196,70 @@ Label text: `Hello {{handle}}` — `await` works in object scripts too.
 
 ## Pages and navigation
 
-Coming in **M3**: multi-page books, the page navigator, and scripting like
-`page.go('page2')` plus page enter/leave hooks. This guide is updated whenever
-the scripting API grows — check back after each milestone.
+The **Pages** panel (left sidebar) manages the book's pages:
+
+- click a page to edit it; press **Run** to play the page you're editing
+- **double-click a page name** to rename it
+- ⧉ duplicates a page — objects, properties and scripts included
+- ✕ deletes it (a book always keeps at least one page)
+- **+ Add page** appends a fresh page
+
+### The `page` API
+
+- `page.name` — current page name
+- `page.names` — array of every page name
+- `page.go('Results')` — navigate. Fires the current page's `pageLeave()` (if
+  defined), renders the target page, then fires its `pageEnter()`. If no page
+  has that name, an error is reported and the book stays on the current page.
+
+### Page lifecycle
+
+Each page's **page script** can define lifecycle hooks:
+
+```js
+function pageEnter() {
+  store.set('score', 0)
+}
+
+function pageLeave() {
+  // runs before leaving this page
+}
+```
+
+`store` is shared across all pages for the whole run — that's how a score,
+a name, or any state travels between pages. It resets when you press Run again.
+
+### Recipe: quiz with a results page
+
+**Quiz** page — the correct answer button's `click` script:
+
+```js
+store.set('score', 1)
+page.go('Results')
+```
+
+Wrong-answer buttons' `click` script:
+
+```js
+store.set('score', 0)
+page.go('Results')
+```
+
+**Results** page — a label with text `Score: {{score}} - {{verdict}}`, and page script:
+
+```js
+function pageEnter() {
+  store.set('verdict', store.get('score') ? 'Nice!' : 'Try again')
+}
+```
+
+A "Play again" button's `click` script: `page.go('Quiz')`
 
 ## Sandbox notes
 
 - Scripts are **your own code**, running inside the app's canvas frame — nothing
   is blocked or sandboxed beyond that. All the normal web platform is available:
   `fetch`, `async/await`, `JSON`, `Math`, `Date`, timers, and so on.
-- The store lives only while the page is running; it resets on each **Run**.
+- The store lives for the whole run and is shared by every page — it resets on
+  each **Run**.
 - Long-running loops freeze the canvas — that's ordinary JavaScript behavior.
