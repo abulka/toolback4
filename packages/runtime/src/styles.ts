@@ -126,6 +126,21 @@ body {
   position: relative;
 }
 
+.tb-page-holder {
+  position: relative;
+}
+
+.tb-ghost {
+  opacity: 0.75;
+  outline: 2px dashed var(--tb-accent);
+  outline-offset: 2px;
+  z-index: 5;
+}
+
+.tb-ghost > * {
+  pointer-events: none;
+}
+
 .tb-design .tb-page,
 .tb-design .tb-page * {
   pointer-events: none !important;

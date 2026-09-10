@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import {
   createObject,
+  DEFAULT_PROPS,
   type Breakpoint,
   type ControlKind,
   type Rect,
@@ -13,15 +14,6 @@ let sendSync: ((msg: EditorToCanvasMessage) => void) | null = null
 
 export function setSyncSender(fn: (msg: EditorToCanvasMessage) => void): void {
   sendSync = fn
-}
-
-const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
-  button: { text: 'Button' },
-  label: { text: 'Label' },
-  input: { placeholder: 'Type here' },
-  image: {},
-  card: { title: 'Card', text: 'Card body' },
-  container: {},
 }
 
 export const useBookStore = defineStore('book', () => {

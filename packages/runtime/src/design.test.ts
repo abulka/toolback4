@@ -81,6 +81,67 @@ describe('design mode (structural)', () => {
   })
 })
 
+describe('palette drag ghost', () => {
+  it('renders a real control ghost that follows dragOver and is removed on dragEnd', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const cleanup = listenForEditor(root, () => {})
+    try {
+      const book = sampleBook()
+      window.dispatchEvent(
+        new MessageEvent('message', { data: { type: 'toolback:load', book, design: true } }),
+      )
+
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: {
+            type: 'toolback:dragOver',
+            control: 'button',
+            rect: { x: 64, y: 64, w: 176, h: 48 },
+          },
+        }),
+      )
+      let ghost = root.querySelector<HTMLElement>('.tb-ghost')
+      expect(ghost).not.toBeNull()
+      expect(ghost!.querySelector('button.tb-button')).not.toBeNull()
+      expect(ghost!.style.left).toBe('64px')
+      expect(ghost!.style.width).toBe('176px')
+
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: {
+            type: 'toolback:dragOver',
+            control: 'button',
+            rect: { x: 128, y: 96, w: 176, h: 48 },
+          },
+        }),
+      )
+      expect(root.querySelectorAll('.tb-ghost')).toHaveLength(1)
+      ghost = root.querySelector<HTMLElement>('.tb-ghost')
+      expect(ghost!.style.left).toBe('128px')
+      expect(ghost!.style.top).toBe('96px')
+
+      window.dispatchEvent(new MessageEvent('message', { data: { type: 'toolback:dragEnd' } }))
+      expect(root.querySelector('.tb-ghost')).toBeNull()
+
+      // ghost is wiped by any re-render too
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: { type: 'toolback:dragOver', control: 'card', rect: { x: 0, y: 0, w: 100, h: 100 } },
+        }),
+      )
+      expect(root.querySelector('.tb-ghost .tb-card')).not.toBeNull()
+      window.dispatchEvent(
+        new MessageEvent('message', { data: { type: 'toolback:load', book, design: true } }),
+      )
+      expect(root.querySelector('.tb-ghost')).toBeNull()
+    } finally {
+      cleanup()
+      root.remove()
+    }
+  })
+})
+
 describe('design controller wiring', () => {
   it('forwards selection and commit messages through send', () => {
     const sent: Array<{ type: string }> = []

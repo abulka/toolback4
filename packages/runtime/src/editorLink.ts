@@ -1,16 +1,19 @@
-import type { Book, Breakpoint, Rect } from '@toolback/format'
+import type { Book, Breakpoint, ControlKind, Rect } from '@toolback/format'
 import { getObjectRects, renderBook } from './index'
 import { createDesignController, type DesignOutMessage } from './design'
 import { runBook, stopRun } from './player'
 import type { ObjectRects } from './index'
 
-export type EditorToCanvasMessage = {
-  type: 'toolback:load'
-  book: Book
-  breakpoint?: Breakpoint
-  design?: boolean
-  selection?: string | null
-}
+export type EditorToCanvasMessage =
+  | {
+      type: 'toolback:load'
+      book: Book
+      breakpoint?: Breakpoint
+      design?: boolean
+      selection?: string | null
+    }
+  | { type: 'toolback:dragOver'; control: ControlKind; rect: Rect }
+  | { type: 'toolback:dragEnd' }
 
 export type CanvasToEditorMessage =
   | { type: 'toolback:ready' }
@@ -45,7 +48,16 @@ export function listenForEditor(
 
   const onMessage = (e: MessageEvent): void => {
     const data = e.data as EditorToCanvasMessage | undefined
-    if (!data || data.type !== 'toolback:load') return
+    if (!data || typeof data.type !== 'string' || !data.type.startsWith('toolback:')) return
+    if (data.type === 'toolback:dragOver') {
+      design.dragOver(data.control, data.rect)
+      return
+    }
+    if (data.type === 'toolback:dragEnd') {
+      design.dragEnd()
+      return
+    }
+    if (data.type !== 'toolback:load') return
     try {
       ensureStructure()
       if (data.design) {

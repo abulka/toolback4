@@ -18,7 +18,7 @@ onMounted(() => {
 const palette: ControlKind[] = ['button', 'label', 'input', 'image', 'card', 'container']
 
 function onPaletteDown(kind: ControlKind, e: PointerEvent): void {
-  if (iframe.value) startPaletteDrag(e, kind, iframe.value)
+  if (iframe.value && !store.isRunning) startPaletteDrag(e, kind, iframe.value)
 }
 </script>
 

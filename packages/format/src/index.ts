@@ -76,6 +76,15 @@ export const DEFAULT_SIZES: Record<ControlKind, { w: number; h: number }> = {
   container: { w: 400, h: 280 },
 }
 
+export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
+  button: { text: 'Button' },
+  label: { text: 'Label' },
+  input: { placeholder: 'Type here' },
+  image: {},
+  card: { title: 'Card', text: 'Card body' },
+  container: {},
+}
+
 export function safeParseBook(data: unknown) {
   return BookSchema.safeParse(data)
 }

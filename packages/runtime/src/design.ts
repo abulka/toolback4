@@ -1,4 +1,6 @@
-import type { Rect } from '@toolback/format'
+import type { ControlKind, Rect } from '@toolback/format'
+import { DEFAULT_PROPS } from '@toolback/format'
+import { renderObject } from '@toolback/controls'
 
 export const GRID = 8
 export const MIN_SIZE = 24
@@ -47,6 +49,8 @@ export interface DesignController {
   attach(wrapper: HTMLElement): void
   setEnabled(enabled: boolean): void
   onRendered(selection: string | null): void
+  dragOver(control: ControlKind, rect: Rect): void
+  dragEnd(): void
   readonly selectedId: string | null
 }
 
@@ -85,6 +89,8 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   let rects = new Map<string, Rect>()
   let drag: DragState = null
   let enabled = false
+  let phantom: HTMLElement | null = null
+  let phantomKind: ControlKind | null = null
 
   function buildOverlay(): void {
     if (!wrapper || overlay) return
@@ -193,6 +199,12 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     redrawSelection()
   }
 
+  function removePhantom(): void {
+    phantom?.remove()
+    phantom = null
+    phantomKind = null
+  }
+
   function pointerPos(e: PointerEvent): { x: number; y: number } {
     const base = overlay!.getBoundingClientRect()
     return { x: e.clientX - base.left, y: e.clientY - base.top }
@@ -266,6 +278,7 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     overlay.style.display = on ? 'block' : 'none'
     if (!on) {
       drag = null
+      removePhantom()
       setSelected(null)
     }
   }
@@ -279,6 +292,35 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     },
     setEnabled(on: boolean): void {
       applyEnabled(on)
+    },
+    dragOver(control: ControlKind, rect: Rect): void {
+      if (!wrapper || !enabled) return
+      if (!phantom || phantomKind !== control) {
+        removePhantom()
+        const holder = wrapper.querySelector<HTMLElement>('.tb-page-holder')
+        if (!holder) return
+        phantom = wrapper.ownerDocument.createElement('div')
+        phantom.className = 'tb-object tb-ghost'
+        phantom.appendChild(
+          renderObject({
+            id: 'ghost',
+            name: 'ghost',
+            control,
+            rects: { desktop: rect },
+            props: { ...DEFAULT_PROPS[control] },
+            on: {},
+          }),
+        )
+        holder.appendChild(phantom)
+        phantomKind = control
+      }
+      phantom!.style.left = `${rect.x}px`
+      phantom!.style.top = `${rect.y}px`
+      phantom!.style.width = `${rect.w}px`
+      phantom!.style.height = `${rect.h}px`
+    },
+    dragEnd(): void {
+      removePhantom()
     },
     onRendered(selection: string | null): void {
       pageRoot = wrapper?.querySelector<HTMLElement>('.tb-page') ?? null
