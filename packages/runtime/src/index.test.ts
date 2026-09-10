@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createObject } from '@toolback/format'
+import { createObject, type Book } from '@toolback/format'
 import { sampleBook } from '@toolback/format/src/sample'
 import { getObjectRects, listenForEditor, renderBook, renderObjectInto, shouldToggleRun } from './index'
 
@@ -123,6 +123,103 @@ describe('runtime', () => {
         cleanup()
         root.remove()
         input.remove()
+      }
+    })
+  })
+
+  describe('store streaming', () => {
+    function tinyBook(): Book {
+      const obj = createObject('button', 'btn', { desktop: { x: 0, y: 0, w: 100, h: 40 } }, { text: 'x' })
+      obj.on = { click: `store.set('n', 5)` }
+      return {
+        id: 'b',
+        title: 'T',
+        canvas: { desktop: { width: 400, height: 300 } },
+        pages: [
+          {
+            id: 'p',
+            name: 'P',
+            script: `function pageEnter() { store.set('seed', 1) }`,
+            background: '#ffffff',
+            objects: [obj],
+          },
+        ],
+      }
+    }
+
+    it('streams store entries while running and clears them on design load', () => {
+      const sent: Array<{ type: string; entries?: Array<[string, string]> }> = []
+      const send = (msg: { type: string; entries?: Array<[string, string]> }) => sent.push(msg)
+      const root = document.createElement('div')
+      document.body.appendChild(root)
+
+      const cleanup = listenForEditor(root, send)
+      try {
+        window.dispatchEvent(
+          new MessageEvent('message', { data: { type: 'toolback:load', book: tinyBook(), design: false } }),
+        )
+        expect(sent.filter((m) => m.type === 'toolback:store').at(-1)?.entries).toContainEqual(['seed', '1'])
+
+        root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
+        expect(sent.filter((m) => m.type === 'toolback:store').at(-1)?.entries).toEqual(
+          expect.arrayContaining([
+            ['seed', '1'],
+            ['n', '5'],
+          ]),
+        )
+
+        window.dispatchEvent(
+          new MessageEvent('message', { data: { type: 'toolback:load', book: tinyBook(), design: true } }),
+        )
+        expect(sent.filter((m) => m.type === 'toolback:store').at(-1)?.entries).toEqual([])
+      } finally {
+        cleanup()
+        root.remove()
+      }
+    })
+
+    it('store values render as readable labels', () => {
+      const sent: Array<{ type: string; entries?: Array<[string, string]> }> = []
+      const send = (msg: { type: string; entries?: Array<[string, string]> }) => sent.push(msg)
+      const root = document.createElement('div')
+      document.body.appendChild(root)
+      const obj = createObject('label', 'lbl', { desktop: { x: 0, y: 0, w: 100, h: 40 } })
+      const book: Book = {
+        id: 'b2',
+        title: 'T',
+        canvas: { desktop: { width: 400, height: 300 } },
+        pages: [
+          {
+            id: 'p',
+            name: 'P',
+            script: [
+              `function pageEnter() {`,
+              `  store.set('num', 42)`,
+              `  store.set('text', 'hi')`,
+              `  store.set('list', [1, 2])`,
+              `  store.set('missing', undefined)`,
+              `  store.set('fn', function greet() {})`,
+              `}`,
+            ].join('\n'),
+            background: '#ffffff',
+            objects: [obj],
+          },
+        ],
+      }
+      const cleanup = listenForEditor(root, send)
+      try {
+        window.dispatchEvent(
+          new MessageEvent('message', { data: { type: 'toolback:load', book, design: false } }),
+        )
+        const entries = sent.filter((m) => m.type === 'toolback:store').at(-1)?.entries ?? []
+        expect(entries).toContainEqual(['num', '42'])
+        expect(entries).toContainEqual(['text', 'hi'])
+        expect(entries).toContainEqual(['list', '[1,2]'])
+        expect(entries).toContainEqual(['missing', 'undefined'])
+        expect(entries).toContainEqual(['fn', 'ƒ greet'])
+      } finally {
+        cleanup()
+        root.remove()
       }
     })
   })

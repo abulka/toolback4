@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { ControlKind } from '@toolback/format'
 import { shouldToggleRun } from '@toolback/runtime'
 import { wireCanvas } from './canvasClient'
@@ -11,9 +11,88 @@ import PropertiesPanel from './components/PropertiesPanel.vue'
 import ScriptEditor from './components/ScriptEditor.vue'
 import HelpButton from './components/HelpButton.vue'
 import PagesPanel from './components/PagesPanel.vue'
+import StoreBrowser from './components/StoreBrowser.vue'
 
 const store = useBookStore()
 const iframe = ref<HTMLIFrameElement | null>(null)
+
+// --- RHS panel tabs (Objects and Store live in their own tabs)
+type PropsTab = 'page' | 'selection' | 'objects' | 'store'
+const TABS: Array<{ id: PropsTab; label: string }> = [
+  { id: 'page', label: 'Page' },
+  { id: 'selection', label: 'Selection' },
+  { id: 'objects', label: 'Objects' },
+  { id: 'store', label: 'Store' },
+]
+const propsTab = ref<PropsTab>(
+  (localStorage.getItem('toolback.propsTab') as PropsTab | null) ?? 'page',
+)
+function setTab(t: PropsTab): void {
+  propsTab.value = t
+  localStorage.setItem('toolback.propsTab', t)
+}
+// selecting an object on the canvas or in the list reveals its properties
+watch(
+  () => store.selectionId,
+  (id) => {
+    if (id) propsTab.value = 'selection'
+  },
+)
+
+// --- panel visibility: manual toggles + optional auto-hide while running
+function boolPref(key: string, fallback: boolean): boolean {
+  const raw = localStorage.getItem(key)
+  return raw === null ? fallback : raw === '1'
+}
+const showLeft = ref(boolPref('toolback.showLeft', true))
+const showRight = ref(boolPref('toolback.showRight', true))
+const autoHide = ref(boolPref('toolback.autoHidePanels', true))
+let preRunLeft = showLeft.value
+let preRunRight = showRight.value
+
+watch(
+  () => store.isRunning,
+  (running) => {
+    if (running) {
+      preRunLeft = showLeft.value
+      preRunRight = showRight.value
+      if (autoHide.value) {
+        showLeft.value = false
+        showRight.value = false
+      }
+    } else {
+      showLeft.value = preRunLeft
+      showRight.value = preRunRight
+    }
+  },
+)
+
+function toggleLeft(): void {
+  showLeft.value = !showLeft.value
+  localStorage.setItem('toolback.showLeft', showLeft.value ? '1' : '0')
+}
+
+function toggleRight(): void {
+  showRight.value = !showRight.value
+  localStorage.setItem('toolback.showRight', showRight.value ? '1' : '0')
+}
+
+const settingsOpen = ref(false)
+const settingsPop = ref<HTMLElement | null>(null)
+
+function setAutoHide(v: boolean): void {
+  autoHide.value = v
+  localStorage.setItem('toolback.autoHidePanels', v ? '1' : '0')
+}
+
+function onDocClick(e: MouseEvent): void {
+  if (!settingsOpen.value) return
+  if (settingsPop.value && !settingsPop.value.contains(e.target as Node)) {
+    settingsOpen.value = false
+  }
+}
+
+// --- run shortcut (F3 / ⌥3)
 
 // F3 or ⌥3 (Alt+3) toggles Run. Capture phase + stopPropagation so it wins
 // over Monaco's F3 find-next; ⌥3 is skipped in editable targets by shouldToggleRun.
@@ -25,8 +104,14 @@ function onRunKey(e: KeyboardEvent): void {
   store.toggleRun()
 }
 
+function onDocKey(e: KeyboardEvent): void {
+  if (e.key === 'Escape') settingsOpen.value = false
+}
+
 onMounted(async () => {
   window.addEventListener('keydown', onRunKey, true)
+  document.addEventListener('click', onDocClick)
+  document.addEventListener('keydown', onDocKey)
   if (iframe.value) wireCanvas(iframe.value)
   await store.restoreAutosave()
   await store.refreshRecents()
@@ -34,6 +119,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onRunKey, true)
+  document.removeEventListener('click', onDocClick)
+  document.removeEventListener('keydown', onDocKey)
 })
 
 const palette: ControlKind[] = ['button', 'label', 'input', 'image', 'card', 'container']
@@ -96,6 +183,10 @@ const canvasStyle = computed(() => {
   return { width: `${size.width}px`, height: `${size.height}px` }
 })
 
+const shellStyle = computed(() => ({
+  gridTemplateColumns: `${showLeft.value ? '220px' : '0px'} 1fr ${showRight.value ? '6px' : '0px'} ${showRight.value ? `${store.propsWidth}px` : '0px'}`,
+}))
+
 function startSplitDrag(e: PointerEvent): void {
   const startX = e.clientX
   const startW = store.propsWidth
@@ -116,7 +207,7 @@ function startSplitDrag(e: PointerEvent): void {
 </script>
 
 <template>
-  <div class="shell" :style="{ gridTemplateColumns: `220px 1fr 6px ${store.propsWidth}px` }">
+  <div class="shell" :style="shellStyle">
     <header class="topbar">
       <div class="left-group">
         <div class="brand">
@@ -145,17 +236,51 @@ function startSplitDrag(e: PointerEvent): void {
           </button>
         </div>
       </div>
-      <button
-        class="run"
-        :class="{ running: store.isRunning }"
-        title="Toggle run mode (F3 or ⌥3)"
-        @click="store.toggleRun()"
-      >
-        {{ store.isRunning ? 'Stop' : 'Run' }}
-      </button>
+      <div class="right-group">
+        <button
+          class="panel-toggle"
+          :class="{ off: !showLeft }"
+          title="Hide/show the left panel (palette + pages)"
+          @click="toggleLeft"
+        >◧</button>
+        <button
+          class="panel-toggle"
+          :class="{ off: !showRight }"
+          title="Hide/show the right panel (properties)"
+          @click="toggleRight"
+        >◨</button>
+        <div class="gear-wrap">
+          <button
+            class="panel-toggle gear"
+            :class="{ on: settingsOpen }"
+            title="Settings"
+            @click.stop="settingsOpen = !settingsOpen"
+          >⚙</button>
+          <div v-if="settingsOpen" ref="settingsPop" class="settings-pop">
+            <h3>Settings</h3>
+            <label class="check">
+              <input
+                type="checkbox"
+                :checked="autoHide"
+                @change="setAutoHide(($event.target as HTMLInputElement).checked)"
+              />
+              Hide panels while running
+            </label>
+            <p class="hint">Run (F3 or ⌥3) tucks the panels away; stopping brings them back.</p>
+          </div>
+        </div>
+        <button
+          class="run"
+          :class="{ running: store.isRunning }"
+          title="Toggle run mode (F3 or ⌥3)"
+          @click="store.toggleRun()"
+        >
+          {{ store.isRunning ? 'Stop' : 'Run' }}
+        </button>
+      </div>
     </header>
 
-    <aside class="palette">
+    <aside v-show="showLeft" class="palette">
       <h2>Palette</h2>
       <ul>
         <li v-for="kind in palette" :key="kind" @pointerdown="onPaletteDown(kind, $event)">
@@ -178,52 +303,69 @@ function startSplitDrag(e: PointerEvent): void {
     </main>
 
     <div
+      v-show="showRight"
       class="splitter"
       title="Drag to resize · double-click to reset"
       @pointerdown="startSplitDrag"
       @dblclick="store.resetPropsWidth()"
     ></div>
 
-    <aside class="properties">
-      <h2>Page</h2>
-      <div class="field">
-        <label>Title</label>
-        <input :value="store.book.title" disabled />
-      </div>
-      <div class="field">
-        <label>Page name</label>
-        <input :value="store.activePage.name" disabled />
+    <aside v-show="showRight" class="properties">
+      <div class="props-tabs">
+        <button
+          v-for="t in TABS"
+          :key="t.id"
+          :class="{ on: propsTab === t.id }"
+          @click="setTab(t.id)"
+        >{{ t.label }}</button>
       </div>
 
-      <div class="row">
-        <h2>Page script</h2>
-        <HelpButton anchor="page-script" />
+      <div v-show="propsTab === 'page'">
+        <div class="field">
+          <label>Title</label>
+          <input :value="store.book.title" disabled />
+        </div>
+        <div class="field">
+          <label>Page name</label>
+          <input :value="store.activePage.name" disabled />
+        </div>
+
+        <div class="row">
+          <h2 class="tab-head">Page script</h2>
+          <HelpButton anchor="page-script" />
+        </div>
+        <p class="hint mono-hint">
+          Shared functions + <code>pageEnter()</code>. Object scripts can call these directly.
+        </p>
+        <ScriptEditor
+          editor-class="page-script"
+          :model-value="store.activePage.script"
+          height="190px"
+          @update:model-value="store.setPageScript"
+        />
       </div>
-      <p class="hint mono-hint">
-        Shared functions + <code>pageEnter()</code>. Object scripts can call these directly.
-      </p>
-      <ScriptEditor
-        editor-class="page-script"
-        :model-value="store.activePage.script"
-        height="190px"
-        @update:model-value="store.setPageScript"
-      />
 
-      <h2>Selection</h2>
-      <PropertiesPanel />
+      <div v-show="propsTab === 'selection'">
+        <PropertiesPanel />
+      </div>
 
-      <h2>Objects</h2>
-      <ul class="objects">
-        <li
-          v-for="obj in store.activePage.objects"
-          :key="obj.id"
-          :class="{ selected: obj.id === store.selectionId }"
-          @click="store.setSelection(obj.id)"
-        >
-          <span class="obj-kind">{{ obj.control }}</span>
-          <span class="obj-name">{{ obj.name }}</span>
-        </li>
-      </ul>
+      <div v-show="propsTab === 'objects'">
+        <ul class="objects">
+          <li
+            v-for="obj in store.activePage.objects"
+            :key="obj.id"
+            :class="{ selected: obj.id === store.selectionId }"
+            @click="store.setSelection(obj.id)"
+          >
+            <span class="obj-kind">{{ obj.control }}</span>
+            <span class="obj-name">{{ obj.name }}</span>
+          </li>
+        </ul>
+      </div>
+
+      <div v-show="propsTab === 'store'">
+        <StoreBrowser />
+      </div>
     </aside>
 
     <footer class="status">
@@ -433,6 +575,116 @@ body.tb-palette-dragging * {
 
 .run.running {
   background: #059669;
+}
+
+.right-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panel-toggle {
+  font: 500 13px/1 system-ui, sans-serif;
+  color: var(--ed-text);
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.panel-toggle:hover {
+  border-color: var(--ed-accent);
+  color: #fff;
+}
+
+.panel-toggle.off {
+  color: var(--ed-text-dim);
+  opacity: 0.55;
+}
+
+.panel-toggle.on {
+  color: #fff;
+  background: var(--ed-accent);
+  border-color: var(--ed-accent);
+}
+
+.gear-wrap {
+  position: relative;
+}
+
+.settings-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  width: 280px;
+  background: var(--ed-panel);
+  border: 1px solid var(--ed-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.settings-pop h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--ed-text-dim);
+}
+
+.settings-pop .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-pop .check input {
+  accent-color: var(--ed-accent);
+}
+
+.settings-pop .hint {
+  margin: 10px 2px 0;
+  font-size: 11px;
+  color: var(--ed-text-dim);
+}
+
+.props-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 8px;
+  padding: 2px;
+  margin-bottom: 12px;
+}
+
+.props-tabs button {
+  flex: 1;
+  font: 500 12px/1 system-ui, sans-serif;
+  color: var(--ed-text-dim);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 4px;
+  cursor: pointer;
+}
+
+.props-tabs button:hover {
+  color: var(--ed-text);
+}
+
+.props-tabs button.on {
+  color: #fff;
+  background: var(--ed-accent);
+}
+
+.tab-head {
+  margin-top: 4px;
 }
 
 .mono-hint {

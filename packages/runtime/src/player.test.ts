@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { createObject, type Book } from '@toolback/format'
-import { extractFunctionNames, runBook, stopRun } from './player'
+import { createStore, extractFunctionNames, runBook, stopRun } from './player'
+
+describe('store', () => {
+  it('snapshots key/value pairs in insertion order', () => {
+    const store = createStore()
+    expect(store.snapshot()).toEqual([])
+    store.set('a', 1)
+    store.set('b', 'two')
+    store.set('a', true)
+    expect(store.snapshot()).toEqual([
+      ['a', true],
+      ['b', 'two'],
+    ])
+  })
+})
 
 function makeBook(opts: {
   pageScript?: string

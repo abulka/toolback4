@@ -249,6 +249,9 @@ The script editors help as you type:
 
 - Script errors appear in the editor **status bar**, tagged with where they came
   from (`button1.click: Error: …`, `page script: SyntaxError: …`).
+- The **Store tab** in the right-hand panel is a live view of the store while a
+  run is active — every `store.set()` shows up there as it happens. It clears
+  when you stop.
 - `console.log(...)` writes to the browser devtools console — open devtools and
   pick the canvas frame's context.
 - Referencing an object that doesn't exist gives `undefined` — e.g. setting a

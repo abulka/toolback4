@@ -48,6 +48,9 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
       case 'toolback:runToggle':
         store.toggleRun()
         break
+      case 'toolback:store':
+        store.storeEntries = msg.entries
+        break
     }
   })
 }

@@ -4,6 +4,7 @@ import { renderBookPage } from './index'
 export interface ToolbackStore {
   get(key: string): unknown
   set(key: string, value: unknown): void
+  snapshot(): Array<[string, unknown]>
   subscribe(fn: () => void): () => void
 }
 
@@ -16,6 +17,7 @@ export function createStore(): ToolbackStore {
       data.set(key, value)
       for (const fn of subs) fn()
     },
+    snapshot: () => Array.from(data.entries()),
     subscribe: (fn) => {
       subs.add(fn)
       return () => subs.delete(fn)

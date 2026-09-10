@@ -39,6 +39,7 @@ export const useBookStore = defineStore('book', () => {
   const dragOverCanvas = ref(false)
   const isRunning = ref(false)
   const scriptError = ref('')
+  const storeEntries = ref<Array<[string, string]>>([])
   const currentPageIndex = ref(0)
   const recents = ref<RecentEntry[]>([])
   const autosaveAt = ref<number | null>(null)
@@ -274,6 +275,7 @@ export const useBookStore = defineStore('book', () => {
     dragOverCanvas,
     isRunning,
     scriptError,
+    storeEntries,
     currentPageIndex,
     recents,
     autosaveAt,

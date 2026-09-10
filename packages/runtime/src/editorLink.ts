@@ -24,8 +24,21 @@ export type CanvasToEditorMessage =
   | { type: 'toolback:scriptError'; message: string }
   | { type: 'toolback:error'; message: string }
   | { type: 'toolback:runToggle' }
+  | { type: 'toolback:store'; entries: Array<[string, string]> }
 
 export type CanvasMessageSender = (msg: CanvasToEditorMessage) => void
+
+/** Display label for a store value in the editor's store browser */
+function storeValueLabel(v: unknown): string {
+  if (typeof v === 'function') return `ƒ ${v.name || 'anonymous'}`
+  if (v === undefined) return 'undefined'
+  if (typeof v === 'string') return v
+  try {
+    return JSON.stringify(v) ?? String(v)
+  } catch {
+    return String(v)
+  }
+}
 
 /**
  * Run-mode toggle keys: F3 (ToolBook heritage) and ⌥3 / Alt+3 (no fn-key needed).
@@ -55,6 +68,13 @@ export function listenForEditor(
 
   let wrapper: HTMLElement | null = null
   let holder: HTMLElement | null = null
+  let storeUnsub: (() => void) | null = null
+
+  function stopStoreStream(): void {
+    storeUnsub?.()
+    storeUnsub = null
+    send({ type: 'toolback:store', entries: [] })
+  }
 
   function ensureStructure(): void {
     if (wrapper && wrapper.isConnected && holder) return
@@ -84,6 +104,7 @@ export function listenForEditor(
       ensureStructure()
       const pageIndex = Number.isInteger(data.pageIndex) ? (data.pageIndex as number) : 0
       if (data.design) {
+        stopStoreStream()
         stopRun()
         renderBookPage(data.book, pageIndex, holder!, data.breakpoint ?? 'desktop')
         const pageRoot = holder!.querySelector<HTMLElement>('.tb-page')
@@ -92,7 +113,7 @@ export function listenForEditor(
         design.onRendered(data.selection ?? null)
       } else {
         design.setEnabled(false)
-        runBook(
+        const handle = runBook(
           data.book,
           holder!,
           data.breakpoint ?? 'desktop',
@@ -101,6 +122,17 @@ export function listenForEditor(
         )
         const pageRoot = holder!.querySelector<HTMLElement>('.tb-page')
         send({ type: 'toolback:rects', rects: pageRoot ? getObjectRects(pageRoot) : {} })
+
+        // stream store contents to the editor's store browser
+        stopStoreStream()
+        const sendStore = (): void => {
+          send({
+            type: 'toolback:store',
+            entries: handle.store.snapshot().map(([k, v]) => [k, storeValueLabel(v)]),
+          })
+        }
+        sendStore()
+        storeUnsub = handle.store.subscribe(sendStore)
       }
     } catch (err) {
       send({ type: 'toolback:error', message: String(err) })
