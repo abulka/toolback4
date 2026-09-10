@@ -1,4 +1,5 @@
 import type { Book, Breakpoint, PageObject, Rect } from '@toolback/format'
+import { flattenObjects } from '@toolback/format'
 import { renderBookPage } from './index'
 
 export interface ToolbackStore {
@@ -68,6 +69,9 @@ function makeControlApi(
   listeners: Array<() => void>,
 ): ControlApi {
   const input = el instanceof HTMLInputElement ? el : null
+  // groups have no content of their own — writing textContent would wipe
+  // the member DOM, so text/value are inert for them
+  const isGroup = obj.control === 'group'
 
   const rectNow = (): Rect => obj.rects[breakpoint] ?? obj.rects.desktop
   const writeRect = (r: Rect): void => {
@@ -89,9 +93,10 @@ function makeControlApi(
     el,
     name: obj.name,
     get text() {
-      return input ? input.value : (el.textContent ?? '')
+      return isGroup ? '' : input ? input.value : (el.textContent ?? '')
     },
     set text(v: string) {
+      if (isGroup) return
       if (input) input.value = String(v)
       else el.textContent = String(v)
     },
@@ -148,7 +153,7 @@ function makeControlApi(
 
 const DYN_RE = /\{\{\s*([\w$]+)\s*\}\}/g
 
-const NAME_RESERVED = new Set(['page', 'controls', 'store', 'event'])
+const NAME_RESERVED = new Set(['page', 'controls', 'store', 'event', 'target'])
 const IDENT_RE = /^[A-Za-z_$][\w$]*$/
 
 /**
@@ -167,7 +172,7 @@ function wireDynamicText(
   listeners: Array<() => void>,
 ): void {
   const entries: Array<{ el: HTMLElement; template: string }> = []
-  for (const obj of page.objects) {
+  for (const obj of flattenObjects(page.objects)) {
     const t = obj.props['text']
     if (typeof t !== 'string' || !t.includes('{{')) continue
     const el = controlElement(pageRoot, obj.name)
@@ -223,9 +228,10 @@ function runPage(st: RunState, idx: number): void {
     const page = st.book.pages[idx] ?? st.book.pages[0]!
     renderBookPage(st.book, idx, st.root, st.breakpoint)
     const pageRoot = st.root.querySelector<HTMLElement>('.tb-page')!
+    const flat = flattenObjects(page.objects)
 
     for (const k of Object.keys(st.controls)) delete st.controls[k]
-    for (const obj of page.objects) {
+    for (const obj of flat) {
       const wrapper = controlWrapper(pageRoot, obj.name)
       const el = (wrapper?.firstElementChild as HTMLElement | null) ?? null
       if (el && wrapper) {
@@ -243,7 +249,7 @@ function runPage(st: RunState, idx: number): void {
           .map((n) => `${JSON.stringify(n)}: typeof ${n} === 'function' ? ${n} : undefined`)
           .join(',')
         const bare = shortNamesFor(
-          page.objects.map((o) => o.name),
+          flat.map((o) => o.name),
           names,
         )
         const shortNames = bare.length > 0 ? `const { ${bare.join(', ')} } = controls;` : ''
@@ -255,26 +261,49 @@ function runPage(st: RunState, idx: number): void {
       })
     }
     const fnNames = Object.keys(st.pageFns)
-    const fnValues = fnNames.map((n) => st.pageFns[n])
 
-    for (const obj of page.objects) {
+    /** the object that actually received the event — nearest data-tb-name element */
+    const resolveTarget = (e: Event, fallback: ControlApi): ControlApi => {
+      let el = e.target as HTMLElement | null
+      while (el) {
+        const name = el.dataset?.tbName
+        if (name) {
+          const found = st.controls[name]
+          if (found) return found
+        }
+        el = el.parentElement
+      }
+      return fallback
+    }
+
+    for (const obj of flat) {
       const ctl = st.controls[obj.name]
       if (!ctl) continue
       for (const [eventName, script] of Object.entries(obj.on)) {
         if (!script || !script.trim()) continue
         try {
-          const bare = shortNamesFor(page.objects.map((o) => o.name), fnNames)
+          const bare = shortNamesFor(flat.map((o) => o.name), fnNames)
           const shortNames =
             bare.length > 0 ? `const { ${bare.join(', ')} } = controls;` : ''
+          // `target` = the object that received the event: in a group script
+          // it is the member that was clicked (events bubble); in a member's
+          // own script it is the object itself. Page functions with colliding
+          // names win, so the param list is deduped and args aligned.
+          const paramNames = [...new Set([...fnNames, 'event', 'target'])]
           const factory = new Function(
             'api',
-            ...fnNames,
-            'event',
+            ...paramNames,
             `"use strict";\nconst { page, controls, store } = api;\nreturn (async () => {\n${shortNames}\n${script}\n})();`,
           )
           const handler = (e: Event) => {
+            const args: unknown[] = [api]
+            for (const p of paramNames) {
+              if (p === 'event') args.push(e)
+              else if (p === 'target') args.push(resolveTarget(e, ctl))
+              else args.push(st.pageFns[p])
+            }
             safeRun(st, `${obj.name}.${eventName}`, () => {
-              Promise.resolve(factory(api, ...fnValues, e)).catch((err) =>
+              Promise.resolve(factory(...args)).catch((err) =>
                 st.onError?.(`${obj.name}.${eventName}: ${String(err)}`),
               )
             })

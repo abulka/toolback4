@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import type { ControlKind } from '@toolback/format'
-import { shouldToggleRun } from '@toolback/runtime'
+import type { ControlKind, PageObject } from '@toolback/format'
+import { treeRows } from '@toolback/format'
+import { isDeleteSelectionKey, shouldToggleRun, zOrderActionOf } from '@toolback/runtime'
 import { wireCanvas } from './canvasClient'
 import { startPaletteDrag } from './paletteDrag'
 import { useBookStore } from './stores/book'
@@ -31,11 +32,11 @@ function setTab(t: PropsTab): void {
   propsTab.value = t
   localStorage.setItem('toolback.propsTab', t)
 }
-// selecting an object on the canvas or in the list reveals its properties
+// selecting objects on the canvas or in the list reveals the properties
 watch(
-  () => store.selectionId,
-  (id) => {
-    if (id) propsTab.value = 'selection'
+  () => store.selectionIds.join(','),
+  (ids) => {
+    if (ids) propsTab.value = 'selection'
   },
 )
 
@@ -92,7 +93,7 @@ function onDocClick(e: MouseEvent): void {
   }
 }
 
-// --- run shortcut (F3 / ⌥3)
+// --- run shortcut (F3 / ⌥3), z-order (⌘[/⌘]) and delete — global keys
 
 // F3 or ⌥3 (Alt+3) toggles Run. Capture phase + stopPropagation so it wins
 // over Monaco's F3 find-next; ⌥3 is skipped in editable targets by shouldToggleRun.
@@ -104,12 +105,38 @@ function onRunKey(e: KeyboardEvent): void {
   store.toggleRun()
 }
 
+// z-order + delete: skip while typing (⌘[ is outdent in Monaco); only when
+// there is a selection
+function onArrangeKey(e: KeyboardEvent): void {
+  const action = zOrderActionOf(e)
+  if (action) {
+    const el = e.target as HTMLElement | null
+    const editable =
+      !!el &&
+      (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el.isContentEditable)
+    if (editable || store.selectionIds.length === 0) return
+    e.preventDefault()
+    store.reorderSelection(action)
+    return
+  }
+  if (isDeleteSelectionKey(e)) {
+    const el = e.target as HTMLElement | null
+    const editable =
+      !!el &&
+      (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el.isContentEditable)
+    if (editable || store.selectionIds.length === 0) return
+    e.preventDefault()
+    store.removeSelected()
+  }
+}
+
 function onDocKey(e: KeyboardEvent): void {
   if (e.key === 'Escape') settingsOpen.value = false
 }
 
 onMounted(async () => {
   window.addEventListener('keydown', onRunKey, true)
+  document.addEventListener('keydown', onArrangeKey)
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', onDocKey)
   if (iframe.value) wireCanvas(iframe.value)
@@ -119,9 +146,16 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onRunKey, true)
-  document.removeEventListener('click', onDocClick)
   document.removeEventListener('keydown', onDocKey)
+  document.removeEventListener('keydown', onArrangeKey)
+  document.removeEventListener('click', onDocClick)
 })
+
+const objectRows = computed(() => treeRows(store.activePage.objects))
+
+function selectInList(obj: PageObject): void {
+  store.setSelection([obj.id])
+}
 
 const palette: ControlKind[] = ['button', 'label', 'input', 'image', 'card', 'container']
 
@@ -352,13 +386,15 @@ function startSplitDrag(e: PointerEvent): void {
       <div v-show="propsTab === 'objects'">
         <ul class="objects">
           <li
-            v-for="obj in store.activePage.objects"
-            :key="obj.id"
-            :class="{ selected: obj.id === store.selectionId }"
-            @click="store.setSelection(obj.id)"
+            v-for="row in objectRows"
+            :key="row.obj.id"
+            :class="{ selected: store.selectionIds.includes(row.obj.id) }"
+            :style="{ paddingLeft: `${10 + row.depth * 14}px` }"
+            @click="selectInList(row.obj)"
           >
-            <span class="obj-kind">{{ obj.control }}</span>
-            <span class="obj-name">{{ obj.name }}</span>
+            <span class="obj-kind">{{ row.obj.control }}</span>
+            <span class="obj-name">{{ row.obj.name }}</span>
+            <span v-if="row.obj.children?.length" class="obj-count">{{ row.obj.children.length }}</span>
           </li>
         </ul>
       </div>
@@ -816,6 +852,12 @@ h2:first-child {
 .obj-name {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 12px;
+  flex: 1;
+}
+
+.obj-count {
+  font-size: 10px;
+  color: var(--ed-text-dim);
 }
 
 .hint {

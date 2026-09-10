@@ -1,5 +1,5 @@
 import type * as Monaco from 'monaco-editor'
-import type { Book } from '@toolback/format'
+import { flattenObjects, type Book } from '@toolback/format'
 import { extractFunctionNames, shortNamesFor } from '@toolback/runtime'
 
 export const TOOLBACK_BASE_LIB = `
@@ -50,6 +50,12 @@ declare const store: TBStore
 declare const page: TBPage
 /** The DOM event that fired (available in object event scripts) */
 declare const event: Event & { target: any }
+/**
+ * The object that received the event. In a group script: the member that was
+ * clicked (events bubble up from members). In an object's own script: the
+ * object itself. Only available in object event scripts.
+ */
+declare const target: TBControl
 `
 
 function controlsInterface(names: string[]): string {
@@ -67,7 +73,7 @@ function controlsInterface(names: string[]): string {
  */
 export function buildApiLib(book: Book, pageIndex: number): string {
   const page = book.pages[pageIndex] ?? book.pages[0]!
-  const objectNames = page.objects.map((o) => o.name)
+  const objectNames = flattenObjects(page.objects).map((o) => o.name)
   const fns = extractFunctionNames(page.script)
   const bare = shortNamesFor(objectNames, fns)
 
@@ -95,7 +101,7 @@ export function buildEditorContext(
   storeKeys: string[],
 ): EditorIntellisenseContext {
   const page = book.pages[pageIndex] ?? book.pages[0]!
-  const objectNames = page.objects.map((o) => o.name)
+  const objectNames = flattenObjects(page.objects).map((o) => o.name)
   const fns = extractFunctionNames(page.script)
   return {
     objectNames,

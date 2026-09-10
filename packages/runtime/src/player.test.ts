@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createObject, type Book } from '@toolback/format'
+import { createGroup, createObject, type Book, type PageObject } from '@toolback/format'
 import { createStore, extractFunctionNames, runBook, stopRun } from './player'
 
 describe('store', () => {
@@ -13,6 +13,170 @@ describe('store', () => {
       ['a', true],
       ['b', 'two'],
     ])
+  })
+})
+
+describe('groups', () => {
+  function groupBook(opts?: { groupOn?: Record<string, string>; childOn?: Record<string, string> }): Book {
+    const child = createObject(
+      'button',
+      'kidBtn',
+      { desktop: { x: 10, y: 10, w: 100, h: 40 } },
+      { text: 'kid' },
+    )
+    child.on = opts?.childOn ?? {}
+    const group = createGroup('myGroup', { desktop: { x: 40, y: 40, w: 200, h: 100 } }, [child])
+    group.on = opts?.groupOn ?? {}
+    const book: Book = {
+      id: 'bg',
+      title: 'Groups',
+      canvas: { desktop: { width: 800, height: 600 } },
+      pages: [{ id: 'p', name: 'P', script: '', background: '#fff', objects: [group] }],
+    }
+    return book
+  }
+
+  it('renders members nested inside the group wrapper', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const book = groupBook()
+    runBook(book, root, 'desktop')
+    const groupWrap = root.querySelector('[data-tb-name="myGroup"]')!
+    expect(groupWrap.querySelector('.tb-group')).not.toBeNull()
+    const kid = groupWrap.querySelector('[data-tb-name="kidBtn"]') as HTMLElement
+    expect(kid).not.toBeNull()
+    expect(kid.style.left).toBe('10px')
+    expect(kid.style.top).toBe('10px')
+    stopRun()
+    root.remove()
+  })
+
+  it('a click on a member bubbles to the group handler with the member as target', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = groupBook({
+      groupOn: { click: `store.set('groupSaw', store.get('groupSaw') ? groupSaw++ : 1)` },
+      childOn: { click: `store.set('childSaw', (store.get('childSaw') ?? 0) + 1)` },
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
+    kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(errors).toEqual([])
+    expect(handle.store.get('childSaw')).toBe(1)
+    expect(handle.store.get('groupSaw')).toBe(1)
+    stopRun()
+    root.remove()
+  })
+
+  it('group x/y moves members; text writes are inert', async () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = groupBook({
+      groupOn: { click: `myGroup.x += 24\nmyGroup.text = 'oops'` },
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const groupWrap = root.querySelector('[data-tb-name="myGroup"]') as HTMLElement
+    expect(groupWrap.style.left).toBe('40px')
+    const kid = groupWrap.querySelector('button') as HTMLElement
+    kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(errors).toEqual([])
+    expect(groupWrap.style.left).toBe('64px')
+    // child DOM moved along with the group
+    expect((kid.closest('.tb-object') as HTMLElement)!.style.left).toBe('10px')
+    expect(kid.textContent).toBe('kid')
+    expect(handle.controls['myGroup']!.x).toBe(64)
+    stopRun()
+    root.remove()
+  })
+
+  it('group visible hides members; bare names include group children', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const book = groupBook({
+      groupOn: { click: `myGroup.visible = false` },
+    })
+    const handle = runBook(book, root, 'desktop')
+    const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
+    kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    const groupInner = root.querySelector('[data-tb-name="myGroup"] .tb-group') as HTMLElement
+    expect(groupInner.style.display).toBe('none')
+    expect(handle.controls['kidBtn']).toBeDefined()
+    handle.controls['kidBtn']!.text = 'changed'
+    expect(kid.textContent).toBe('changed')
+    stopRun()
+    root.remove()
+  })
+
+  it('group scripts receive target = the member that got the event', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = groupBook({
+      groupOn: { click: `store.set('who', target.name)` },
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
+    kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(errors).toEqual([])
+    expect(handle.store.get('who')).toBe('kidBtn')
+    stopRun()
+    root.remove()
+  })
+
+  it("a member's own script receives target = itself", () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = groupBook({
+      childOn: { click: `store.set('who', target.name)\nconsole.log('you clicked', target.name)` },
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
+    kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(errors).toEqual([])
+    expect(handle.store.get('who')).toBe('kidBtn')
+    stopRun()
+    root.remove()
+  })
+
+  it('a page function named event or target does not break script compilation', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = groupBook({
+      groupOn: { click: `store.set('who', target.name)` },
+    })
+    book.pages[0]!.script = `function event() { store.set('ev', true) }\nfunction target() { store.set('tfn', true) }`
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
+    kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(errors).toEqual([])
+    expect(handle.store.get('who')).toBe('kidBtn')
+    expect(handle.store.get('ev')).toBeUndefined() // page fn `event` shadows, not called here
+    stopRun()
+    root.remove()
+  })
+
+  it('nested groups render and script through the tree', () => {
+    const root = document.createElement('div')
+    const leaf = createObject('label', 'leaf', { desktop: { x: 4, y: 4, w: 50, h: 20 } }, { text: 'leaf' })
+    const inner = createGroup('inner', { desktop: { x: 8, y: 8, w: 60, h: 40 } }, [leaf])
+    const outer = createGroup('outer', { desktop: { x: 20, y: 20, w: 100, h: 80 } }, [inner])
+    const book: Book = {
+      id: 'bn',
+      title: 'N',
+      canvas: { desktop: { width: 400, height: 300 } },
+      pages: [{ id: 'p', name: 'P', script: '', background: '#fff', objects: [outer] }],
+    }
+    runBook(book, root, 'desktop')
+    const leafEl = root.querySelector('[data-tb-name="leaf"]') as HTMLElement
+    expect(leafEl).not.toBeNull()
+    // leaf sits inside the inner group wrapper, which sits inside the outer
+    expect(leafEl.closest('[data-tb-name="inner"]')).not.toBeNull()
+    expect(leafEl.closest('[data-tb-name="outer"]')).not.toBeNull()
+    stopRun()
   })
 })
 

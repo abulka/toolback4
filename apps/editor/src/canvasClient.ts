@@ -15,7 +15,7 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
       breakpoint: store.breakpoint,
       pageIndex: store.currentPageIndex,
       design: !store.isRunning,
-      selection: store.selectionId,
+      selection: [...store.selectionIds],
     }
     iframe.contentWindow?.postMessage(msg, '*')
   }
@@ -34,10 +34,10 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
         store.canvasReady = true
         break
       case 'toolback:selection':
-        store.applySelection(msg.id)
+        store.applySelection(msg.ids)
         break
       case 'toolback:commit':
-        store.applyRect(msg.id, msg.rect)
+        store.applyRects(msg.objects)
         break
       case 'toolback:scriptError':
         store.scriptError = msg.message
@@ -50,6 +50,12 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
         break
       case 'toolback:store':
         store.storeEntries = msg.entries
+        break
+      case 'toolback:reorder':
+        store.reorderSelection(msg.action)
+        break
+      case 'toolback:deleteSelection':
+        store.removeSelected()
         break
     }
   })

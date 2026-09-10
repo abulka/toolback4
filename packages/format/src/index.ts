@@ -7,6 +7,7 @@ export const CONTROL_KINDS = [
   'image',
   'card',
   'container',
+  'group',
 ] as const
 export type ControlKind = (typeof CONTROL_KINDS)[number]
 
@@ -28,15 +29,29 @@ const RectsSchema = z.object({
 })
 export type Rects = z.infer<typeof RectsSchema>
 
-const PageObjectSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  control: z.enum(CONTROL_KINDS),
-  rects: RectsSchema,
-  props: z.record(z.unknown()).default({}),
-  on: z.record(z.string()).default({}),
-})
-export type PageObject = z.infer<typeof PageObjectSchema>
+export interface PageObject {
+  id: string
+  name: string
+  control: ControlKind
+  rects: Rects
+  props: Record<string, unknown>
+  on: Record<string, string>
+  /** groups only: member objects, positioned relative to the group */
+  children?: PageObject[]
+}
+
+// recursive schema (groups contain groups) — explicit interface + z.lazy
+const PageObjectSchema: z.ZodType<PageObject, z.ZodTypeDef, unknown> = z.lazy(() =>
+  z.object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    control: z.enum(CONTROL_KINDS),
+    rects: RectsSchema,
+    props: z.record(z.unknown()).default({}),
+    on: z.record(z.string()).default({}),
+    children: z.array(PageObjectSchema).optional(),
+  }),
+)
 
 const PageSchema = z.object({
   id: z.string().min(1),
@@ -74,6 +89,7 @@ export const DEFAULT_SIZES: Record<ControlKind, { w: number; h: number }> = {
   image: { w: 280, h: 200 },
   card: { w: 360, h: 220 },
   container: { w: 400, h: 280 },
+  group: { w: 200, h: 200 },
 }
 
 export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
@@ -83,6 +99,7 @@ export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
   image: {},
   card: { title: 'Card', text: 'Card body' },
   container: {},
+  group: {},
 }
 
 export function safeParseBook(data: unknown) {
@@ -133,4 +150,81 @@ export function createBook(title: string): Book {
     },
     pages: [createPage('Page 1')],
   })
+}
+
+export function createGroup(name: string, rects: Rects, children: PageObject[]): PageObject {
+  return PageObjectSchema.parse({
+    id: newId('obj'),
+    name,
+    control: 'group',
+    rects,
+    props: {},
+    on: {},
+    children,
+  })
+}
+
+/** Pre-order walk: every object on the page, including group members. */
+export function flattenObjects(objects: PageObject[]): PageObject[] {
+  const out: PageObject[] = []
+  const walk = (objs: PageObject[]): void => {
+    for (const o of objs) {
+      out.push(o)
+      if (o.children?.length) walk(o.children)
+    }
+  }
+  walk(objects)
+  return out
+}
+
+/** Depth-annotated rows for tree views (objects list). */
+export function treeRows(
+  objects: PageObject[],
+): Array<{ obj: PageObject; depth: number }> {
+  const rows: Array<{ obj: PageObject; depth: number }> = []
+  const walk = (objs: PageObject[], d: number): void => {
+    for (const o of objs) {
+      rows.push({ obj: o, depth: d })
+      if (o.children?.length) walk(o.children, d + 1)
+    }
+  }
+  walk(objects, 0)
+  return rows
+}
+
+export function unionRects(rects: Rect[]): Rect {
+  const x = Math.min(...rects.map((r) => r.x))
+  const y = Math.min(...rects.map((r) => r.y))
+  const right = Math.max(...rects.map((r) => r.x + r.w))
+  const bottom = Math.max(...rects.map((r) => r.y + r.h))
+  return { x, y, w: right - x, h: bottom - y }
+}
+
+export function rebaseRect(r: Rect, origin: { x: number; y: number }): Rect {
+  return { x: r.x - origin.x, y: r.y - origin.y, w: r.w, h: r.h }
+}
+
+export function unrebaseRect(r: Rect, origin: { x: number; y: number }): Rect {
+  return { x: r.x + origin.x, y: r.y + origin.y, w: r.w, h: r.h }
+}
+
+/**
+ * Scale a rect relative to an origin by (fx, fy) — used for group resize
+ * (children positions AND sizes scale proportionally).
+ */
+export function scaleRect(
+  r: Rect,
+  origin: { x: number; y: number },
+  fx: number,
+  fy: number,
+): Rect {
+  const round = (n: number): number => Math.max(0, Math.round(n))
+  const w = Math.max(1, round(r.w * fx))
+  const h = Math.max(1, round(r.h * fy))
+  return {
+    x: round(origin.x + (r.x - origin.x) * fx),
+    y: round(origin.y + (r.y - origin.y) * fy),
+    w,
+    h,
+  }
 }

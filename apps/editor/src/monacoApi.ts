@@ -43,6 +43,11 @@ export const SNIPPETS: SnippetSpec[] = [
     body: "controls.${1:objectName}.on('${2:click}', (e) => {\n\t$0\n})",
   },
   {
+    label: 'log-clicked-member',
+    detail: "group scripts: log which member got the click (target.name)",
+    body: "console.log('you clicked', target.name)$0",
+  },
+  {
     label: 'input-to-store',
     detail: 'remember an input value (input/change script)',
     body: "store.set('${1:key}', event.target.value)$0",
@@ -168,6 +173,10 @@ function buildProvider(monaco: typeof Monaco): Monaco.languages.CompletionItemPr
           item('preventDefault', 'prevent the default behaviour', 'preventDefault()', K.Method, false),
           item('stopPropagation', 'stop the event bubbling up', 'stopPropagation()', K.Method, false),
         ]
+      } else if (recv === 'target') {
+        list = CONTROL_MEMBERS.map((m) =>
+          item(m.label, m.detail, m.body, m.kind === 'method' ? K.Method : K.Property, m.kind === 'method'),
+        )
       } else if (ctx.objectNames.includes(recv)) {
         list = CONTROL_MEMBERS.map((m) =>
           item(m.label, m.detail, m.body, m.kind === 'method' ? K.Method : K.Property, m.kind === 'method'),
@@ -232,6 +241,7 @@ function buildProvider(monaco: typeof Monaco): Monaco.languages.CompletionItemPr
       ['page', 'page API (name, names, go)'],
       ['controls', 'all objects on this page, by name'],
       ['event', 'the DOM event (in object scripts)'],
+      ['target', 'the object that received the event (group scripts: the member)'],
     ] as const) {
       suggestions.push({
         label: api,

@@ -83,6 +83,19 @@ export function renderContainer(obj: PageObject): HTMLElement {
   return el
 }
 
+/**
+ * Groups render as an invisible wrapper; the runtime injects member objects
+ * (each in its own .tb-object) inside it. pointer-events: none on the wrapper
+ * means only members receive clicks — but events still bubble through, so a
+ * group's event handlers fire for any member.
+ */
+export function renderGroup(obj: PageObject): HTMLElement {
+  const el = document.createElement('div')
+  el.className = 'tb-group'
+  void obj
+  return el
+}
+
 export function registerControls(): void {
   registerControl('button', renderButton)
   registerControl('label', renderLabel)
@@ -90,4 +103,5 @@ export function registerControls(): void {
   registerControl('image', renderImage)
   registerControl('card', renderCard)
   registerControl('container', renderContainer)
+  registerControl('group', renderGroup)
 }

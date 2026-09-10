@@ -10,6 +10,7 @@ import DynamicTextEditor from './DynamicTextEditor.vue'
 const store = useBookStore()
 const storeKeyList = computed(() => collectStoreKeys(store.book))
 const sel = computed(() => store.selectedObject)
+const multi = computed(() => store.selectionIds.length > 1)
 const rect = computed<Rect | null>(() =>
   sel.value ? (sel.value.rects[store.breakpoint] ?? sel.value.rects.desktop) : null,
 )
@@ -69,30 +70,68 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
   const n = Math.max(8, Math.round(Number((e.target as HTMLInputElement).value)) || 0)
   store.applyRect(sel.value.id, { ...rect.value, [field]: n })
 }
+
+function isGroupSel(): boolean {
+  return sel.value?.control === 'group'
+}
+
+/** ungrouping discards the group's own scripts — ask before destroying them */
+function onUngroup(): void {
+  const g = sel.value
+  if (g?.control === 'group') {
+    const events = Object.keys(g.on ?? {}).filter((k) => g.on[k]?.trim())
+    if (events.length) {
+      const ok = window.confirm(
+        `Ungroup "${g.name}"? Its script${events.length > 1 ? 's' : ''} (${events.join(', ')}) will be lost.`,
+      )
+      if (!ok) return
+    }
+  }
+  store.ungroupSelected()
+}
 </script>
 
 <template>
-  <div v-if="!sel" class="empty">
+  <div v-if="!sel && !multi" class="empty">
     Nothing selected. Click an object on the canvas, or drag one in from the palette.
+  </div>
+  <div v-else-if="multi" class="panel">
+    <div class="head">
+      <span class="obj-kind">{{ store.selectionIds.length }} objects</span>
+    </div>
+    <p class="hint">
+      Shift-click adds or removes · drag any of them to move together · drag on
+      empty canvas draws a selection box.
+    </p>
+    <div class="actions">
+      <button class="action" :disabled="!store.groupEligible" @click="store.groupSelected()">Group</button>
+      <button class="action" :disabled="!store.ungroupEligible" @click="onUngroup">Ungroup</button>
+      <button class="action danger" @click="store.removeSelected()">Delete</button>
+    </div>
+    <p v-if="store.selectionIds.length >= 2 && !store.groupEligible" class="hint warn">
+      Grouping needs all selected objects under the same parent.
+    </p>
   </div>
   <div v-else class="panel">
     <div class="head">
-      <span class="obj-kind">{{ sel.control }}</span>
-      <span class="obj-name">{{ sel.name }}</span>
+      <span class="obj-kind">{{ sel!.control }}</span>
+      <span class="obj-name">{{ sel!.name }}</span>
     </div>
 
     <h2>Content</h2>
     <div v-for="f in textFields" :key="f.key" class="field">
       <label>{{ f.label }}</label>
       <DynamicTextEditor
-        v-if="f.key === 'text'"
+        v-if="f.key === 'text' && !isGroupSel()"
         :model-value="propValue(f.key)"
         :store-keys="storeKeyList"
         @update:model-value="onPropValue(f.key, $event)"
       />
-      <input v-else :value="propValue(f.key)" @input="onProp(f.key, $event)" />
+      <input v-else-if="f.key !== 'text' && !isGroupSel()" :value="propValue(f.key)" @input="onProp(f.key, $event)" />
     </div>
-    <p v-if="textFields.length === 0" class="hint">No content properties.</p>
+    <p v-if="textFields.length === 0 || isGroupSel()" class="hint">
+      {{ isGroupSel() ? 'Groups have no content — members do. Use Script for shared behaviour.' : 'No content properties.' }}
+    </p>
 
     <div class="row">
       <h2>Script</h2>
@@ -110,8 +149,22 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
       height="150px"
       @update:model-value="onScript"
     />
+    <p v-if="isGroupSel()" class="hint">
+      Group handlers fire when any member is clicked — <code>event.target</code> is the member.
+    </p>
 
-    <h2>Geometry · desktop</h2>
+    <h2>Arrange</h2>
+    <div class="actions">
+      <button class="action" title="Bring to front (⌘⇧])" @click="store.reorderSelection('front')">⤒ Front</button>
+      <button class="action" title="Forward (⌘])" @click="store.reorderSelection('forward')">↑</button>
+      <button class="action" title="Backward (⌘[)" @click="store.reorderSelection('backward')">↓</button>
+      <button class="action" title="Send to back (⌘⇧[)" @click="store.reorderSelection('back')">⤓ Back</button>
+    </div>
+    <div v-if="isGroupSel()" class="actions">
+      <button class="action" @click="onUngroup">Ungroup</button>
+    </div>
+
+    <h2>Geometry · {{ store.breakpoint }}</h2>
     <div class="geo">
       <div class="field">
         <label>X</label>
@@ -131,7 +184,7 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
       </div>
     </div>
 
-    <button class="delete" @click="store.removeObject(sel.id)">Delete object</button>
+    <button class="delete" @click="store.removeSelected()">Delete object</button>
   </div>
 </template>
 
@@ -221,6 +274,15 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
   margin: 4px 0 0;
 }
 
+.hint code {
+  color: var(--ed-accent);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.hint.warn {
+  color: #fbbf24;
+}
+
 .row {
   display: flex;
   align-items: center;
@@ -257,5 +319,43 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
    (Firefox, Windows); macOS native popups ignore it — the • marker always shows */
 .event-row select option.scripted {
   font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+
+.action {
+  flex: 1;
+  font: 500 12px/1 system-ui, sans-serif;
+  color: var(--ed-text);
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  padding: 7px 0;
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled) {
+  border-color: var(--ed-accent);
+  color: #fff;
+}
+
+.action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.action.danger {
+  color: #fca5a5;
+  border-color: rgba(220, 38, 38, 0.35);
+}
+
+.action.danger:hover:not(:disabled) {
+  border-color: #dc2626;
+  color: #fff;
+  background: rgba(220, 38, 38, 0.2);
 }
 </style>

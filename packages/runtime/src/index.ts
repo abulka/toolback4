@@ -14,7 +14,7 @@ export {
 } from './player'
 export type { ToolbackStore, ControlApi, RunHandle } from './player'
 export type { EditorToCanvasMessage, CanvasToEditorMessage, CanvasMessageSender } from './editorLink'
-export { listenForEditor, shouldToggleRun } from './editorLink'
+export { listenForEditor, shouldToggleRun, zOrderActionOf, isDeleteSelectionKey } from './editorLink'
 
 let stylesInjected = false
 
@@ -44,7 +44,17 @@ export function renderObjectInto(
   wrapper.style.top = `${rect.y}px`
   wrapper.style.width = `${rect.w}px`
   wrapper.style.height = `${rect.h}px`
-  wrapper.appendChild(renderObject(obj))
+
+  if (obj.control === 'group' && obj.children?.length) {
+    // members render inside the group wrapper; their rects are relative to it
+    // (absolute positioning resolves against this wrapper automatically)
+    wrapper.appendChild(renderObject(obj))
+    const inner = wrapper.firstElementChild as HTMLElement
+    for (const child of obj.children) renderObjectInto(inner, child, breakpoint)
+  } else {
+    wrapper.appendChild(renderObject(obj))
+  }
+
   pageRoot.appendChild(wrapper)
   return wrapper
 }

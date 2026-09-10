@@ -18,11 +18,29 @@ There are two places a script can live:
 ## How names work
 
 Every object gets a name when you drop it on the canvas: `button1`, `label1`,
-`input2`, … You can see (and reference) names in the **Objects** list and in the
-**Selection** header of the properties panel. Names are how one object talks to
-another: `controls.button1`, `controls.nameInput` — or just `button1`,
-`nameInput` (object names are usable as plain identifiers in any script; see the
-[controls](#controls) section).
+`input2`, … You can see (and reference) names in the **Objects** list (group
+members are indented under their group) and in the **Selection** header of the
+properties panel. Names are how one object talks to another: `controls.button1`,
+`controls.nameInput` — or just `button1`, `nameInput` (object names are usable
+as plain identifiers in any script; see the [controls](#controls) section).
+Group members are named too, and `controls.group1` is the group itself.
+
+## Z-order
+
+Objects render in **Objects list order**: later = on top. The **Arrange**
+buttons in the Selection panel move the selected object to the front, back,
+or one step forward/backward — keyboard: `⌘]` / `⌘[` step, `⌘⇧]` / `⌘⇧[`
+front/back (works with the canvas focused too). Moving a group moves its whole
+subtree together in the order.
+
+## Multi-select
+
+- **Shift-click** adds or removes an object from the selection
+- **Drag on empty canvas** draws a selection box (shift adds to the current
+  selection)
+- Dragging any selected object moves them all together; **Delete** removes them
+- Groups: clicking a member selects the **group**; alt-click or double-click
+  selects the member itself
 
 ## The runtime API
 
@@ -79,6 +97,21 @@ In an object script, `event` is the DOM event that fired. The most useful trick:
 ```js
 // in an input's change or input script:
 store.set('name', event.target.value)
+```
+
+### target
+
+Also available in object event scripts: **`target` is the object that received
+the event** — a full control API (`.name`, `.text`, `.value`, …), not just a
+DOM element.
+
+- In an **object's own script**, `target` is the object itself
+- In a **group's script**, `target` is the member that was actually clicked —
+  see [Groups](#groups)
+
+```js
+// a group's click script — say which member was clicked
+console.log('you clicked', target.name)
 ```
 
 ## Object scripts
@@ -222,6 +255,47 @@ async function pageEnter() {
 
 Label text: `Hello {{handle}}` — `await` works in object scripts too.
 
+## Groups
+
+Select several objects (shift-click, or drag a box on empty canvas) and press
+**Group** in the Selection panel. The group is a parent object: it has a name
+(`group1`, …), a position, and its own Script section. **Ungroup** releases the
+members back.
+
+What a group gives you:
+
+- **Move as one** — dragging the group (or setting its `x`/`y`) moves every
+  member. Resizing the group scales members proportionally.
+- **Hide as one** — `myGroup.visible = false` hides the whole group.
+- **Shared scripts with bubbling** — a group's event handlers fire when the
+  event happens on *any* member. The member's own handler runs first, then the
+  group's. In a group's script, **`target` is the member that received the
+  event** — a full object, so `target.name` tells you which one:
+
+```js
+// myGroup's click script — responds to a click on any member
+console.log('you clicked', target.name)
+if (target.name === 'okButton') {
+  store.set('clicked', 'the OK button')
+}
+```
+
+- **Members stay addressable** — group members are ordinary objects: bare
+  names and `controls.<name>` reach them wherever they sit. A member's `x`/`y`
+  are relative to the group. The group's box always hugs its members: moving
+  or resizing a member recomputes it to the minimum bounds.
+- **Editing inside a group** — drilling in takes a **concerted double-click**
+  (or alt-click) on a member. While inside, single clicks select members so you
+  can move them individually; the group's box always snaps to the minimum
+  bounds of its members. Click empty canvas (or press `Esc`) to step back
+  out — gentle single clicks always select the whole group, so click-and-drag
+  moves the group, never a member, unless you deliberately drilled in.
+- **Nesting** — groups can contain groups.
+- **Ungrouping** discards the group's own scripts — the editor asks first.
+
+`text` and `value` do nothing on a group (a group has no text of its own);
+members carry content, the group carries behaviour and position.
+
 ## Autocomplete and error squiggles
 
 The script editors help as you type:
@@ -232,11 +306,11 @@ The script editors help as you type:
   typing; **Tab** (or Enter/click) inserts.
 - **Typing `.` after an object** lists that object's properties — `button2.`
   offers `text`, `value`, `visible`, `enabled`, `x`, `y`, `width`, `height`,
-  `on`, `el` — with short descriptions of each. `store.`, `page.`, `controls.`
-  and `event.` all have their own member lists.
+  `on`, `el` — with short descriptions of each. `store.`, `page.`, `controls.`,
+  `event.` and `target.` all have their own member lists.
 - **Templates**: `pageEnter`, `pageLeave`, `store.set`, `store.get`, `page.go`,
-  `onEvent`, `input-to-store`, `fetch-to-store`, `console.log`. They expand
-  into ready-to-fill code with tab stops.
+  `onEvent`, `input-to-store`, `fetch-to-store`, `log-clicked-member`,
+  `console.log`. They expand into ready-to-fill code with tab stops.
 - **Typing `{{` in a script** offers your store keys and inserts
   `store.get('key')` (the script-side way to read a value — `{{key}}` bindings
   themselves belong in Text properties). In a Text property, `{{` lists keys

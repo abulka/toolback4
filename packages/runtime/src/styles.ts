@@ -120,6 +120,17 @@ body {
   border-radius: 12px;
 }
 
+/* groups: invisible wrapper around members; clicks pass to members only,
+   but member events still bubble through the wrapper to group handlers.
+   members re-enable pointer events (the property is inherited). */
+.tb-group {
+  pointer-events: none;
+}
+
+.tb-group .tb-object {
+  pointer-events: auto;
+}
+
 /* ---- design-mode chrome ---- */
 
 .tb-canvas-root {
@@ -160,6 +171,15 @@ body {
   pointer-events: none;
   display: none;
   z-index: 21;
+}
+
+.tb-marquee {
+  position: absolute;
+  border: 1px dashed var(--tb-accent);
+  background: rgba(99, 102, 241, 0.08);
+  pointer-events: none;
+  display: none;
+  z-index: 24;
 }
 
 .tb-handle {
