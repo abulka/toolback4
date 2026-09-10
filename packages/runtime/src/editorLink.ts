@@ -23,8 +23,29 @@ export type CanvasToEditorMessage =
   | { type: 'toolback:commit'; kind: 'move' | 'resize'; id: string; rect: Rect }
   | { type: 'toolback:scriptError'; message: string }
   | { type: 'toolback:error'; message: string }
+  | { type: 'toolback:runToggle' }
 
 export type CanvasMessageSender = (msg: CanvasToEditorMessage) => void
+
+/**
+ * Run-mode toggle keys: F3 (ToolBook heritage) and ⌥3 / Alt+3 (no fn-key needed).
+ * ⌥3 is skipped while typing in editable targets — on Mac it is a text character.
+ */
+export function shouldToggleRun(e: KeyboardEvent): boolean {
+  if (e.repeat) return false
+  const isF3 = e.key === 'F3' || e.code === 'F3'
+  if (isF3) return true
+  const isAlt3 =
+    e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === 'Digit3'
+  if (!isAlt3) return false
+  const el = e.target as HTMLElement | null
+  const editable =
+    !!el &&
+    (el instanceof HTMLInputElement ||
+      el instanceof HTMLTextAreaElement ||
+      el.isContentEditable)
+  return !editable
+}
 
 export function listenForEditor(
   root: HTMLElement = document.body,
@@ -86,10 +107,22 @@ export function listenForEditor(
     }
   }
 
+  // keydowns inside the canvas never reach the editor window, so the
+  // run shortcut must also live here (focus is commonly in the canvas,
+  // e.g. right after clicking Run and interacting with the page)
+  const onRunKey = (e: KeyboardEvent): void => {
+    if (!shouldToggleRun(e)) return
+    e.preventDefault()
+    e.stopPropagation()
+    send({ type: 'toolback:runToggle' })
+  }
+  window.addEventListener('keydown', onRunKey, true)
+
   window.addEventListener('message', onMessage)
   send({ type: 'toolback:ready' })
 
   return () => {
     window.removeEventListener('message', onMessage)
+    window.removeEventListener('keydown', onRunKey, true)
   }
 }

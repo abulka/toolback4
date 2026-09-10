@@ -36,7 +36,7 @@
           "rects": { "desktop": { "x": 80, "y": 144, "w": 440, "h": 184 } },
           "props": {
             "title": "What's inside",
-            "text": "All six controls, every event, the store, {{key}} labels and scripted geometry. Open each object's Script panel to see how it works — then press Run and play."
+            "text": "All six controls, every event, the store, dynamic {{...}} labels and scripted geometry. Open each object's Script panel to see how it works — then press Run and play."
           },
           "on": {}
         },

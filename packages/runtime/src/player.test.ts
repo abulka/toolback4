@@ -62,6 +62,17 @@ describe('player', () => {
     root.remove()
   })
 
+  it('dynamic text: unset keys render empty, non-word keys render literally', () => {
+    const root = document.createElement('div')
+    const book = makeBook({
+      objects: [{ name: 'out', control: 'label', text: 'A {{missing}} B {{...}} C {{ok}}' }],
+    })
+    const handle = runBook(book, root, 'desktop')
+    handle.store.set('ok', 7)
+    expect(root.querySelector('.tb-label')?.textContent).toBe('A  B {{...}} C 7')
+    handle.stop()
+  })
+
   it('shares page-level functions with object scripts (function-name sugar)', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)

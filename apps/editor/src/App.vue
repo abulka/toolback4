@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { ControlKind } from '@toolback/format'
+import { shouldToggleRun } from '@toolback/runtime'
 import { wireCanvas } from './canvasClient'
 import { startPaletteDrag } from './paletteDrag'
 import { useBookStore } from './stores/book'
@@ -14,10 +15,25 @@ import PagesPanel from './components/PagesPanel.vue'
 const store = useBookStore()
 const iframe = ref<HTMLIFrameElement | null>(null)
 
+// F3 or ⌥3 (Alt+3) toggles Run. Capture phase + stopPropagation so it wins
+// over Monaco's F3 find-next; ⌥3 is skipped in editable targets by shouldToggleRun.
+// Keydowns inside the canvas iframe are handled canvas-side (editorLink) instead.
+function onRunKey(e: KeyboardEvent): void {
+  if (!shouldToggleRun(e)) return
+  e.preventDefault()
+  e.stopPropagation()
+  store.toggleRun()
+}
+
 onMounted(async () => {
+  window.addEventListener('keydown', onRunKey, true)
   if (iframe.value) wireCanvas(iframe.value)
   await store.restoreAutosave()
   await store.refreshRecents()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onRunKey, true)
 })
 
 const palette: ControlKind[] = ['button', 'label', 'input', 'image', 'card', 'container']
@@ -132,7 +148,7 @@ function startSplitDrag(e: PointerEvent): void {
       <button
         class="run"
         :class="{ running: store.isRunning }"
-        title="Run this page"
+        title="Toggle run mode (F3 or ⌥3)"
         @click="store.toggleRun()"
       >
         {{ store.isRunning ? 'Stop' : 'Run' }}

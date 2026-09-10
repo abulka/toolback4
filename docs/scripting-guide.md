@@ -13,7 +13,7 @@ There are two places a script can live:
   handler body. It runs every time that event fires on that object.
 - **Page script** — the **Page script** panel in the properties sidebar. Define
   functions once here and call them from any object script. Also the home of
-  `pageEnter()`, which runs when you press **Run**.
+  `pageEnter()`, which runs when you press **Run** (shortcut: `F3` or `⌥3`).
 
 ## How names work
 
@@ -264,6 +264,7 @@ The script editors help as you type:
 The **Pages** panel (left sidebar) manages the book's pages:
 
 - click a page to edit it; press **Run** to play the page you're editing
+  (shortcut: `F3` or `⌥3` — works even when the canvas has focus)
 - **double-click a page name** to rename it
 - ⧉ duplicates a page — objects, properties and scripts included
 - ✕ deletes it (a book always keeps at least one page)

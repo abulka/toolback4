@@ -18,6 +18,10 @@ const EVENTS = ['click', 'dblclick', 'change', 'input', 'mouseenter', 'mouseleav
 const currentEvent = ref<(typeof EVENTS)[number]>('click')
 const eventScript = computed(() => sel.value?.on[currentEvent.value] ?? '')
 
+function hasScript(e: (typeof EVENTS)[number]): boolean {
+  return Boolean(sel.value?.on[e]?.trim())
+}
+
 function onScript(code: string): void {
   if (sel.value) store.setEventScript(sel.value.id, currentEvent.value, code)
 }
@@ -97,7 +101,7 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
     <div class="event-row">
       <label>Event</label>
       <select v-model="currentEvent">
-        <option v-for="e in EVENTS" :key="e" :value="e">{{ e }}</option>
+        <option v-for="e in EVENTS" :key="e" :value="e" :class="{ scripted: hasScript(e) }">{{ hasScript(e) ? e + ' •' : e }}</option>
       </select>
     </div>
     <ScriptEditor
@@ -247,5 +251,11 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
   color: var(--ed-text);
   padding: 5px 8px;
   font: inherit;
+}
+
+/* events that carry a script: bold where the browser styles option popups
+   (Firefox, Windows); macOS native popups ignore it — the • marker always shows */
+.event-row select option.scripted {
+  font-weight: 700;
 }
 </style>

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createObject } from '@toolback/format'
 import { sampleBook } from '@toolback/format/src/sample'
-import { getObjectRects, listenForEditor, renderBook, renderObjectInto } from './index'
+import { getObjectRects, listenForEditor, renderBook, renderObjectInto, shouldToggleRun } from './index'
+
+function key(key: string, code: string, init: KeyboardEventInit = {}): KeyboardEvent {
+  return new KeyboardEvent('keydown', { key, code, ...init })
+}
 
 describe('runtime', () => {
   it('renders the sample book into positioned objects', () => {
@@ -63,5 +67,63 @@ describe('runtime', () => {
       cleanup()
       root.remove()
     }
+  })
+
+  describe('run-toggle shortcut', () => {
+    it('classifies F3 and ⌥3, rejects plain 3, other modifiers and repeats', () => {
+      expect(shouldToggleRun(key('F3', 'F3'))).toBe(true)
+      expect(shouldToggleRun(key('£', 'Digit3', { altKey: true }))).toBe(true)
+      expect(shouldToggleRun(key('3', 'Digit3'))).toBe(false)
+      expect(shouldToggleRun(key('³', 'Digit3', { shiftKey: true, altKey: true }))).toBe(false)
+      expect(shouldToggleRun(key('Digit3', 'Digit3', { ctrlKey: true, altKey: true }))).toBe(false)
+      expect(shouldToggleRun(key('Ω', 'KeyE', { altKey: true }))).toBe(false)
+      expect(shouldToggleRun(key('F3', 'F3', { repeat: true }))).toBe(false)
+    })
+
+    it('ignores ⌥3 while typing in editable targets, still allows F3 there', () => {
+      const input = document.createElement('input')
+      document.body.appendChild(input)
+      const onInput = new KeyboardEvent('keydown', {
+        key: '£',
+        code: 'Digit3',
+        altKey: true,
+        bubbles: true,
+      })
+      Object.defineProperty(onInput, 'target', { value: input })
+      expect(shouldToggleRun(onInput)).toBe(false)
+
+      const f3InInput = new KeyboardEvent('keydown', { key: 'F3', code: 'F3', bubbles: true })
+      Object.defineProperty(f3InInput, 'target', { value: input })
+      expect(shouldToggleRun(f3InInput)).toBe(true)
+
+      input.remove()
+    })
+
+    it('the canvas forwards run-toggle keys to the editor, editable ⌥3 stays typed', () => {
+      const sent: Array<{ type: string }> = []
+      const send = (msg: { type: string }) => sent.push(msg)
+      const root = document.createElement('div')
+      document.body.appendChild(root)
+      const input = document.createElement('input')
+      document.body.appendChild(input)
+
+      const cleanup = listenForEditor(root, send)
+      try {
+        input.dispatchEvent(
+          new KeyboardEvent('keydown', { key: '£', code: 'Digit3', altKey: true, bubbles: true }),
+        )
+        expect(sent.filter((m) => m.type === 'toolback:runToggle')).toHaveLength(0)
+
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F3', code: 'F3' }))
+        expect(sent.filter((m) => m.type === 'toolback:runToggle')).toHaveLength(1)
+
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F3', code: 'F3', bubbles: true }))
+        expect(sent.filter((m) => m.type === 'toolback:runToggle')).toHaveLength(2)
+      } finally {
+        cleanup()
+        root.remove()
+        input.remove()
+      }
+    })
   })
 })
