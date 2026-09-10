@@ -24,6 +24,16 @@ export function getMonaco(): Promise<typeof Monaco> {
           'editor.background': '#0f1115',
           'editorLineNumber.foreground': '#3a4150',
           'editor.lineHighlightBackground': '#161a21',
+          'editorSuggestWidget.background': '#14171d',
+          'editorSuggestWidget.foreground': '#d3d8e0',
+          'editorSuggestWidget.selectedBackground': '#2a3040',
+          'editorSuggestWidget.border': '#262c37',
+          'editorSuggestWidget.highlightForeground': '#a5b4fc',
+          'editorWidget.background': '#14171d',
+          'editorWidget.foreground': '#d3d8e0',
+          'editorWidget.border': '#262c37',
+          'editorHoverWidget.background': '#14171d',
+          'editorHoverWidget.foreground': '#d3d8e0',
         },
       })
       return monaco

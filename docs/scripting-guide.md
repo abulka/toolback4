@@ -191,6 +191,29 @@ async function pageEnter() {
 
 Label text: `Hello {{handle}}` — `await` works in object scripts too.
 
+## Autocomplete and error squiggles
+
+The script editors help as you type:
+
+- **Ctrl+Space** opens a short, curated list — *only* toolback things: your
+  objects (first), the API (`store`, `page`, `controls`, `event`), and
+  ready-made templates. No thousands of irrelevant browser globals. Filter by
+  typing; **Tab** (or Enter/click) inserts.
+- **Typing `.` after an object** lists that object's properties — `button2.`
+  offers `text`, `value`, `visible`, `enabled`, `on`, `el` — with short
+  descriptions of each. `store.`, `page.`, `controls.` and `event.` all have
+  their own member lists.
+- **Templates**: `pageEnter`, `pageLeave`, `store.set`, `store.get`, `page.go`,
+  `onEvent`, `input-to-store`, `fetch-to-store`, `console.log`. They expand
+  into ready-to-fill code with tab stops.
+- **Typing `{{` in a script** offers your store keys and inserts
+  `store.get('key')` (the script-side way to read a value — `{{key}}` bindings
+  themselves belong in Text properties). In a Text property, `{{` lists keys
+  and adds the closing `}}` for you.
+- **Red squiggles** underline syntax errors (like a stray `}`) before you even
+  press Run. A squiggle is a hint — you can still run the page, and any error
+  will also appear in the status bar when it actually happens.
+
 ## Debugging
 
 - Script errors appear in the editor **status bar**, tagged with where they came

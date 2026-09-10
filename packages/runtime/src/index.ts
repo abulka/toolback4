@@ -10,6 +10,7 @@ export {
   stopRun,
   createStore,
   extractFunctionNames,
+  shortNamesFor,
 } from './player'
 export type { ToolbackStore, ControlApi, RunHandle } from './player'
 export type { EditorToCanvasMessage, CanvasToEditorMessage, CanvasMessageSender } from './editorLink'

@@ -95,11 +95,13 @@ const DYN_RE = /\{\{\s*([\w$]+)\s*\}\}/g
 const NAME_RESERVED = new Set(['page', 'controls', 'store', 'event'])
 const IDENT_RE = /^[A-Za-z_$][\w$]*$/
 
-function shortNameDecl(objectNames: string[], exclude: Set<string>): string {
-  const ok = objectNames.filter(
-    (n) => IDENT_RE.test(n) && !NAME_RESERVED.has(n) && !exclude.has(n),
-  )
-  return ok.length > 0 ? `const { ${ok.join(', ')} } = controls;` : ''
+/**
+ * Bare object names usable as identifiers in scripts: valid identifiers,
+ * not colliding with the runtime API or the page's own function declarations.
+ */
+export function shortNamesFor(objectNames: string[], exclude: Iterable<string>): string[] {
+  const ex = new Set(exclude)
+  return objectNames.filter((n) => IDENT_RE.test(n) && !NAME_RESERVED.has(n) && !ex.has(n))
 }
 
 function wireDynamicText(
@@ -181,10 +183,11 @@ function runPage(st: RunState, idx: number): void {
         const returnObj = names
           .map((n) => `${JSON.stringify(n)}: typeof ${n} === 'function' ? ${n} : undefined`)
           .join(',')
-        const shortNames = shortNameDecl(
+        const bare = shortNamesFor(
           page.objects.map((o) => o.name),
-          new Set(names),
+          names,
         )
+        const shortNames = bare.length > 0 ? `const { ${bare.join(', ')} } = controls;` : ''
         const factory = new Function(
           'api',
           `"use strict";\nconst { page, controls, store } = api;\n${shortNames}\n${page.script}\n;return { ${returnObj} };`,
@@ -201,10 +204,9 @@ function runPage(st: RunState, idx: number): void {
       for (const [eventName, script] of Object.entries(obj.on)) {
         if (!script || !script.trim()) continue
         try {
-          const shortNames = shortNameDecl(
-            page.objects.map((o) => o.name),
-            new Set([...fnNames, obj.name]),
-          )
+          const bare = shortNamesFor(page.objects.map((o) => o.name), fnNames)
+          const shortNames =
+            bare.length > 0 ? `const { ${bare.join(', ')} } = controls;` : ''
           const factory = new Function(
             'api',
             ...fnNames,

@@ -2,10 +2,13 @@
 import { computed, ref } from 'vue'
 import type { Rect } from '@toolback/format'
 import { useBookStore } from '../stores/book'
+import { collectStoreKeys } from '../storeKeys'
 import ScriptEditor from './ScriptEditor.vue'
 import HelpButton from './HelpButton.vue'
+import DynamicTextEditor from './DynamicTextEditor.vue'
 
 const store = useBookStore()
+const storeKeyList = computed(() => collectStoreKeys(store.book))
 const sel = computed(() => store.selectedObject)
 const rect = computed<Rect | null>(() =>
   sel.value ? (sel.value.rects[store.breakpoint] ?? sel.value.rects.desktop) : null,
@@ -52,6 +55,11 @@ function onProp(key: string, e: Event): void {
   store.updateProps(sel.value.id, { [key]: (e.target as HTMLInputElement).value })
 }
 
+function onPropValue(key: string, v: string): void {
+  if (!sel.value) return
+  store.updateProps(sel.value.id, { [key]: v })
+}
+
 function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
   if (!sel.value || !rect.value) return
   const n = Math.max(8, Math.round(Number((e.target as HTMLInputElement).value)) || 0)
@@ -72,7 +80,13 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
     <h2>Content</h2>
     <div v-for="f in textFields" :key="f.key" class="field">
       <label>{{ f.label }}</label>
-      <input :value="propValue(f.key)" @input="onProp(f.key, $event)" />
+      <DynamicTextEditor
+        v-if="f.key === 'text'"
+        :model-value="propValue(f.key)"
+        :store-keys="storeKeyList"
+        @update:model-value="onPropValue(f.key, $event)"
+      />
+      <input v-else :value="propValue(f.key)" @input="onProp(f.key, $event)" />
     </div>
     <p v-if="textFields.length === 0" class="hint">No content properties.</p>
 

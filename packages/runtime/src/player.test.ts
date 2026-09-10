@@ -224,6 +224,21 @@ describe('player', () => {
     root.remove()
   })
 
+  it("object scripts can use their own bare name", () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = makeBook({
+      objects: [{ name: 'btn', control: 'button', text: 'orig', on: { click: `btn.text = 'self'` } }],
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
+    expect(errors).toEqual([])
+    expect(handle.controls['btn']!.text).toBe('self')
+    handle.stop()
+    root.remove()
+  })
+
   it('stop unwires listeners', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
