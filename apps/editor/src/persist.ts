@@ -10,7 +10,23 @@ function openDb(): Promise<IDBDatabase> {
       const db = req.result
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE)
     }
-    req.onsuccess = () => resolve(req.result)
+    req.onsuccess = () => {
+      const db = req.result
+      if (db.objectStoreNames.contains(STORE)) {
+        resolve(db)
+        return
+      }
+      // DB exists at the same version but without our store (e.g. created
+      // externally): bump the version to create it.
+      db.close()
+      const bumped = indexedDB.open(DB_NAME, db.version + 1)
+      bumped.onupgradeneeded = () => {
+        const db2 = bumped.result
+        if (!db2.objectStoreNames.contains(STORE)) db2.createObjectStore(STORE)
+      }
+      bumped.onsuccess = () => resolve(bumped.result)
+      bumped.onerror = () => reject(bumped.error)
+    }
     req.onerror = () => reject(req.error)
   })
 }

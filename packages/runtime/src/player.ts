@@ -92,6 +92,16 @@ function makeControlApi(
 
 const DYN_RE = /\{\{\s*([\w$]+)\s*\}\}/g
 
+const NAME_RESERVED = new Set(['page', 'controls', 'store', 'event'])
+const IDENT_RE = /^[A-Za-z_$][\w$]*$/
+
+function shortNameDecl(objectNames: string[], exclude: Set<string>): string {
+  const ok = objectNames.filter(
+    (n) => IDENT_RE.test(n) && !NAME_RESERVED.has(n) && !exclude.has(n),
+  )
+  return ok.length > 0 ? `const { ${ok.join(', ')} } = controls;` : ''
+}
+
 function wireDynamicText(
   pageRoot: HTMLElement,
   page: { objects: PageObject[] },
@@ -171,9 +181,13 @@ function runPage(st: RunState, idx: number): void {
         const returnObj = names
           .map((n) => `${JSON.stringify(n)}: typeof ${n} === 'function' ? ${n} : undefined`)
           .join(',')
+        const shortNames = shortNameDecl(
+          page.objects.map((o) => o.name),
+          new Set(names),
+        )
         const factory = new Function(
           'api',
-          `"use strict";\nconst { page, controls, store } = api;\n${page.script}\n;return { ${returnObj} };`,
+          `"use strict";\nconst { page, controls, store } = api;\n${shortNames}\n${page.script}\n;return { ${returnObj} };`,
         )
         st.pageFns = (factory(api) ?? {}) as Record<string, (e?: unknown) => unknown>
       })
@@ -187,11 +201,15 @@ function runPage(st: RunState, idx: number): void {
       for (const [eventName, script] of Object.entries(obj.on)) {
         if (!script || !script.trim()) continue
         try {
+          const shortNames = shortNameDecl(
+            page.objects.map((o) => o.name),
+            new Set([...fnNames, obj.name]),
+          )
           const factory = new Function(
             'api',
             ...fnNames,
             'event',
-            `"use strict";\nconst { page, controls, store } = api;\nreturn (async () => {\n${script}\n})();`,
+            `"use strict";\nconst { page, controls, store } = api;\nreturn (async () => {\n${shortNames}\n${script}\n})();`,
           )
           const handler = (e: Event) => {
             safeRun(st, `${obj.name}.${eventName}`, () => {

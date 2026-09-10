@@ -173,6 +173,57 @@ describe('player', () => {
     expect(errors[0]).toContain('enter failed')
   })
 
+  it('exposes bare object names in page and object scripts', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = makeBook({
+      pageScript: `function stamp() { btn.text = 'fred' }`,
+      objects: [
+        { name: 'btn', control: 'button', text: 'original', on: { click: `go.text = 'from object script'` } },
+        { name: 'go', control: 'label', on: { click: `void 0` } },
+      ],
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+
+    const btn = root.querySelector('button.tb-button')!
+    btn.dispatchEvent(new MouseEvent('click'))
+    expect(errors).toEqual([])
+    expect(btn.textContent).toBe('original')
+    expect(handle.controls['go']!.text).toBe('from object script')
+
+    handle.stop()
+    root.remove()
+  })
+
+  it('bare names work inside pageEnter and do not clobber page functions', () => {
+    const root = document.createElement('div')
+    const errors: string[] = []
+    const book = makeBook({
+      pageScript: `function pageEnter() { lbl.text = 'set by pageEnter' }`,
+      objects: [{ name: 'lbl', control: 'label' }],
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    expect(errors).toEqual([])
+    expect(handle.controls['lbl']!.text).toBe('set by pageEnter')
+    handle.stop()
+  })
+
+  it('reserved words and page-function names are not shadowed by short names', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = makeBook({
+      pageScript: `function pageEnter() { bump() }\nfunction bump() { store.set('bumped', true) }`,
+      objects: [{ name: 'bump', control: 'label', text: 'collision test' }],
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    expect(errors).toEqual([])
+    expect(handle.store.get('bumped')).toBe(true)
+    handle.stop()
+    root.remove()
+  })
+
   it('stop unwires listeners', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)

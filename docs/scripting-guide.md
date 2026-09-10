@@ -20,7 +20,9 @@ There are two places a script can live:
 Every object gets a name when you drop it on the canvas: `button1`, `label1`,
 `input2`, … You can see (and reference) names in the **Objects** list and in the
 **Selection** header of the properties panel. Names are how one object talks to
-another: `controls.button1`, `controls.nameInput`, and so on.
+another: `controls.button1`, `controls.nameInput` — or just `button1`,
+`nameInput` (object names are usable as plain identifiers in any script; see the
+[controls](#controls) section).
 
 ## The runtime API
 
@@ -38,6 +40,10 @@ Values can be any JavaScript value. Labels render them as text.
 ### controls
 
 `controls.<name>` gives you every object on the page, by name.
+
+**Shorthand:** object names are also available directly — `button2.text = 'fred'`
+is exactly the same as `controls.button2.text = 'fred'`. This works in page
+scripts and object scripts, and you can read too (`if (input1.value === '') …`).
 
 Get/set properties:
 
@@ -191,6 +197,11 @@ Label text: `Hello {{handle}}` — `await` works in object scripts too.
   from (`button1.click: Error: …`, `page script: SyntaxError: …`).
 - `console.log(...)` writes to the browser devtools console — open devtools and
   pick the canvas frame's context.
+- Referencing an object that doesn't exist gives `undefined` — e.g. setting a
+  property on it reports `Cannot set properties of undefined`. Check the
+  spelling against the Objects list.
+- If you press Run and a page's `pageEnter` seems to run more than expected,
+  press Stop and Run again to start a fresh session.
 - The store resets every time you press **Run**. Edits made while running re-run
   the page, so it's a live-coding loop.
 

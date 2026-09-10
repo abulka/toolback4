@@ -1,7 +1,11 @@
 import type { CanvasToEditorMessage, EditorToCanvasMessage } from '@toolback/runtime'
 import { setSyncSender, useBookStore } from './stores/book'
 
+let wired = false
+
 export function wireCanvas(iframe: HTMLIFrameElement): void {
+  if (wired) return
+  wired = true
   const store = useBookStore()
 
   const sendLoad = (): void => {
