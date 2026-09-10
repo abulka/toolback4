@@ -9,6 +9,7 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
       type: 'toolback:load',
       book: JSON.parse(JSON.stringify(store.book)),
       breakpoint: store.breakpoint,
+      pageIndex: store.currentPageIndex,
       design: !store.isRunning,
       selection: store.selectionId,
     }

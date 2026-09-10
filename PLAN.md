@@ -5,7 +5,7 @@ scripted in plain JavaScript. Fourth attempt — informed by the post-mortem of
 `../pyinvent`, `../toolback`, `../toolback-lite`, `../toolback-lite-vue3`
 (those folders are archived reference material; salvage ideas, not code).
 
-**Status: M0 + M1 + M2 complete — M3 (book) is next**
+**Status: M0 + M1 + M2 + M3 complete — M4 (publish) is next**
 (see [Milestones](#milestones) and [Progress log](#progress-log)).
 
 ---
@@ -115,11 +115,12 @@ Each milestone ends with a demo you actually build *in* the tool.
 - [x] Demo: counter — pageEnter seeds 100, button increments, label shows `Count: {{count}}` live
 
 ### M3 — Book
-- [ ] Page navigator, add/remove/duplicate pages
-- [ ] `page.go('name')`, onPageEnter/Leave
-- [ ] Save/open `.toolbook.json` (File System Access), IndexedDB autosave, recent books
-- [ ] Update `docs/scripting-guide.md`: pages, `page.go()`, page lifecycle events
-- [ ] Demo: 2-page quiz with score
+- [x] Page navigator (add / duplicate / rename via double-click / delete, per-page editing)
+- [x] `page.go('name')`, `page.names`, `pageEnter`/`pageLeave` per page; shared store across the run
+- [x] IndexedDB autosave (debounced, restores on load), recents list (Save/Open/Recent… menu)
+- [x] `.toolbook.json` save/open via File System Access API with download/input fallback
+- [x] `docs/scripting-guide.md`: pages & navigation fully documented (API, lifecycle, quiz recipe) + `?` button on the Pages panel
+- [x] Demo: 2-page quiz (Quiz → Paris/London/Berlin → Results with `Score: {{score}} - {{verdict}}` → Play again) built and played through the UI
 
 ### M4 — Publish
 - [ ] One-click standalone HTML export (runtime + JSON blob)
@@ -130,6 +131,15 @@ Each milestone ends with a demo you actually build *in* the tool.
 
 Multiplayer, SCORM/xAPI, Electron/PWA packaging, 3D/Lottie/maps, theming system,
 reusable widget/component library, version history, AI helpers, analytics.
+
+## Backlog (requested, post-M3)
+
+- **Z-order control** — bring to front / send to back / nudge forward / backward
+  per object (needs a `z` field in the format or explicit array-order controls).
+- **Multi-select** — shift/ rubber-band selection, group move (and group resize?),
+  group delete; selection model must move from single id to id sets.
+- **Group scripts** — attach scripts to groups of objects (depends on a grouping
+  model; also unlocks shared behaviours across a group).
 
 ## Risks
 
@@ -150,4 +160,5 @@ reusable widget/component library, version history, AI helpers, analytics.
   - Two bugs found and fixed by the acceptance run: (1) `canvasClient.sendLoad` hardcoded `design:true` from M1 — the store's sync flag was dead code; (2) Monaco auto-bracket-pairing + scripted blind typing produced a stray `}` (a human watching the screen wouldn't hit it; kept auto-pairing, adjusted the test).
   Next: M3 — page navigator, `page.go()`, save/open `.toolbook.json`, autosave.
 - **2026-09-09** — **Live drag-out preview shipped.** Dragging from the palette now renders the **real control** inside the canvas, gliding under the cursor with 8px snap and a dashed placement outline (screenshot: `doco/drag-preview.png`); the editor-side ghost chip auto-hides while over the canvas. Drop commits the object at exactly the ghost's rect — one operation, zero repositioning. ESC cancels mid-drag; palette drag is disabled while running. Mechanics: the editor streams `toolback:dragOver {control, rect}` messages into the iframe (rAF-throttled; pointer capture from M1 makes this cross-document), the design controller renders/moves a `tb-ghost` phantom built from the real control renderers with `DEFAULT_PROPS` (now shared via `packages/format`), and the drop's `addObject` sync seamlessly swaps ghost → real object at the same rect. Verified in-browser: ghost is a real button mid-drag, drop lands at the exact ghost rect, ESC cancels cleanly. 34/34 vitest, typecheck + build clean. Next: M3 — pages, `page.go()`, save/open, autosave.
+- **2026-09-10** — **M3 complete: multi-page books + persistence.** Verified end-to-end in-browser (screenshot: `doco/m3-demo.png`): built a 2-page quiz through the UI — Quiz page (question label, Paris/London/Berlin buttons with scripts `store.set("score", …); page.go("Results")`, `pageEnter` seeds score), Results page (`Score: {{score}} - {{verdict}}` label, `pageEnter` sets verdict, Play again button `page.go("Quiz")`) — then ran it: Paris → "Score: 1 - Nice!", Play again → Quiz, London → "Score: 0 - Try again". Runtime: `runBook` now drives multi-page navigation (`page.go` fires `pageLeave` → re-renders page → rebuilds controls/scripts → fires `pageEnter`; store persists across pages; unknown page names report an error and stay put; `startPageIndex` supported; `Run` plays the page being edited). Editor: Pages panel (click to switch, double-click rename, ⧉ duplicate-with-objects, ✕ delete, + Add), file bar (New / Open… / Save via File System Access API with automatic download/input fallbacks), debounced IndexedDB autosave that restores on reload, recents menu. Scripting guide rewritten with the pages/navigation API + quiz recipe; `?` on the Pages panel opens it. Fixes found by acceptance: template-ref-in-v-for broke rename autofocus (array ref); Monaco auto-closing brackets turned scripted inserts into syntax errors — disabled (`autoClosingBrackets: 'never'`) since it also confuses beginners. 37/37 vitest, typecheck + build clean. Notes: autosave is session crash-recovery (New overwrites it — recents only lists Saved/Open'ed books); a "New discards unsaved changes" confirm is backlog-worthy. Next: M4 — one-click standalone HTML export + breakpoint preview.
 - **2026-09-09** — **Scripting guide + in-app help shipped.** `docs/scripting-guide.md` is the canonical reference (API: `store` / `controls.<name>` / `page` / `event`, object vs page scripts, `{{key}}` labels, six copy-paste recipes, debugging, sandbox notes, and an honest "pages are coming in M3" stub). `?` buttons next to "Page script" and "Script" open the guide rendered as HTML (imported via Vite `?raw`, rendered with `marked`, heading anchors scroll to the right section). Enabling improvements made while documenting: object event scripts and `pageEnter()` are now async — `await fetch(...)` works directly in any script (`player.ts`, +3 tests); `async function` declarations are recognized by the function-name sugar (regex bug found by the new tests); `input` (per-keystroke) added to the event dropdown. Verified in-browser: both `?` buttons open/scroll/close correctly, and the guide's "echo an input as you type" recipe works verbatim when built through the UI (screenshot: `doco/scripting-guide-popup.png`). 33/33 vitest, typecheck + build clean.

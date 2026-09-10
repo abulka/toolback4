@@ -1,14 +1,27 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import {
+  createBook,
   createObject,
+  createPage,
   DEFAULT_PROPS,
+  newId,
+  parseBook,
+  type Book,
   type Breakpoint,
   type ControlKind,
   type Rect,
 } from '@toolback/format'
 import { sampleBook } from '@toolback/format/src/sample'
 import type { EditorToCanvasMessage, ObjectRects } from '@toolback/runtime'
+import {
+  getRecentBook,
+  getRecents,
+  loadAutosave,
+  putRecentBook,
+  saveAutosave,
+  type RecentEntry,
+} from '../persist'
 
 let sendSync: ((msg: EditorToCanvasMessage) => void) | null = null
 
@@ -26,12 +39,20 @@ export const useBookStore = defineStore('book', () => {
   const dragOverCanvas = ref(false)
   const isRunning = ref(false)
   const scriptError = ref('')
+  const currentPageIndex = ref(0)
+  const recents = ref<RecentEntry[]>([])
+  const autosaveAt = ref<number | null>(null)
+  const fileNote = ref('')
 
-  const activePage = computed(() => book.value.pages[0]!)
+  const activePage = computed(
+    () => book.value.pages[currentPageIndex.value] ?? book.value.pages[0]!,
+  )
   const objectCount = computed(() => Object.keys(rects.value).length)
   const selectedObject = computed(
     () => activePage.value.objects.find((o) => o.id === selectionId.value) ?? null,
   )
+
+  let autosaveTimer: ReturnType<typeof setTimeout> | undefined
 
   function sync(): void {
     if (!sendSync) return
@@ -39,9 +60,111 @@ export const useBookStore = defineStore('book', () => {
       type: 'toolback:load',
       book: JSON.parse(JSON.stringify(book.value)),
       breakpoint: breakpoint.value,
+      pageIndex: currentPageIndex.value,
       design: !isRunning.value,
       selection: selectionId.value,
     })
+    clearTimeout(autosaveTimer)
+    autosaveTimer = setTimeout(() => {
+      const snapshot = JSON.parse(JSON.stringify(book.value)) as Book
+      void saveAutosave(snapshot).then(() => {
+        autosaveAt.value = Date.now()
+      })
+    }, 800)
+  }
+
+  function uniquePageName(): string {
+    const existing = new Set(book.value.pages.map((p) => p.name))
+    let n = book.value.pages.length + 1
+    while (existing.has(`Page ${n}`)) n++
+    return `Page ${n}`
+  }
+
+  function selectPage(i: number): void {
+    currentPageIndex.value = Math.max(0, Math.min(i, book.value.pages.length - 1))
+    selectionId.value = null
+    sync()
+  }
+
+  function addPage(): void {
+    book.value.pages.push(createPage(uniquePageName()))
+    selectPage(book.value.pages.length - 1)
+  }
+
+  function duplicatePage(i: number): void {
+    const src = book.value.pages[i]
+    if (!src) return
+    const copy = JSON.parse(JSON.stringify(src)) as typeof src
+    copy.id = newId('page')
+    copy.name = uniquePageName()
+    for (const o of copy.objects) o.id = newId('obj')
+    book.value.pages.splice(i + 1, 0, copy)
+    selectPage(i + 1)
+  }
+
+  function removePage(i: number): void {
+    if (book.value.pages.length <= 1) return
+    book.value.pages.splice(i, 1)
+    selectPage(Math.min(currentPageIndex.value, book.value.pages.length - 1))
+  }
+
+  function renamePage(i: number, name: string): void {
+    const page = book.value.pages[i]
+    if (!page) return
+    const trimmed = name.trim()
+    if (trimmed) page.name = trimmed
+    sync()
+  }
+
+  function newBook(): void {
+    book.value = createBook('Untitled book')
+    currentPageIndex.value = 0
+    selectionId.value = null
+    isRunning.value = false
+    sync()
+  }
+
+  function hydrate(raw: unknown): boolean {
+    try {
+      book.value = parseBook(JSON.parse(JSON.stringify(raw)))
+    } catch (err) {
+      error.value = `Invalid book file: ${String(err)}`
+      return false
+    }
+    currentPageIndex.value = 0
+    selectionId.value = null
+    isRunning.value = false
+    sync()
+    return true
+  }
+
+  async function restoreAutosave(): Promise<boolean> {
+    const saved = await loadAutosave()
+    if (!saved?.book) return false
+    try {
+      book.value = parseBook(saved.book)
+    } catch {
+      return false
+    }
+    currentPageIndex.value = 0
+    selectionId.value = null
+    autosaveAt.value = saved.at
+    sync()
+    return true
+  }
+
+  async function refreshRecents(): Promise<void> {
+    recents.value = await getRecents()
+  }
+
+  async function rememberCurrent(): Promise<void> {
+    const snapshot = JSON.parse(JSON.stringify(book.value)) as Book
+    recents.value = await putRecentBook(snapshot)
+  }
+
+  async function openRecent(id: string): Promise<void> {
+    const recent = await getRecentBook(id)
+    if (recent) hydrate(recent)
   }
 
   function toggleRun(): void {
@@ -120,6 +243,10 @@ export const useBookStore = defineStore('book', () => {
     dragOverCanvas,
     isRunning,
     scriptError,
+    currentPageIndex,
+    recents,
+    autosaveAt,
+    fileNote,
     activePage,
     objectCount,
     selectedObject,
@@ -127,6 +254,17 @@ export const useBookStore = defineStore('book', () => {
     toggleRun,
     setEventScript,
     setPageScript,
+    selectPage,
+    addPage,
+    duplicatePage,
+    removePage,
+    renamePage,
+    newBook,
+    hydrate,
+    restoreAutosave,
+    refreshRecents,
+    rememberCurrent,
+    openRecent,
     addObject,
     applyRect,
     updateProps,

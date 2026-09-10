@@ -55,9 +55,9 @@ Methods:
 ### page
 
 - `page.name` — the name of the current page
-
-Pages and navigation are coming in M3 — see
-[Pages and navigation](#pages-and-navigation) below.
+- `page.names` — the names of all pages in the book
+- `page.go('Results')` — navigate to another page (see
+  [Pages and navigation](#pages-and-navigation))
 
 ### event
 

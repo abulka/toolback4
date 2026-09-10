@@ -1,5 +1,5 @@
 import type { Book, Breakpoint, ControlKind, Rect } from '@toolback/format'
-import { getObjectRects, renderBook } from './index'
+import { getObjectRects, renderBookPage } from './index'
 import { createDesignController, type DesignOutMessage } from './design'
 import { runBook, stopRun } from './player'
 import type { ObjectRects } from './index'
@@ -9,6 +9,7 @@ export type EditorToCanvasMessage =
       type: 'toolback:load'
       book: Book
       breakpoint?: Breakpoint
+      pageIndex?: number
       design?: boolean
       selection?: string | null
     }
@@ -60,17 +61,22 @@ export function listenForEditor(
     if (data.type !== 'toolback:load') return
     try {
       ensureStructure()
+      const pageIndex = Number.isInteger(data.pageIndex) ? (data.pageIndex as number) : 0
       if (data.design) {
         stopRun()
-        renderBook(data.book, holder!, data.breakpoint ?? 'desktop')
+        renderBookPage(data.book, pageIndex, holder!, data.breakpoint ?? 'desktop')
         const pageRoot = holder!.querySelector<HTMLElement>('.tb-page')
         send({ type: 'toolback:rects', rects: pageRoot ? getObjectRects(pageRoot) : {} })
         design.setEnabled(true)
         design.onRendered(data.selection ?? null)
       } else {
         design.setEnabled(false)
-        runBook(data.book, holder!, data.breakpoint ?? 'desktop', (message) =>
-          send({ type: 'toolback:scriptError', message }),
+        runBook(
+          data.book,
+          holder!,
+          data.breakpoint ?? 'desktop',
+          (message) => send({ type: 'toolback:scriptError', message }),
+          pageIndex,
         )
         const pageRoot = holder!.querySelector<HTMLElement>('.tb-page')
         send({ type: 'toolback:rects', rects: pageRoot ? getObjectRects(pageRoot) : {} })

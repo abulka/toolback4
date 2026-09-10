@@ -199,4 +199,99 @@ describe('player', () => {
     stopRun()
     root.remove()
   })
+
+  describe('multi-page', () => {
+    function makeTwoPageBook(): Book {
+      return {
+        id: 'book2',
+        title: 'Quiz',
+        canvas: { desktop: { width: 1280, height: 800 } },
+        pages: [
+          {
+            id: 'p1',
+            name: 'Quiz',
+            script: `function pageLeave() { store.set('left1', true) }`,
+            background: '#ffffff',
+            objects: [
+              {
+                ...createObject('button', 'answer', { desktop: { x: 0, y: 0, w: 100, h: 40 } }),
+                on: { click: `store.set('from', 'quiz'); page.go('Results')` },
+              },
+            ],
+          },
+          {
+            id: 'p2',
+            name: 'Results',
+            script: `function pageEnter() { store.set('entered2', true) }`,
+            background: '#ffffff',
+            objects: [
+              {
+                ...createObject('label', 'scoreLabel', { desktop: { x: 0, y: 0, w: 200, h: 40 } }),
+                props: { text: 'Score: {{score}}' },
+              },
+            ],
+          },
+        ],
+      }
+    }
+
+    const tick = () => new Promise((r) => setTimeout(r, 20))
+
+    it('page.go navigates: fires pageLeave/pageEnter, rebuilds controls and DOM, keeps store', async () => {
+      const root = document.createElement('div')
+      document.body.appendChild(root)
+      const errors: string[] = []
+      const handle = runBook(makeTwoPageBook(), root, 'desktop', (m) => errors.push(m))
+
+      expect(root.querySelector('button.tb-button')).not.toBeNull()
+      expect(root.querySelector('.tb-label')).toBeNull()
+      expect(handle.controls['answer']).toBeDefined()
+      expect(handle.controls['scoreLabel']).toBeUndefined()
+
+      root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
+      await tick()
+
+      expect(errors).toEqual([])
+      expect(handle.store.get('from')).toBe('quiz')
+      expect(handle.store.get('left1')).toBe(true)
+      expect(handle.store.get('entered2')).toBe(true)
+      expect(root.querySelector('button.tb-button')).toBeNull()
+      expect(root.querySelector('.tb-label')?.textContent).toBe('Score: ')
+      expect(handle.controls['answer']).toBeUndefined()
+      expect(handle.controls['scoreLabel']).toBeDefined()
+
+      handle.stop()
+      root.remove()
+    })
+
+    it('page.go to an unknown name reports an error and stays put', async () => {
+      const root = document.createElement('div')
+      document.body.appendChild(root)
+      const errors: string[] = []
+      const book = makeTwoPageBook()
+      book.pages[0]!.objects[0]!.on['click'] = `page.go('Nope')`
+      const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+
+      root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
+      await tick()
+
+      expect(errors[0]).toContain('no page named')
+      expect(handle.store.get('entered2')).toBeUndefined()
+      expect(root.querySelector('button.tb-button')).not.toBeNull()
+
+      handle.stop()
+      root.remove()
+    })
+
+    it('starts on the requested page', () => {
+      const root = document.createElement('div')
+      document.body.appendChild(root)
+      const handle = runBook(makeTwoPageBook(), root, 'desktop', undefined, 1)
+      expect(root.querySelector('.tb-label')).not.toBeNull()
+      expect(root.querySelector('button.tb-button')).toBeNull()
+      expect(handle.store.get('entered2')).toBe(true)
+      handle.stop()
+      root.remove()
+    })
+  })
 })

@@ -4,15 +4,19 @@ import type { ControlKind } from '@toolback/format'
 import { wireCanvas } from './canvasClient'
 import { startPaletteDrag } from './paletteDrag'
 import { useBookStore } from './stores/book'
+import { openBookFile, saveBookFile } from './files'
 import PropertiesPanel from './components/PropertiesPanel.vue'
 import ScriptEditor from './components/ScriptEditor.vue'
 import HelpButton from './components/HelpButton.vue'
+import PagesPanel from './components/PagesPanel.vue'
 
 const store = useBookStore()
 const iframe = ref<HTMLIFrameElement | null>(null)
 
-onMounted(() => {
+onMounted(async () => {
   if (iframe.value) wireCanvas(iframe.value)
+  await store.restoreAutosave()
+  await store.refreshRecents()
 })
 
 const palette: ControlKind[] = ['button', 'label', 'input', 'image', 'card', 'container']
@@ -20,19 +24,64 @@ const palette: ControlKind[] = ['button', 'label', 'input', 'image', 'card', 'co
 function onPaletteDown(kind: ControlKind, e: PointerEvent): void {
   if (iframe.value && !store.isRunning) startPaletteDrag(e, kind, iframe.value)
 }
+
+async function onNew(): Promise<void> {
+  store.newBook()
+  await store.rememberCurrent()
+}
+
+async function onSave(): Promise<void> {
+  try {
+    const result = await saveBookFile(store.book)
+    await store.rememberCurrent()
+    store.fileNote = result === 'saved' ? 'saved to file' : 'downloaded'
+  } catch (err) {
+    if (!(err instanceof DOMException && err.name === 'AbortError')) {
+      store.error = String(err)
+    }
+  }
+}
+
+async function onOpen(): Promise<void> {
+  try {
+    const book = await openBookFile()
+    if (book && store.hydrate(book)) await store.rememberCurrent()
+  } catch (err) {
+    if (!(err instanceof DOMException && err.name === 'AbortError')) {
+      store.error = `Open failed: ${String(err)}`
+    }
+  }
+}
+
+async function onRecent(e: Event): Promise<void> {
+  const id = (e.target as HTMLSelectElement).value
+  ;(e.target as HTMLSelectElement).value = ''
+  if (id) await store.openRecent(id)
+}
 </script>
 
 <template>
   <div class="shell">
     <header class="topbar">
-      <div class="brand">
-        <span class="logo">toolback</span>
-        <span class="badge">v4 · M2 scripting</span>
+      <div class="left-group">
+        <div class="brand">
+          <span class="logo">toolback</span>
+          <span class="badge">v4 · M3 book</span>
+        </div>
+        <div class="filebar">
+          <button @click="onNew">New</button>
+          <button @click="onOpen">Open…</button>
+          <button @click="onSave">Save</button>
+          <select v-if="store.recents.length" class="recents" @change="onRecent">
+            <option value="">Recent…</option>
+            <option v-for="r in store.recents" :key="r.id" :value="r.id">{{ r.title }}</option>
+          </select>
+        </div>
       </div>
       <button
         class="run"
         :class="{ running: store.isRunning }"
-        title="Toggle run mode"
+        title="Run this page"
         @click="store.toggleRun()"
       >
         {{ store.isRunning ? 'Stop' : 'Run' }}
@@ -48,6 +97,7 @@ function onPaletteDown(kind: ControlKind, e: PointerEvent): void {
         </li>
       </ul>
       <p class="hint">Drag onto the canvas →</p>
+      <PagesPanel />
     </aside>
 
     <main class="canvas-area" :class="{ active: store.dragOverCanvas }">
@@ -108,7 +158,9 @@ function onPaletteDown(kind: ControlKind, e: PointerEvent): void {
       <template v-else-if="store.canvasReady">
         <span class="ok">● canvas ready</span>
         <span class="mode" :class="{ running: store.isRunning }">{{ store.isRunning ? 'RUNNING' : 'design' }}</span>
-        <span>{{ store.objectCount }} objects · book "{{ store.book.title }}" · page "{{ store.activePage.name }}"</span>
+        <span>page {{ store.currentPageIndex + 1 }}/{{ store.book.pages.length }} · {{ store.objectCount }} objects · "{{ store.book.title }}"</span>
+        <span v-if="store.autosaveAt" class="dim">autosaved {{ new Date(store.autosaveAt).toLocaleTimeString() }}</span>
+        <span v-if="store.fileNote" class="dim">{{ store.fileNote }}</span>
         <span v-if="store.scriptError" class="err">script: {{ store.scriptError }}</span>
       </template>
       <template v-else>
@@ -178,6 +230,48 @@ body.tb-palette-dragging * {
   padding: 0 14px;
   background: var(--ed-panel);
   border-bottom: 1px solid var(--ed-border);
+}
+
+.left-group {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.filebar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filebar button {
+  font: 500 12px/1 system-ui, sans-serif;
+  color: var(--ed-text);
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.filebar button:hover {
+  border-color: var(--ed-accent);
+  color: #fff;
+}
+
+.recents {
+  max-width: 140px;
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  color: var(--ed-text-dim);
+  padding: 6px 6px;
+  font: 500 12px/1 system-ui, sans-serif;
+}
+
+.dim {
+  color: var(--ed-text-dim);
+  opacity: 0.8;
 }
 
 .brand {

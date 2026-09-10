@@ -1,5 +1,5 @@
 import type { Book, Breakpoint, PageObject } from '@toolback/format'
-import { renderBook } from './index'
+import { renderBookPage } from './index'
 
 export interface ToolbackStore {
   get(key: string): unknown
@@ -116,6 +116,112 @@ function wireDynamicText(
   listeners.push(store.subscribe(render))
 }
 
+interface RunState {
+  book: Book
+  root: HTMLElement
+  breakpoint: Breakpoint
+  onError?: (message: string) => void
+  store: ToolbackStore
+  pageApi: unknown
+  controls: Record<string, ControlApi>
+  listeners: Array<() => void>
+  pageFns: Record<string, (e?: unknown) => unknown>
+  idx: number
+  navLock: boolean
+}
+
+function safeRun(st: RunState, what: string, fn: () => void): void {
+  try {
+    fn()
+  } catch (err) {
+    st.onError?.(`${what}: ${String(err)}`)
+  }
+}
+
+function runPage(st: RunState, idx: number): void {
+  if (st.navLock) return
+  st.navLock = true
+  try {
+    const leave = st.pageFns['pageLeave']
+    if (typeof leave === 'function') {
+      safeRun(st, 'pageLeave', () => {
+        Promise.resolve(leave()).catch((err) => st.onError?.(`pageLeave: ${String(err)}`))
+      })
+    }
+    for (const un of st.listeners) un()
+    st.listeners = []
+
+    st.idx = idx
+    const page = st.book.pages[idx] ?? st.book.pages[0]!
+    renderBookPage(st.book, idx, st.root, st.breakpoint)
+    const pageRoot = st.root.querySelector<HTMLElement>('.tb-page')!
+
+    for (const k of Object.keys(st.controls)) delete st.controls[k]
+    for (const obj of page.objects) {
+      const el = controlElement(pageRoot, obj.name)
+      if (el) st.controls[obj.name] = makeControlApi(obj, el, st.listeners)
+    }
+
+    const api = { page: st.pageApi, controls: st.controls, store: st.store }
+
+    st.pageFns = {}
+    if (page.script.trim()) {
+      safeRun(st, 'page script', () => {
+        const names = extractFunctionNames(page.script)
+        const returnObj = names
+          .map((n) => `${JSON.stringify(n)}: typeof ${n} === 'function' ? ${n} : undefined`)
+          .join(',')
+        const factory = new Function(
+          'api',
+          `"use strict";\nconst { page, controls, store } = api;\n${page.script}\n;return { ${returnObj} };`,
+        )
+        st.pageFns = (factory(api) ?? {}) as Record<string, (e?: unknown) => unknown>
+      })
+    }
+    const fnNames = Object.keys(st.pageFns)
+    const fnValues = fnNames.map((n) => st.pageFns[n])
+
+    for (const obj of page.objects) {
+      const ctl = st.controls[obj.name]
+      if (!ctl) continue
+      for (const [eventName, script] of Object.entries(obj.on)) {
+        if (!script || !script.trim()) continue
+        try {
+          const factory = new Function(
+            'api',
+            ...fnNames,
+            'event',
+            `"use strict";\nconst { page, controls, store } = api;\nreturn (async () => {\n${script}\n})();`,
+          )
+          const handler = (e: Event) => {
+            safeRun(st, `${obj.name}.${eventName}`, () => {
+              Promise.resolve(factory(api, ...fnValues, e)).catch((err) =>
+                st.onError?.(`${obj.name}.${eventName}: ${String(err)}`),
+              )
+            })
+          }
+          ctl.el.addEventListener(eventName, handler)
+          st.listeners.push(() => ctl.el.removeEventListener(eventName, handler))
+        } catch (err) {
+          st.onError?.(`${obj.name}.${eventName}: ${String(err)}`)
+        }
+      }
+    }
+
+    wireDynamicText(pageRoot, page, st.store, st.listeners)
+
+    st.navLock = false
+    const enter = st.pageFns['pageEnter']
+    if (typeof enter === 'function') {
+      safeRun(st, 'pageEnter', () => {
+        Promise.resolve(enter()).catch((err) => st.onError?.(`pageEnter: ${String(err)}`))
+      })
+    }
+  } finally {
+    st.navLock = false
+  }
+}
+
 export interface RunHandle {
   store: ToolbackStore
   controls: Record<string, ControlApi>
@@ -134,90 +240,50 @@ export function runBook(
   root: HTMLElement,
   breakpoint: Breakpoint = 'desktop',
   onError?: (message: string) => void,
+  startPageIndex = 0,
 ): RunHandle {
   stopRun()
 
-  const page = book.pages[0]!
-  renderBook(book, root, breakpoint)
-  const pageRoot = root.querySelector<HTMLElement>('.tb-page')!
-
   const store = createStore()
-  const controls: Record<string, ControlApi> = {}
-  const listeners: Array<() => void> = []
-  const safe = (what: string, fn: () => void) => {
-    try {
-      fn()
-    } catch (err) {
-      onError?.(`${what}: ${String(err)}`)
-    }
+  const st: RunState = {
+    book,
+    root,
+    breakpoint,
+    onError,
+    store,
+    pageApi: null,
+    controls: {},
+    listeners: [],
+    pageFns: {},
+    idx: startPageIndex,
+    navLock: false,
   }
 
-  for (const obj of page.objects) {
-    const el = controlElement(pageRoot, obj.name)
-    if (el) controls[obj.name] = makeControlApi(obj, el, listeners)
-  }
-
-  const api = { page: { name: page.name }, controls, store }
-
-  let pageFns: Record<string, (e?: unknown) => unknown> = {}
-  if (page.script.trim()) {
-    safe('page script', () => {
-      const names = extractFunctionNames(page.script)
-      const returnObj = names
-        .map((n) => `${JSON.stringify(n)}: typeof ${n} === 'function' ? ${n} : undefined`)
-        .join(',')
-      const factory = new Function(
-        'api',
-        `"use strict";\nconst { page, controls, store } = api;\n${page.script}\n;return { ${returnObj} };`,
-      )
-      pageFns = (factory(api) ?? {}) as Record<string, (e?: unknown) => unknown>
-    })
-  }
-  const fnNames = Object.keys(pageFns)
-  const fnValues = fnNames.map((n) => pageFns[n])
-
-  for (const obj of page.objects) {
-    const ctl = controls[obj.name]
-    if (!ctl) continue
-    for (const [eventName, script] of Object.entries(obj.on)) {
-      if (!script || !script.trim()) continue
-      try {
-        const factory = new Function(
-          'api',
-          ...fnNames,
-          'event',
-          `"use strict";\nconst { page, controls, store } = api;\nreturn (async () => {\n${script}\n})();`,
-        )
-        const handler = (e: Event) => {
-          safe(`${obj.name}.${eventName}`, () => {
-            Promise.resolve(factory(api, ...fnValues, e)).catch((err) =>
-              onError?.(`${obj.name}.${eventName}: ${String(err)}`),
-            )
-          })
-        }
-        ctl.el.addEventListener(eventName, handler)
-        listeners.push(() => ctl.el.removeEventListener(eventName, handler))
-      } catch (err) {
-        onError?.(`${obj.name}.${eventName}: ${String(err)}`)
+  st.pageApi = {
+    get name(): string {
+      return (book.pages[st.idx] ?? book.pages[0]!).name
+    },
+    names: book.pages.map((p) => p.name),
+    go(name: string): void {
+      const i = book.pages.findIndex((p) => p.name === name)
+      if (i === -1) {
+        onError?.(`page.go: no page named "${name}"`)
+        return
       }
-    }
+      runPage(st, i)
+    },
   }
 
-  wireDynamicText(pageRoot, page, store, listeners)
-
-  const pageEnter = pageFns['pageEnter']
-  if (typeof pageEnter === 'function') {
-    safe('pageEnter', () => {
-      Promise.resolve(pageEnter()).catch((err) => onError?.(`pageEnter: ${String(err)}`))
-    })
-  }
+  runPage(st, startPageIndex)
 
   active = {
     store,
-    controls,
+    get controls() {
+      return st.controls
+    },
     stop: () => {
-      for (const un of listeners) un()
-      listeners.length = 0
+      for (const un of st.listeners) un()
+      st.listeners = []
     },
   }
   return active

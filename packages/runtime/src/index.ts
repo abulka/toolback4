@@ -79,10 +79,19 @@ export function renderBook(
   root: HTMLElement,
   breakpoint: Breakpoint = 'desktop',
 ): HTMLElement {
+  return renderBookPage(book, 0, root, breakpoint)
+}
+
+export function renderBookPage(
+  book: Book,
+  pageIndex: number,
+  root: HTMLElement,
+  breakpoint: Breakpoint = 'desktop',
+): HTMLElement {
   for (const child of Array.from(root.children)) {
     root.removeChild(child)
   }
-  const page = book.pages[0]!
+  const page = book.pages[pageIndex] ?? book.pages[0]!
   const canvasSize = book.canvas[breakpoint] ?? book.canvas.desktop
   return renderPage(page, breakpoint, root, canvasSize)
 }

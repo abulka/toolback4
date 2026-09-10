@@ -32,6 +32,9 @@ onMounted(async () => {
     tabSize: 2,
     renderLineHighlight: 'line',
     padding: { top: 6, bottom: 6 },
+    autoClosingBrackets: 'never',
+    autoIndent: 'keep',
+    formatOnType: false,
   })
   editor.onDidChangeModelContent(() => {
     emit('update:modelValue', editor!.getValue())
