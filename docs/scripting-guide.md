@@ -51,6 +51,13 @@ Get/set properties:
 - `value` — the value of an input
 - `visible` — `true`/`false`, show or hide the object
 - `enabled` — `true`/`false`, enable or disable (buttons and inputs)
+- `x`, `y` — the object's position on the canvas, in pixels (moving it)
+- `width`, `height` — the object's size, in pixels (resizing it; minimum 1)
+
+Geometry changes apply immediately, and they stick for the whole run — even
+across `page.go` navigations. Each breakpoint (desktop/tablet/mobile) keeps its
+own position, so editing `x` while running the desktop preview only changes the
+desktop rect.
 
 Methods:
 
@@ -177,6 +184,30 @@ A button's `click` script:
 controls.card1.visible = !controls.card1.visible
 ```
 
+### Move and resize objects from script
+
+Every object knows where it is — read or write `x`, `y`, `width`, `height`:
+
+```js
+// a button's click script: slide the box right, grow it a little
+controls.box.x += 24
+controls.box.width = 300
+```
+
+Combined with `await` this makes simple animations:
+
+```js
+// a button's click script: hop the box up and back down
+for (let i = 0; i < 10; i++) {
+  box.y -= 8
+  await new Promise((r) => setTimeout(r, 30))
+}
+for (let i = 0; i < 10; i++) {
+  box.y += 8
+  await new Promise((r) => setTimeout(r, 30))
+}
+```
+
 ### Fetch data when the page runs
 
 Page script:
@@ -200,9 +231,9 @@ The script editors help as you type:
   ready-made templates. No thousands of irrelevant browser globals. Filter by
   typing; **Tab** (or Enter/click) inserts.
 - **Typing `.` after an object** lists that object's properties — `button2.`
-  offers `text`, `value`, `visible`, `enabled`, `on`, `el` — with short
-  descriptions of each. `store.`, `page.`, `controls.` and `event.` all have
-  their own member lists.
+  offers `text`, `value`, `visible`, `enabled`, `x`, `y`, `width`, `height`,
+  `on`, `el` — with short descriptions of each. `store.`, `page.`, `controls.`
+  and `event.` all have their own member lists.
 - **Templates**: `pageEnter`, `pageLeave`, `store.set`, `store.get`, `page.go`,
   `onEvent`, `input-to-store`, `fetch-to-store`, `console.log`. They expand
   into ready-to-fill code with tab stops.

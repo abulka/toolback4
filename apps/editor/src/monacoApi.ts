@@ -71,6 +71,10 @@ const CONTROL_MEMBERS: Array<{
   { label: 'value', detail: "input's current value", body: 'value', kind: 'prop' },
   { label: 'visible', detail: 'show/hide the object', body: 'visible', kind: 'prop' },
   { label: 'enabled', detail: 'enable/disable the object', body: 'enabled', kind: 'prop' },
+  { label: 'x', detail: 'left position (px) — moves the object', body: 'x', kind: 'prop' },
+  { label: 'y', detail: 'top position (px) — moves the object', body: 'y', kind: 'prop' },
+  { label: 'width', detail: 'width (px) — resizes the object', body: 'width', kind: 'prop' },
+  { label: 'height', detail: 'height (px) — resizes the object', body: 'height', kind: 'prop' },
   { label: 'name', detail: "this object's name", body: 'name', kind: 'prop' },
   {
     label: 'on',

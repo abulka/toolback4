@@ -1,0 +1,122 @@
+{
+  "id": "book_cc924a911",
+  "title": "Hello Toolbook",
+  "canvas": {
+    "desktop": {
+      "width": 1280,
+      "height": 800
+    }
+  },
+  "pages": [
+    {
+      "id": "page_fb245c3b2",
+      "name": "Page 1",
+      "script": "",
+      "background": "#ffffff",
+      "objects": [
+        {
+          "id": "obj_1973aa773",
+          "name": "helloLabel",
+          "control": "label",
+          "rects": {
+            "desktop": {
+              "x": 96,
+              "y": 88,
+              "w": 280,
+              "h": 56
+            }
+          },
+          "props": {
+            "text": "Hello, Toolbook nostalgia!"
+          },
+          "on": {
+            "click": "\n\nbutt"
+          }
+        },
+        {
+          "id": "obj_474c719f4",
+          "name": "myButton",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 96,
+              "y": 184,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "go page 2"
+          },
+          "on": {
+            "click": "page.go('Page 2')\n//image1.visible = false\n\n"
+          }
+        },
+        {
+          "id": "obj_610bdbd36",
+          "name": "image1",
+          "control": "image",
+          "rects": {
+            "desktop": {
+              "x": 624,
+              "y": 32,
+              "w": 216,
+              "h": 112
+            }
+          },
+          "props": {
+            "src": "https://dummyimage.com/600x400/000/fff&text=hi+there"
+          },
+          "on": {}
+        }
+      ]
+    },
+    {
+      "id": "page_4d378c595",
+      "name": "Page 2",
+      "script": "function pageEnter() {\n  console.log('hi from page enter')\n  button2.text = 'back to the first page'\n}\n",
+      "background": "#ffffff",
+      "objects": [
+        {
+          "id": "obj_710c31c36",
+          "name": "button1",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 80,
+              "y": 104,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "mess with button below"
+          },
+          "on": {
+            "click": "button2.text = 'Back TO PAGE 1'\nbutton2.width += 10",
+            "mouseenter": "button2.visible = !button2.visible"
+          }
+        },
+        {
+          "id": "obj_d21a2a587",
+          "name": "button2",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 80,
+              "y": 176,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "Back"
+          },
+          "on": {
+            "click": "page.go('Page 1')"
+          }
+        }
+      ]
+    }
+  ]
+}

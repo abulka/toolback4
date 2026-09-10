@@ -18,6 +18,14 @@ interface TBControl {
   visible: boolean
   /** Enable or disable the object (buttons and inputs) */
   enabled: boolean
+  /** Left edge position (px) — moves the object */
+  x: number
+  /** Top edge position (px) — moves the object */
+  y: number
+  /** Width (px) — resizes the object */
+  width: number
+  /** Height (px) — resizes the object */
+  height: number
   /** Attach an extra event handler, e.g. on('click', (e) => { ... }) */
   on(event: string, fn: TBListener): void
 }

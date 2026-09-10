@@ -1,4 +1,4 @@
-import type { Book, Breakpoint, PageObject } from '@toolback/format'
+import type { Book, Breakpoint, PageObject, Rect } from '@toolback/format'
 import { renderBookPage } from './index'
 
 export interface ToolbackStore {
@@ -30,6 +30,14 @@ export interface ControlApi {
   value: string
   visible: boolean
   enabled: boolean
+  /** Left edge (px) on the canvas */
+  x: number
+  /** Top edge (px) on the canvas */
+  y: number
+  /** Width (px) */
+  width: number
+  /** Height (px) */
+  height: number
   on(event: string, fn: (e: Event) => void): void
 }
 
@@ -43,16 +51,38 @@ function escapeSel(name: string): string {
 }
 
 function controlElement(pageRoot: HTMLElement, name: string): HTMLElement | null {
-  const wrapper = pageRoot.querySelector<HTMLElement>(`[data-tb-name="${escapeSel(name)}"]`)
-  return (wrapper?.firstElementChild as HTMLElement) ?? null
+  return controlWrapper(pageRoot, name)?.firstElementChild as HTMLElement | null
+}
+
+function controlWrapper(pageRoot: HTMLElement, name: string): HTMLElement | null {
+  return pageRoot.querySelector<HTMLElement>(`[data-tb-name="${escapeSel(name)}"]`)
 }
 
 function makeControlApi(
   obj: PageObject,
   el: HTMLElement,
+  wrapper: HTMLElement,
+  breakpoint: Breakpoint,
   listeners: Array<() => void>,
 ): ControlApi {
   const input = el instanceof HTMLInputElement ? el : null
+
+  const rectNow = (): Rect => obj.rects[breakpoint] ?? obj.rects.desktop
+  const writeRect = (r: Rect): void => {
+    obj.rects = { ...obj.rects, [breakpoint]: r }
+    wrapper.style.left = `${r.x}px`
+    wrapper.style.top = `${r.y}px`
+    wrapper.style.width = `${r.w}px`
+    wrapper.style.height = `${r.h}px`
+  }
+  const setRectPart = (part: 'x' | 'y' | 'w' | 'h', v: unknown): void => {
+    const n = typeof v === 'number' ? v : Number(v)
+    if (!Number.isFinite(n)) return
+    const r = { ...rectNow() }
+    r[part] = part === 'x' || part === 'y' ? Math.round(n) : Math.max(1, Math.round(n))
+    writeRect(r)
+  }
+
   return {
     el,
     name: obj.name,
@@ -82,6 +112,30 @@ function makeControlApi(
       if (el instanceof HTMLButtonElement || el instanceof HTMLInputElement) {
         el.disabled = !v
       }
+    },
+    get x() {
+      return rectNow().x
+    },
+    set x(v: number) {
+      setRectPart('x', v)
+    },
+    get y() {
+      return rectNow().y
+    },
+    set y(v: number) {
+      setRectPart('y', v)
+    },
+    get width() {
+      return rectNow().w
+    },
+    set width(v: number) {
+      setRectPart('w', v)
+    },
+    get height() {
+      return rectNow().h
+    },
+    set height(v: number) {
+      setRectPart('h', v)
     },
     on(event: string, fn: (e: Event) => void) {
       el.addEventListener(event, fn)
@@ -170,8 +224,11 @@ function runPage(st: RunState, idx: number): void {
 
     for (const k of Object.keys(st.controls)) delete st.controls[k]
     for (const obj of page.objects) {
-      const el = controlElement(pageRoot, obj.name)
-      if (el) st.controls[obj.name] = makeControlApi(obj, el, st.listeners)
+      const wrapper = controlWrapper(pageRoot, obj.name)
+      const el = (wrapper?.firstElementChild as HTMLElement | null) ?? null
+      if (el && wrapper) {
+        st.controls[obj.name] = makeControlApi(obj, el, wrapper, st.breakpoint, st.listeners)
+      }
     }
 
     const api = { page: st.pageApi, controls: st.controls, store: st.store }

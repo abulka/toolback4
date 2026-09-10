@@ -360,4 +360,126 @@ describe('player', () => {
       root.remove()
     })
   })
+
+  describe('rect properties', () => {
+    function rectBook(on?: Record<string, string>): Book {
+      const obj = createObject('label', 'box', { desktop: { x: 40, y: 60, w: 120, h: 80 } }, { text: 'box' })
+      const book = makeBook({ objects: [] })
+      book.pages[0]!.objects = [{ ...obj, on: on ?? {} }]
+      return book
+    }
+
+    function wrapperOf(root: HTMLElement, name: string): HTMLElement {
+      return root.querySelector(`[data-tb-name="${name}"]`) as HTMLElement
+    }
+
+    it('reads x/y/width/height from the object rect', () => {
+      const book = rectBook()
+      const root = document.createElement('div')
+      const handle = runBook(book, root, 'desktop')
+      const box = handle.controls['box']!
+      expect(box.x).toBe(40)
+      expect(box.y).toBe(60)
+      expect(box.width).toBe(120)
+      expect(box.height).toBe(80)
+      handle.stop()
+    })
+
+    it('writes move/resize the object on screen and in the book data', () => {
+      const book = rectBook()
+      const root = document.createElement('div')
+      const handle = runBook(book, root, 'desktop')
+      const box = handle.controls['box']!
+      box.x = 200
+      box.y = 90
+      box.width = 300
+      box.height = 40
+
+      const wrapper = wrapperOf(root, 'box')
+      expect(wrapper.style.left).toBe('200px')
+      expect(wrapper.style.top).toBe('90px')
+      expect(wrapper.style.width).toBe('300px')
+      expect(wrapper.style.height).toBe('40px')
+
+      const stored = book.pages[0]!.objects[0]!.rects.desktop
+      expect(stored).toEqual({ x: 200, y: 90, w: 300, h: 40 })
+      handle.stop()
+    })
+
+    it('supports += and clamps size to a minimum of 1px', () => {
+      const book = rectBook()
+      const root = document.createElement('div')
+      const handle = runBook(book, root, 'desktop')
+      const box = handle.controls['box']!
+      box.x += 10
+      expect(box.x).toBe(50)
+      box.width = 0
+      expect(box.width).toBe(1)
+      expect(wrapperOf(root, 'box').style.width).toBe('1px')
+      handle.stop()
+    })
+
+    it('ignores non-finite values', () => {
+      const book = rectBook()
+      const root = document.createElement('div')
+      const handle = runBook(book, root, 'desktop')
+      const box = handle.controls['box']!
+      box.x = Number.NaN
+      box.y = 'abc' as unknown as number
+      box.width = Number.POSITIVE_INFINITY
+      expect(box.x).toBe(40)
+      expect(box.y).toBe(60)
+      expect(box.width).toBe(120)
+      expect(wrapperOf(root, 'box').style.left).toBe('40px')
+      handle.stop()
+    })
+
+    it('rect changes survive page navigation (re-render from book data)', async () => {
+      const book = rectBook({ click: `box.x = 222; page.go('Page 1')` })
+      const root = document.createElement('div')
+      document.body.appendChild(root)
+      const errors: string[] = []
+      const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+
+      ;(wrapperOf(root, 'box').firstElementChild as HTMLElement).dispatchEvent(new MouseEvent('click'))
+      await new Promise((r) => setTimeout(r, 20))
+
+      expect(errors).toEqual([])
+      expect(handle.controls['box']!.x).toBe(222)
+      expect(wrapperOf(root, 'box').style.left).toBe('222px')
+      handle.stop()
+      root.remove()
+    })
+
+    it('writing on a breakpoint without its own rect creates it, desktop stays untouched', () => {
+      const book = rectBook()
+      const root = document.createElement('div')
+      const handle = runBook(book, root, 'tablet')
+      handle.controls['box']!.x = 500
+
+      const obj = book.pages[0]!.objects[0]!
+      expect(obj.rects.desktop.x).toBe(40)
+      expect(obj.rects.tablet).toEqual({ x: 500, y: 60, w: 120, h: 80 })
+      handle.stop()
+    })
+
+    it('reads x/y on tablet from the tablet rect when present', () => {
+      const obj = createObject('label', 'box', {
+        desktop: { x: 40, y: 60, w: 120, h: 80 },
+        tablet: { x: 10, y: 20, w: 90, h: 30 },
+      })
+      const book = makeBook({ objects: [] })
+      book.pages[0]!.objects = [{ ...obj, on: {} }]
+      const root = document.createElement('div')
+      const handle = runBook(book, root, 'tablet')
+      const box = handle.controls['box']!
+      expect(box.x).toBe(10)
+      expect(box.y).toBe(20)
+      expect(box.width).toBe(90)
+      box.x = 99
+      expect(book.pages[0]!.objects[0]!.rects.tablet!.x).toBe(99)
+      expect(book.pages[0]!.objects[0]!.rects.desktop.x).toBe(40)
+      handle.stop()
+    })
+  })
 })

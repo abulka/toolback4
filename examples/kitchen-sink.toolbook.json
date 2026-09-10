@@ -1,0 +1,268 @@
+{
+  "id": "book_kitchen_sink",
+  "title": "Kitchen Sink",
+  "canvas": {
+    "desktop": { "width": 1280, "height": 800 },
+    "tablet": { "width": 768, "height": 1024 },
+    "mobile": { "width": 390, "height": 844 }
+  },
+  "pages": [
+    {
+      "id": "page_hs_home",
+      "name": "Home",
+      "script": "function pageEnter() {\n  store.set('where', page.name)\n  store.set('pages', page.names.join(', '))\n  if (store.get('clicks') === undefined) store.set('clicks', 0)\n  if (store.get('who') === undefined) store.set('who', 'stranger')\n  store.set('hover', 'try this label')\n}\n\nfunction resetDemo() {\n  box.x = 640\n  box.y = 96\n  box.width = 240\n  box.height = 140\n  box.visible = true\n  clickButton.enabled = true\n  store.set('clicks', 0)\n}\n",
+      "background": "#f6f7fb",
+      "objects": [
+        {
+          "id": "obj_hs_title",
+          "name": "homeTitle",
+          "control": "label",
+          "rects": { "desktop": { "x": 48, "y": 32, "w": 780, "h": 56 } },
+          "props": { "text": "Kitchen sink — every control, event and scripting trick in one book" },
+          "on": {}
+        },
+        {
+          "id": "obj_hs_panel",
+          "name": "panel",
+          "control": "container",
+          "rects": { "desktop": { "x": 48, "y": 112, "w": 520, "h": 560 } },
+          "props": {},
+          "on": {}
+        },
+        {
+          "id": "obj_hs_card",
+          "name": "infoCard",
+          "control": "card",
+          "rects": { "desktop": { "x": 80, "y": 144, "w": 440, "h": 184 } },
+          "props": {
+            "title": "What's inside",
+            "text": "All six controls, every event, the store, {{key}} labels and scripted geometry. Open each object's Script panel to see how it works — then press Run and play."
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_hs_input",
+          "name": "nameInput",
+          "control": "input",
+          "rects": { "desktop": { "x": 80, "y": 352, "w": 280, "h": 44 } },
+          "props": { "placeholder": "Your name…" },
+          "on": {
+            "input": "store.set('who', event.target.value)",
+            "change": "store.set('committed', event.target.value)"
+          }
+        },
+        {
+          "id": "obj_hs_echo",
+          "name": "echoLabel",
+          "control": "label",
+          "rects": { "desktop": { "x": 80, "y": 412, "w": 280, "h": 36 } },
+          "props": { "text": "Hi {{who}}" },
+          "on": {}
+        },
+        {
+          "id": "obj_hs_committed",
+          "name": "committedLabel",
+          "control": "label",
+          "rects": { "desktop": { "x": 80, "y": 456, "w": 280, "h": 36 } },
+          "props": { "text": "Committed: {{committed}}" },
+          "on": {}
+        },
+        {
+          "id": "obj_hs_clicks",
+          "name": "clicksLabel",
+          "control": "label",
+          "rects": { "desktop": { "x": 80, "y": 508, "w": 280, "h": 36 } },
+          "props": { "text": "Clicks: {{clicks}}" },
+          "on": {}
+        },
+        {
+          "id": "obj_hs_click",
+          "name": "clickButton",
+          "control": "button",
+          "rects": { "desktop": { "x": 80, "y": 552, "w": 200, "h": 48 } },
+          "props": { "text": "Click me" },
+          "on": {
+            "click": "store.set('clicks', (store.get('clicks') ?? 0) + 1)",
+            "dblclick": "store.set('clicks', 0)"
+          }
+        },
+        {
+          "id": "obj_hs_hint",
+          "name": "hintLabel",
+          "control": "label",
+          "rects": { "desktop": { "x": 80, "y": 616, "w": 440, "h": 32 } },
+          "props": { "text": "double-click resets — 'Lock click' disables the button, 'Reset demo' is a shared page function" },
+          "on": {}
+        },
+        {
+          "id": "obj_hs_hover",
+          "name": "hoverLabel",
+          "control": "label",
+          "rects": { "desktop": { "x": 640, "y": 32, "w": 280, "h": 40 } },
+          "props": { "text": "Hover: {{hover}}" },
+          "on": {
+            "mouseenter": "store.set('hover', 'in')",
+            "mouseleave": "store.set('hover', 'out')"
+          }
+        },
+        {
+          "id": "obj_hs_box",
+          "name": "box",
+          "control": "card",
+          "rects": { "desktop": { "x": 640, "y": 96, "w": 240, "h": 140 } },
+          "props": { "title": "Box", "text": "Nudge / grow / hide me" },
+          "on": {}
+        },
+        {
+          "id": "obj_hs_nudge",
+          "name": "nudgeButton",
+          "control": "button",
+          "rects": { "desktop": { "x": 640, "y": 264, "w": 116, "h": 44 } },
+          "props": { "text": "Nudge" },
+          "on": {
+            "click": "box.x += 24"
+          }
+        },
+        {
+          "id": "obj_hs_grow",
+          "name": "growButton",
+          "control": "button",
+          "rects": { "desktop": { "x": 772, "y": 264, "w": 108, "h": 44 } },
+          "props": { "text": "Grow" },
+          "on": {
+            "click": "box.width += 20\nbox.height += 10"
+          }
+        },
+        {
+          "id": "obj_hs_hide",
+          "name": "hideButton",
+          "control": "button",
+          "rects": { "desktop": { "x": 640, "y": 316, "w": 116, "h": 44 } },
+          "props": { "text": "Hide box" },
+          "on": {
+            "click": "box.visible = !box.visible"
+          }
+        },
+        {
+          "id": "obj_hs_lock",
+          "name": "lockButton",
+          "control": "button",
+          "rects": { "desktop": { "x": 772, "y": 316, "w": 108, "h": 44 } },
+          "props": { "text": "Lock click" },
+          "on": {
+            "click": "clickButton.enabled = !clickButton.enabled"
+          }
+        },
+        {
+          "id": "obj_hs_reset",
+          "name": "resetButton",
+          "control": "button",
+          "rects": { "desktop": { "x": 640, "y": 368, "w": 240, "h": 44 } },
+          "props": { "text": "Reset demo" },
+          "on": {
+            "click": "resetDemo()"
+          }
+        },
+        {
+          "id": "obj_hs_logo",
+          "name": "logo",
+          "control": "image",
+          "rects": { "desktop": { "x": 640, "y": 432, "w": 240, "h": 180 } },
+          "props": {
+            "src": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='240'%20height='180'%3E%3Crect%20width='240'%20height='180'%20rx='16'%20fill='%234f46e5'/%3E%3Ctext%20x='120'%20y='96'%20font-family='sans-serif'%20font-size='26'%20fill='white'%20text-anchor='middle'%3Etoolback%3C/text%3E%3C/svg%3E",
+            "alt": "toolback"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_hs_pages",
+          "name": "pagesLabel",
+          "control": "label",
+          "rects": { "desktop": { "x": 48, "y": 720, "w": 600, "h": 36 } },
+          "props": { "text": "Pages: {{pages}}" },
+          "on": {}
+        },
+        {
+          "id": "obj_hs_goto",
+          "name": "gotoButton",
+          "control": "button",
+          "rects": { "desktop": { "x": 800, "y": 712, "w": 200, "h": 52 } },
+          "props": { "text": "Playground →" },
+          "on": {
+            "click": "page.go('Playground')"
+          }
+        }
+      ]
+    },
+    {
+      "id": "page_hs_playground",
+      "name": "Playground",
+      "script": "async function pageEnter() {\n  store.set('where', page.name)\n  mover.x = 420\n  mover.y = -160\n  for (let i = 0; i < 18; i++) {\n    await new Promise((r) => setTimeout(r, 16))\n    mover.y += 20\n  }\n  mover.y = 200\n}\n\nfunction pageLeave() {\n  store.set('leftPlayground', true)\n}\n",
+      "background": "#f1f5f9",
+      "objects": [
+        {
+          "id": "obj_pg_title",
+          "name": "pgTitle",
+          "control": "label",
+          "rects": { "desktop": { "x": 48, "y": 32, "w": 760, "h": 48 } },
+          "props": { "text": "Playground — scripted animation with await + x / y / width / height" },
+          "on": {}
+        },
+        {
+          "id": "obj_pg_mover",
+          "name": "mover",
+          "control": "card",
+          "rects": { "desktop": { "x": 420, "y": 200, "w": 240, "h": 140 } },
+          "props": { "title": "I move", "text": "pageEnter drops me in from the top" },
+          "on": {}
+        },
+        {
+          "id": "obj_pg_random",
+          "name": "randomButton",
+          "control": "button",
+          "rects": { "desktop": { "x": 96, "y": 200, "w": 240, "h": 48 } },
+          "props": { "text": "Random spot" },
+          "on": {
+            "click": "mover.x = 100 + Math.floor(Math.random() * 800)\nmover.y = 150 + Math.floor(Math.random() * 420)"
+          }
+        },
+        {
+          "id": "obj_pg_size",
+          "name": "sizeButton",
+          "control": "button",
+          "rects": { "desktop": { "x": 96, "y": 264, "w": 240, "h": 48 } },
+          "props": { "text": "Grow / shrink" },
+          "on": {
+            "click": "if (mover.width > 320) {\n  mover.width = 240\n  mover.height = 140\n} else {\n  mover.width += 40\n  mover.height += 20\n}"
+          }
+        },
+        {
+          "id": "obj_pg_home",
+          "name": "homeButton",
+          "control": "button",
+          "rects": { "desktop": { "x": 96, "y": 328, "w": 240, "h": 48 } },
+          "props": { "text": "← Back to Home" },
+          "on": {
+            "click": "page.go('Home')"
+          }
+        },
+        {
+          "id": "obj_pg_status",
+          "name": "statusLabel",
+          "control": "label",
+          "rects": { "desktop": { "x": 96, "y": 400, "w": 480, "h": 36 } },
+          "props": { "text": "You left this page before: {{leftPlayground}}" },
+          "on": {}
+        },
+        {
+          "id": "obj_pg_where",
+          "name": "whereLabel",
+          "control": "label",
+          "rects": { "desktop": { "x": 96, "y": 448, "w": 480, "h": 36 } },
+          "props": { "text": "You are on: {{where}}" },
+          "on": {}
+        }
+      ]
+    }
+  ]
+}
