@@ -57,6 +57,21 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
       case 'toolback:deleteSelection':
         store.removeSelected()
         break
+      case 'toolback:undo':
+        store.undo()
+        break
+      case 'toolback:redo':
+        store.redo()
+        break
+      case 'toolback:duplicate':
+        store.duplicateSelected()
+        break
+      case 'toolback:group':
+        store.groupSelected()
+        break
+      case 'toolback:ungroup':
+        store.ungroupSelected()
+        break
     }
   })
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createObject, type Book } from '@toolback/format'
 import { sampleBook } from '@toolback/format/src/sample'
-import { getObjectRects, listenForEditor, renderBook, renderObjectInto, shouldToggleRun } from './index'
+import { getObjectRects, isGroupKey, listenForEditor, renderBook, renderObjectInto, shouldToggleRun } from './index'
 
 function key(key: string, code: string, init: KeyboardEventInit = {}): KeyboardEvent {
   return new KeyboardEvent('keydown', { key, code, ...init })
@@ -221,6 +221,34 @@ describe('runtime', () => {
         cleanup()
         root.remove()
       }
+    })
+  })
+
+  describe('group shortcut', () => {
+    it('classifies ⌥G as group, ⌥U as ungroup, rejects other alt keys and modifiers', () => {
+      expect(isGroupKey(key('g', 'KeyG', { altKey: true }))).toBe('group')
+      expect(isGroupKey(key('u', 'KeyU', { altKey: true }))).toBe('ungroup')
+      expect(isGroupKey(key('d', 'KeyD', { altKey: true }))).toBeNull()
+      expect(isGroupKey(key('g', 'KeyG', { altKey: true, ctrlKey: true }))).toBeNull()
+      expect(isGroupKey(key('g', 'KeyG', { altKey: true, metaKey: true }))).toBeNull()
+      expect(isGroupKey(key('g', 'KeyG', { altKey: true, shiftKey: true }))).toBeNull()
+      expect(isGroupKey(key('g', 'KeyG'))).toBeNull()
+    })
+
+    it('ignores ⌥G/⌥U while typing in editable targets', () => {
+      const input = document.createElement('input')
+      document.body.appendChild(input)
+      const g = new KeyboardEvent('keydown', { key: 'g', code: 'KeyG', altKey: true, bubbles: true })
+      Object.defineProperty(g, 'target', { value: input })
+      expect(isGroupKey(g)).toBeNull()
+      const u = new KeyboardEvent('keydown', { key: 'u', code: 'KeyU', altKey: true, bubbles: true })
+      Object.defineProperty(u, 'target', { value: input })
+      expect(isGroupKey(u)).toBeNull()
+
+      const notInput = new KeyboardEvent('keydown', { key: 'g', code: 'KeyG', altKey: true, bubbles: true })
+      Object.defineProperty(notInput, 'target', { value: document.body })
+      expect(isGroupKey(notInput)).toBe('group')
+      input.remove()
     })
   })
 })

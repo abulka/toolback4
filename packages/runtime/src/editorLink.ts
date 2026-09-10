@@ -27,6 +27,11 @@ export type CanvasToEditorMessage =
   | { type: 'toolback:store'; entries: Array<[string, string]> }
   | { type: 'toolback:reorder'; action: 'front' | 'back' | 'forward' | 'backward' }
   | { type: 'toolback:deleteSelection' }
+  | { type: 'toolback:undo' }
+  | { type: 'toolback:redo' }
+  | { type: 'toolback:duplicate' }
+  | { type: 'toolback:group' }
+  | { type: 'toolback:ungroup' }
 
 export type CanvasMessageSender = (msg: CanvasToEditorMessage) => void
 
@@ -46,6 +51,40 @@ export function isDeleteSelectionKey(e: KeyboardEvent): boolean {
   return (
     !e.metaKey && !e.ctrlKey && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace')
   )
+}
+
+/** Undo/redo shortcut (⌘Z / ⌘⇧Z, or Ctrl): 'undo' | 'redo' | null */
+export function isUndoKey(e: KeyboardEvent): 'undo' | 'redo' | null {
+  if ((!e.metaKey && !e.ctrlKey) || e.altKey) return null
+  if (e.key.toLowerCase() !== 'z') return null
+  return e.shiftKey ? 'redo' : 'undo'
+}
+
+/**
+ * Whether e is an Alt+<letter> shortcut we own. Alt combos are text characters
+ * on Mac (⌥D = ∂, ⌥G = ‰, ⌥U = umlaut dead key), so editable targets are
+ * always excluded and left to the OS/IME.
+ */
+function isAltShortcutKey(e: KeyboardEvent, code: string): boolean {
+  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return false
+  if (e.code !== code) return false
+  const el = e.target as HTMLElement | null
+  if (el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el.isContentEditable)) {
+    return false
+  }
+  return true
+}
+
+/** Duplicate shortcut (⌥D / Alt+D). Skipped in editable targets. */
+export function isDuplicateKey(e: KeyboardEvent): boolean {
+  return isAltShortcutKey(e, 'KeyD')
+}
+
+/** Group/ungroup shortcut (⌥G / ⌥U, Alt+G / Alt+U): 'group' | 'ungroup' | null */
+export function isGroupKey(e: KeyboardEvent): 'group' | 'ungroup' | null {
+  if (isAltShortcutKey(e, 'KeyG')) return 'group'
+  if (isAltShortcutKey(e, 'KeyU')) return 'ungroup'
+  return null
 }
 
 /** Display label for a store value in the editor's store browser */
@@ -176,6 +215,26 @@ const onKey = (e: KeyboardEvent): void => {
         e.preventDefault()
         e.stopPropagation()
         design.escape()
+        return
+      }
+      const ur = isUndoKey(e)
+      if (ur) {
+        e.preventDefault()
+        e.stopPropagation()
+        send({ type: ur === 'undo' ? 'toolback:undo' : 'toolback:redo' })
+        return
+      }
+      if (isDuplicateKey(e)) {
+        e.preventDefault()
+        e.stopPropagation()
+        send({ type: 'toolback:duplicate' })
+        return
+      }
+      const gk = isGroupKey(e)
+      if (gk) {
+        e.preventDefault()
+        e.stopPropagation()
+        send({ type: gk === 'group' ? 'toolback:group' : 'toolback:ungroup' })
         return
       }
       const action = zOrderActionOf(e)

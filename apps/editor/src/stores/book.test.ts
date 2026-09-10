@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { createGroup, createObject, parseBook, type Book } from '@toolback/format'
+import { createGroup, createObject, flattenObjects, parseBook, type Book } from '@toolback/format'
 import { useBookStore } from './book'
 
 function twoObjectBook(): Book {
@@ -215,5 +215,84 @@ describe('book store — groups and arrange', () => {
     const copyGroup = copy.objects[0]!
     expect(copyGroup.id).not.toBe(origGroup.id)
     expect(copyGroup.children![0]!.id).not.toBe(origGroup.children![0]!.id)
+  })
+
+  it('duplicateSelected deep-copies a group with its whole subtree re-ided and re-named', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const kid = createObject('label', 'kid', { desktop: { x: 0, y: 0, w: 40, h: 20 } })
+    const kidId = kid.id
+    const inner = createGroup('inner', { desktop: { x: 10, y: 10, w: 60, h: 40 } }, [kid])
+    const innerId = inner.id
+    const outer = createGroup('outer', { desktop: { x: 200, y: 200, w: 300, h: 300 } }, [inner])
+    store.book.pages[0]!.objects.push(outer)
+    const origIds = new Set(flattenObjects(store.book.pages[0]!.objects).map((o) => o.id))
+    expect(origIds).toContain(kidId)
+
+    store.setSelection([outer.id])
+    store.duplicateSelected()
+
+    const page = store.book.pages[0]!.objects
+    // two labels + original group + its copy
+    expect(page).toHaveLength(4)
+    const dup = page[3]!
+    expect(dup.control).toBe('group')
+    expect(dup.name).toBe('group1')
+    expect(dup).not.toBe(outer)
+    expect(dup.id).not.toBe(outer.id)
+    // nudged down-right so it visibly separates from the original
+    expect(dup.rects.desktop).toEqual({ x: 224, y: 224, w: 300, h: 300 })
+    const dupInner = dup.children![0]!
+    expect(dupInner.name).toBe('group2')
+    expect(dupInner.id).not.toBe(innerId)
+    const dupKid = dupInner.children![0]!
+    expect(dupKid.name).toBe('label1')
+    expect(dupKid.id).not.toBe(kidId)
+    // whole copied subtree has fresh ids
+    const dupIds = flattenObjects([dup]).map((o) => o.id)
+    expect(dupIds.filter((id) => origIds.has(id))).toEqual([])
+    // duplicates are selected
+    expect(store.selectionIds).toEqual([dup.id])
+    // scripts copy over
+    expect(dupKid.rects.desktop).toEqual(kid.rects.desktop)
+  })
+
+  it('duplicateSelected duplicates plain multi-selections next to their originals', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a', 'b'])
+    store.duplicateSelected()
+
+    const page = store.book.pages[0]!.objects
+    expect(page.map((o) => o.name)).toEqual(['labelA', 'label1', 'labelB', 'label2'])
+    // duplicates are offset down-right, members relative to group untouched
+    expect(page[1]!.rects.desktop).toEqual({ x: 24, y: 24, w: 100, h: 50 })
+    expect(page[3]!.rects.desktop).toEqual({ x: 144, y: 64, w: 80, h: 60 })
+    expect(store.selectionIds).toEqual([page[1]!.id, page[3]!.id])
+  })
+
+  it('duplicateSelected skips members whose group is already selected', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a', 'b'])
+    store.groupSelected()
+    const group = store.book.pages[0]!.objects[0]!
+    // select the whole group AND one member (shift-click scenario)
+    store.setSelection([group.id, group.children![0]!.id])
+    store.duplicateSelected()
+    // only one new top-level object: the member copy rides inside the group copy
+    expect(store.book.pages[0]!.objects).toHaveLength(2)
+    expect(store.selectionIds).toHaveLength(1)
+  })
+
+  it('duplicateSelected is repeatable: each press duplicates the current selection', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a'])
+    store.duplicateSelected()
+    store.duplicateSelected()
+    expect(store.book.pages[0]!.objects.map((o) => o.name)).toEqual([
+      'labelA', 'label1', 'label2', 'labelB',
+    ])
   })
 })

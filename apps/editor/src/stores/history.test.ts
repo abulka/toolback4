@@ -257,4 +257,38 @@ describe('book store — undo/redo history', () => {
     store.undo()
     expect(store.book.pages[0]!.script).toBe('')
   })
+
+  it('undoes a duplicate (single step) and restores the pre-dup selection', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a'])
+    store.duplicateSelected()
+    expect(store.book.pages[0]!.objects).toHaveLength(3)
+    // duplicates are selected, not the originals
+    expect(store.selectionIds).toHaveLength(1)
+    expect(store.selectionIds[0]).not.toBe('a')
+
+    store.undo()
+    expect(store.book.pages[0]!.objects).toHaveLength(2)
+    // back to the originals selected
+    expect(store.selectionIds).toEqual(['a'])
+
+    store.redo()
+    expect(store.book.pages[0]!.objects).toHaveLength(3)
+  })
+
+  it('undoes a group duplicate as one step', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a', 'b'])
+    store.groupSelected()
+    const groupId = store.selectionIds[0]!
+
+    store.duplicateSelected()
+    expect(store.book.pages[0]!.objects).toHaveLength(2)
+
+    store.undo()
+    expect(store.book.pages[0]!.objects).toHaveLength(1)
+    expect(store.selectionIds).toEqual([groupId])
+  })
 })

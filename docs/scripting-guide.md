@@ -42,6 +42,38 @@ subtree together in the order.
 - Groups: clicking a member selects the **group**; alt-click or double-click
   selects the member itself
 
+## Duplicate
+
+Duplicating the selection creates a copy right next to the original — nudged
+24px down-right so it visibly separates — and selects the copy, so pressing
+the shortcut again duplicates the duplicates (each one cascades further).
+
+- **Keyboard:** `⌥D` (Alt+D) — works with the canvas focused too
+- **Top bar:** the ⧉ button next to ↶ / ↷ (disabled when nothing is selected
+  or while running)
+- Duplicating a **group** copies the whole subtree: every member is copied,
+  re-idded and re-named, and keeps its scripts and relative position — the two
+  groups behave exactly alike
+- Undoable in one step (and redoable)
+
+## Undo / redo
+
+Every design edit is undoable: adding, moving, resizing, duplicating or
+deleting objects, z-order, grouping/ungrouping, page changes, property fields
+— and scripts (page script and event handlers), which are part of the book
+like everything else.
+
+- **Keyboard:** `⌘Z` / `⌘⇧Z` (Ctrl on Windows/Linux) — works with the canvas
+  focused too
+- **Top bar:** the ↶ / ↷ buttons (disabled when there is nothing to undo/redo)
+- While typing in a script editor, `⌘Z` undoes text inside that editor
+  (Monaco's own undo), and the finished script becomes an undo step
+- Continuous typing or repeated geometry edits are merged into a single step,
+  so one Undo reverts a whole typing burst at once
+- Undoing a delete brings the objects back — selected
+- Undo/redo is disabled while running (F3) — it's a design-time tool. Opening
+  or creating a new book starts with a clean undo history.
+
 ## The runtime API
 
 Every script has these ready to use — no imports needed.
@@ -258,9 +290,10 @@ Label text: `Hello {{handle}}` — `await` works in object scripts too.
 ## Groups
 
 Select several objects (shift-click, or drag a box on empty canvas) and press
-**Group** in the Selection panel. The group is a parent object: it has a name
-(`group1`, …), a position, and its own Script section. **Ungroup** releases the
-members back.
+**Group** in the Selection panel (or `⌥G` / Alt+G — works with the canvas
+focused too). The group is a parent object: it has a name
+(`group1`, …), a position, and its own Script section. **Ungroup** (`⌥U` /
+Alt+U) releases the members back.
 
 What a group gives you:
 

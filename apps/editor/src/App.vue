@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { ControlKind, PageObject } from '@toolback/format'
 import { treeRows } from '@toolback/format'
-import { isDeleteSelectionKey, shouldToggleRun, zOrderActionOf } from '@toolback/runtime'
+import { isDeleteSelectionKey, isDuplicateKey, isGroupKey, isUndoKey, shouldToggleRun, zOrderActionOf } from '@toolback/runtime'
 import { wireCanvas } from './canvasClient'
 import { startPaletteDrag } from './paletteDrag'
 import { useBookStore } from './stores/book'
@@ -105,6 +105,23 @@ function onRunKey(e: KeyboardEvent): void {
   store.toggleRun()
 }
 
+// undo/redo: ⌘Z / ⌘⇧Z (or Ctrl). Capture phase like F3, but skipped in
+// editable targets — inside Monaco/inputs ⌘Z undoes text in place, and the
+// resulting content change is simply coalesced into a book history step.
+function onUndoKey(e: KeyboardEvent): void {
+  const ur = isUndoKey(e)
+  if (!ur) return
+  const el = e.target as HTMLElement | null
+  const editable =
+    !!el &&
+    (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el.isContentEditable)
+  if (editable) return
+  e.preventDefault()
+  e.stopPropagation()
+  if (ur === 'undo') store.undo()
+  else store.redo()
+}
+
 // z-order + delete: skip while typing (⌘[ is outdent in Monaco); only when
 // there is a selection
 function onArrangeKey(e: KeyboardEvent): void {
@@ -134,11 +151,39 @@ function onDocKey(e: KeyboardEvent): void {
   if (e.key === 'Escape') settingsOpen.value = false
 }
 
+// duplicate: ⌥D (Alt+D). isDuplicateKey already skips editable targets
+// (⌥D types ∂ on Mac) and requires no modifiers beyond Alt. Design-only:
+// nothing to duplicate while running.
+function onDuplicateKey(e: KeyboardEvent): void {
+  if (!isDuplicateKey(e)) return
+  if (store.isRunning) return
+  if (store.selectionIds.length === 0) return
+  e.preventDefault()
+  e.stopPropagation()
+  store.duplicateSelected()
+}
+
+// group/ungroup: ⌥G / ⌥U (Alt+G/Alt+U). Same editable-target skip (⌥U is the
+// umlaut dead key on Mac). The store actions already no-op when the selection
+// isn't eligible, so we only gate on run mode here.
+function onGroupKey(e: KeyboardEvent): void {
+  const gk = isGroupKey(e)
+  if (!gk) return
+  if (store.isRunning) return
+  e.preventDefault()
+  e.stopPropagation()
+  if (gk === 'group') store.groupSelected()
+  else store.ungroupSelected()
+}
+
 onMounted(async () => {
   window.addEventListener('keydown', onRunKey, true)
+  window.addEventListener('keydown', onUndoKey, true)
   document.addEventListener('keydown', onArrangeKey)
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', onDocKey)
+  document.addEventListener('keydown', onDuplicateKey)
+  document.addEventListener('keydown', onGroupKey)
   if (iframe.value) wireCanvas(iframe.value)
   await store.restoreAutosave()
   await store.refreshRecents()
@@ -146,8 +191,11 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onRunKey, true)
+  window.removeEventListener('keydown', onUndoKey, true)
   document.removeEventListener('keydown', onDocKey)
   document.removeEventListener('keydown', onArrangeKey)
+  document.removeEventListener('keydown', onDuplicateKey)
+  document.removeEventListener('keydown', onGroupKey)
   document.removeEventListener('click', onDocClick)
 })
 
@@ -257,6 +305,11 @@ function startSplitDrag(e: PointerEvent): void {
             <option value="">Recent…</option>
             <option v-for="r in store.recents" :key="r.id" :value="r.id">{{ r.title }}</option>
           </select>
+        </div>
+        <div class="historybar" title="Undo (⌘Z) · Redo (⌘⇧Z) · Duplicate (⌥D)">
+          <button :disabled="!store.canUndo" @click="store.undo()">↶</button>
+          <button :disabled="!store.canRedo" @click="store.redo()">↷</button>
+          <button class="dup" :disabled="store.isRunning || !store.selectionIds.length" @click="store.duplicateSelected()">⧉</button>
         </div>
         <div class="bp-switch" title="Preview breakpoint">
           <button
@@ -522,6 +575,39 @@ body.tb-palette-dragging * {
 .filebar button:hover {
   border-color: var(--ed-accent);
   color: #fff;
+}
+
+.historybar {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  padding: 2px;
+  background: var(--ed-bg);
+}
+
+.historybar button {
+  font: 500 12px/1 system-ui, sans-serif;
+  color: var(--ed-text);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 9px;
+  cursor: pointer;
+  min-width: 24px;
+}
+
+.historybar button:hover {
+  color: var(--ed-accent);
+}
+
+.historybar button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.historybar button.dup {
+  margin-left: 4px;
 }
 
 .recents {

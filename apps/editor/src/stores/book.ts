@@ -85,6 +85,86 @@ export const useBookStore = defineStore('book', () => {
 
   let autosaveTimer: ReturnType<typeof setTimeout> | undefined
 
+  // ---- undo/redo: whole-book snapshots. The store is the single source of
+  // truth for every content mutation, so a pre-mutation deep clone of the
+  // book (plus selection/page so undone deletes re-select) covers objects,
+  // scripts, pages, groups, z-order and breakpoints with one mechanism.
+
+  interface HistorySnapshot {
+    book: Book
+    selectionIds: string[]
+    currentPageIndex: number
+  }
+  interface HistoryEntry {
+    label: string
+    coalesceKey?: string
+    at: number
+    snapshot: HistorySnapshot
+  }
+  const MAX_HISTORY = 100
+  const COALESCE_MS = 800
+  const undoStack = ref<HistoryEntry[]>([])
+  const redoStack = ref<HistoryEntry[]>([])
+
+  function captureSnapshot(): HistorySnapshot {
+    return {
+      book: JSON.parse(JSON.stringify(book.value)) as Book,
+      selectionIds: [...selectionIds.value],
+      currentPageIndex: currentPageIndex.value,
+    }
+  }
+
+  function record(label: string, coalesceKey?: string): void {
+    if (isRunning.value) return
+    const at = Date.now()
+    const last = undoStack.value[undoStack.value.length - 1]
+    // merge continuous edits (typing in Monaco / a prop field) into one step
+    if (last && coalesceKey && last.coalesceKey === coalesceKey && at - last.at < COALESCE_MS) {
+      return
+    }
+    undoStack.value.push({ label, coalesceKey, at, snapshot: captureSnapshot() })
+    if (undoStack.value.length > MAX_HISTORY) undoStack.value.shift()
+    redoStack.value = []
+  }
+
+  function clearHistory(): void {
+    undoStack.value = []
+    redoStack.value = []
+  }
+
+  function restoreSnapshot(snapshot: HistorySnapshot): void {
+    book.value = snapshot.book
+    currentPageIndex.value = Math.max(
+      0,
+      Math.min(snapshot.currentPageIndex, book.value.pages.length - 1),
+    )
+    const page = book.value.pages[currentPageIndex.value]
+    const valid = new Set((page ? flattenObjects(page.objects) : []).map((o) => o.id))
+    selectionIds.value = snapshot.selectionIds.filter((id) => valid.has(id))
+    sync()
+  }
+
+  function undo(): void {
+    if (isRunning.value || undoStack.value.length === 0) return
+    const entry = undoStack.value.pop()!
+    redoStack.value.push({ ...entry, snapshot: captureSnapshot() })
+    restoreSnapshot(entry.snapshot)
+  }
+
+  function redo(): void {
+    if (isRunning.value || redoStack.value.length === 0) return
+    const entry = redoStack.value.pop()!
+    // the state we're leaving behind is what the next undo returns to (redo
+    // entries hold the post-action state, so a follow-up undo would otherwise
+    // bounce back to the same spot). coalesceKey cleared: a fresh edit right
+    // after redo must be its own step.
+    undoStack.value.push({ ...entry, snapshot: captureSnapshot(), coalesceKey: undefined })
+    restoreSnapshot(entry.snapshot)
+  }
+
+  const canUndo = computed(() => !isRunning.value && undoStack.value.length > 0)
+  const canRedo = computed(() => !isRunning.value && redoStack.value.length > 0)
+
   function sync(): void {
     if (!sendSync) return
     sendSync({
@@ -172,6 +252,7 @@ export const useBookStore = defineStore('book', () => {
   }
 
   function addPage(): void {
+    record('Add page')
     book.value.pages.push(createPage(uniquePageName()))
     selectPage(book.value.pages.length - 1)
   }
@@ -179,6 +260,7 @@ export const useBookStore = defineStore('book', () => {
   function duplicatePage(i: number): void {
     const src = book.value.pages[i]
     if (!src) return
+    record('Duplicate page')
     const copy = JSON.parse(JSON.stringify(src)) as typeof src
     copy.id = newId('page')
     copy.name = uniquePageName()
@@ -195,6 +277,7 @@ export const useBookStore = defineStore('book', () => {
 
   function removePage(i: number): void {
     if (book.value.pages.length <= 1) return
+    record('Delete page')
     book.value.pages.splice(i, 1)
     selectPage(Math.min(currentPageIndex.value, book.value.pages.length - 1))
   }
@@ -203,7 +286,10 @@ export const useBookStore = defineStore('book', () => {
     const page = book.value.pages[i]
     if (!page) return
     const trimmed = name.trim()
-    if (trimmed) page.name = trimmed
+    if (trimmed) {
+      record('Rename page')
+      page.name = trimmed
+    }
     sync()
   }
 
@@ -211,6 +297,7 @@ export const useBookStore = defineStore('book', () => {
     if (isRunning.value) return
     // upgrade pre-M4 books that only have a desktop canvas size
     if (!book.value.canvas[bp]) {
+      record('Breakpoint size')
       book.value.canvas[bp] =
         bp === 'mobile'
           ? { width: 390, height: 844 }
@@ -236,6 +323,7 @@ export const useBookStore = defineStore('book', () => {
   }
 
   function newBook(): void {
+    clearHistory()
     book.value = createBook('Untitled book')
     currentPageIndex.value = 0
     selectionIds.value = []
@@ -250,6 +338,7 @@ export const useBookStore = defineStore('book', () => {
       error.value = `Invalid book file: ${String(err)}`
       return false
     }
+    clearHistory()
     currentPageIndex.value = 0
     selectionIds.value = []
     isRunning.value = false
@@ -265,6 +354,7 @@ export const useBookStore = defineStore('book', () => {
     } catch {
       return false
     }
+    clearHistory()
     currentPageIndex.value = 0
     selectionIds.value = []
     autosaveAt.value = saved.at
@@ -295,12 +385,14 @@ export const useBookStore = defineStore('book', () => {
   function setEventScript(id: string, event: string, code: string): void {
     const obj = locateObj(id)?.obj
     if (!obj) return
+    record('Edit script', `script:${id}:${event}`)
     if (code.trim()) obj.on[event] = code
     else delete obj.on[event]
     sync()
   }
 
   function setPageScript(code: string): void {
+    record('Edit page script', `script:page:${activePage.value.id}`)
     activePage.value.script = code
     sync()
   }
@@ -313,6 +405,7 @@ export const useBookStore = defineStore('book', () => {
   }
 
   function addObject(control: ControlKind, rect: Rect): void {
+    record('Add ' + control)
     const obj = createObject(control, uniqueName(control), { desktop: rect }, { ...DEFAULT_PROPS[control] })
     activePage.value.objects.push(obj)
     selectionIds.value = [obj.id]
@@ -320,6 +413,9 @@ export const useBookStore = defineStore('book', () => {
   }
 
   function applyRects(list: Array<{ id: string; rect: Rect }>): void {
+    if (!list.some(({ id }) => locateObj(id))) return
+    const key = 'rect:' + [...new Set(list.map((l) => l.id))].sort().join(',')
+    record('Move/Resize', key)
     const affectedParents = new Set<PageObject>()
     for (const { id, rect } of list) {
       const found = locateObj(id)
@@ -378,12 +474,15 @@ export const useBookStore = defineStore('book', () => {
   function updateProps(id: string, patch: Record<string, unknown>): void {
     const obj = locateObj(id)?.obj
     if (!obj) return
+    record('Edit properties', `props:${id}`)
     obj.props = { ...obj.props, ...patch }
     sync()
   }
 
   function removeSelected(): void {
     if (selectionIds.value.length === 0) return
+    if (!selectionIds.value.some((id) => locateObj(id))) return
+    record('Delete')
     const affectedParents = new Set<PageObject>()
     for (const id of [...selectionIds.value]) {
       const found = locateObj(id)
@@ -397,11 +496,80 @@ export const useBookStore = defineStore('book', () => {
     sync()
   }
 
+  /**
+   * Duplicate the selection: deep copies (groups copy their whole `children`
+   * subtree), every object re-ided and re-named, inserted directly after its
+   * original, duplicates selected. Undoable in one step.
+   */
+  function duplicateSelected(): void {
+    if (selectionIds.value.length === 0) return
+    const sel = new Set(selectionIds.value)
+    const originals: PageObject[] = []
+    for (const id of selectionIds.value) {
+      const found = locateObj(id)
+      if (!found) continue
+      // skip members of a selected group — their copies ride inside the
+      // group's subtree copy already
+      const chain = locateChain(id)
+      const underSelected = chain
+        ? chain.slice(0, -1).some((a) => sel.has(a.id))
+        : false
+      if (underSelected) continue
+      originals.push(found.obj)
+    }
+    if (!originals.length) return
+
+    record('Duplicate')
+    // fresh names computed once so nested group levels never collide (the
+    // clones aren't on the page until the recursion is done)
+    const usedNames = new Set(flattenObjects(activePage.value.objects).map((o) => o.name))
+    const freshName = (control: ControlKind): string => {
+      let n = 1
+      while (usedNames.has(`${control}${n}`)) n++
+      usedNames.add(`${control}${n}`)
+      return `${control}${n}`
+    }
+    // nudge the copy down-right so it visibly separates from the original
+    const DUP_OFFSET = 24
+    const copies: PageObject[] = []
+    const cloneObject = (src: PageObject): PageObject => {
+      const copy = JSON.parse(JSON.stringify(src)) as PageObject
+      copy.id = newId('obj')
+      copy.name = freshName(src.control)
+      if (copy.children?.length) {
+        const kids: PageObject[] = []
+        for (const k of src.children!) kids.push(cloneObject(k))
+        copy.children = kids
+      }
+      return copy
+    }
+    const offsetCopy = (copy: PageObject): void => {
+      for (const bp of BREAKPOINTS) {
+        const r = copy.rects[bp]
+        if (!r) continue
+        copy.rects[bp] = { ...r, x: r.x + DUP_OFFSET, y: r.y + DUP_OFFSET }
+      }
+    }
+    for (const o of originals) {
+      const found = locateObj(o.id)!
+      const at = found.siblings.findIndex((x) => x.id === o.id)
+      const copy = cloneObject(o)
+      // only nudge the top-level copy's own rects — members stay relative to
+      // their group, which moves as a whole
+      offsetCopy(copy)
+      found.siblings.splice(at + 1, 0, copy)
+      copies.push(copy)
+    }
+    selectionIds.value = copies.map((c) => c.id)
+    sync()
+  }
+
   function reorderSelection(action: 'front' | 'back' | 'forward' | 'backward'): void {
     const found = selectionIds.value.length === 1 ? locateObj(selectionIds.value[0]!) : null
     if (!found) return
     const idx = found.siblings.findIndex((o) => o.id === found.obj.id)
     if (idx === -1) return
+    record('Reorder')
     const [obj] = found.siblings.splice(idx, 1)
     let target: number
     switch (action) {
@@ -436,6 +604,7 @@ export const useBookStore = defineStore('book', () => {
     const indices = members.map((m) => siblings.indexOf(m))
     const insertAt = Math.max(...indices) - (members.length - 1)
 
+    record('Group')
     const groupRects: Record<string, Rect> = {}
     for (const bp of BREAKPOINTS) {
       const rectsForBp = members.map((m) => m.rects[bp] ?? m.rects.desktop)
@@ -462,6 +631,7 @@ export const useBookStore = defineStore('book', () => {
   function ungroupSelected(): void {
     const found = ungroupEligible.value ? locateObj(selectionIds.value[0]!) : null
     if (!found || found.obj.control !== 'group' || !found.obj.children?.length) return
+    record('Ungroup')
     const group = found.obj
     const idx = found.siblings.findIndex((o) => o.id === found.obj.id)
     const children = group.children ?? []
@@ -539,10 +709,15 @@ export const useBookStore = defineStore('book', () => {
     applyRects,
     updateProps,
     removeSelected,
+    duplicateSelected,
     reorderSelection,
     groupSelected,
     ungroupSelected,
     setSelection,
     applySelection,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   }
 })

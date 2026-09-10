@@ -14,7 +14,7 @@ export {
 } from './player'
 export type { ToolbackStore, ControlApi, RunHandle } from './player'
 export type { EditorToCanvasMessage, CanvasToEditorMessage, CanvasMessageSender } from './editorLink'
-export { listenForEditor, shouldToggleRun, zOrderActionOf, isDeleteSelectionKey } from './editorLink'
+export { listenForEditor, shouldToggleRun, zOrderActionOf, isDeleteSelectionKey, isUndoKey, isDuplicateKey, isGroupKey } from './editorLink'
 
 let stylesInjected = false
 
