@@ -239,22 +239,16 @@ Now any object script can call `fullName()` — e.g. a button's click script:
 fullName()
 ```
 
-## Dynamic labels
-
-Put `{{key}}` in a label or button's **Text** property and it stays live:
-
-- label text: `Count: {{count}}` → re-renders every time `store.set('count', …)` runs
-- a key that was never set renders as empty text
-
-And the self-binding: **`{{self.name}}`** (or `{{this.name}}`) shows the
-object's **own name**. Duplicate the object and every copy displays its own
-fresh name with no edits:
-
 ```text
 I am {{self.name}}
 ```
 
 This is how object state becomes visible text.
+
+**Text sizing**: labels and buttons have a **Font size (px)** field in the
+Selection panel (the `fontSize` property). Long text wraps inside the object's
+box and clips if it doesn't fit — give a paragraph label a smaller size (14)
+and a taller box, or use a card for long body text.
 
 ## Events reference
 

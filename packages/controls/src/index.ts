@@ -24,11 +24,24 @@ export function textProp(obj: PageObject, key = 'text', fallback = ''): string {
   return typeof v === 'string' ? v : fallback
 }
 
+/** optional numeric prop (e.g. fontSize) — ignores empty/invalid values */
+export function numProp(obj: PageObject, key: string): number | null {
+  const v = obj.props[key]
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
+  }
+  return null
+}
+
 export function renderButton(obj: PageObject): HTMLElement {
   const el = document.createElement('button')
   el.type = 'button'
   el.className = 'tb-button'
   el.textContent = textProp(obj, 'text', 'Button')
+  const fs = numProp(obj, 'fontSize')
+  if (fs) el.style.fontSize = `${fs}px`
   return el
 }
 
@@ -36,6 +49,8 @@ export function renderLabel(obj: PageObject): HTMLElement {
   const el = document.createElement('div')
   el.className = 'tb-label'
   el.textContent = textProp(obj, 'text', 'Label')
+  const fs = numProp(obj, 'fontSize')
+  if (fs) el.style.fontSize = `${fs}px`
   return el
 }
 

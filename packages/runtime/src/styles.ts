@@ -29,6 +29,7 @@ body {
 .tb-object > * {
   width: 100%;
   height: 100%;
+  box-sizing: border-box;
 }
 
 .tb-button {
@@ -47,11 +48,14 @@ body {
 }
 
 .tb-label {
-  font: 500 22px/1.3 var(--tb-font);
+  font: 500 15px/1.45 var(--tb-font);
   color: var(--tb-text);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  padding: 3px 4px;
   overflow: hidden;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .tb-missing {

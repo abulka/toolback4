@@ -35,7 +35,10 @@ const textFields = computed(() => {
   switch (sel.value.control) {
     case 'button':
     case 'label':
-      return [{ key: 'text', label: 'Text' }]
+      return [
+        { key: 'text', label: 'Text' },
+        { key: 'fontSize', label: 'Font size (px)' },
+      ]
     case 'input':
       return [{ key: 'placeholder', label: 'Placeholder' }]
     case 'image':
@@ -56,6 +59,11 @@ const textFields = computed(() => {
 function propValue(key: string): string {
   const v = sel.value?.props[key]
   return typeof v === 'string' ? v : ''
+}
+
+function numPropValue(key: string): string {
+  const v = sel.value?.props[key]
+  return typeof v === 'number' && Number.isFinite(v) ? String(v) : ''
 }
 
 function onProp(key: string, e: Event): void {
@@ -148,6 +156,13 @@ async function copyJson(): Promise<void> {
         :model-value="propValue(f.key)"
         :store-keys="storeKeyList"
         @update:model-value="onPropValue(f.key, $event)"
+      />
+      <input
+        v-else-if="f.key === 'fontSize' && !isGroupSel()"
+        type="number"
+        min="8"
+        :value="numPropValue(f.key)"
+        @input="onProp(f.key, $event)"
       />
       <input v-else-if="f.key !== 'text' && !isGroupSel()" :value="propValue(f.key)" @input="onProp(f.key, $event)" />
     </div>

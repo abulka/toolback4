@@ -11,20 +11,20 @@ apart: **Open…** in the file bar (or just open one from your OS's file dialog)
 
 ## Kitchen sink
 
-**Home** page:
+A guided tour — the **Home** page is a menu, and every page demonstrates one
+feature with explanatory text, a live demo, and a "where the scripts live"
+tip (open any object's **Script** section — scripted events are marked with
+a `•` in the event dropdown):
 
-- all six controls: container, card, input, label, button, image
-- every event: `click`, `dblclick`, `input`, `change`, `mouseenter`, `mouseleave`
-- `{{key}}` dynamic labels (`Hi {{who}}`, `Clicks: {{clicks}}`, …)
-- scripted geometry: `box.x += 24`, `box.width += 20`, `box.visible = !box.visible`,
-  `clickButton.enabled = !clickButton.enabled`
-- a shared page function (`resetDemo`) called from a button script
-- `pageEnter` reading `page.name` / `page.names`
+| Page | Demonstrates |
+| --- | --- |
+| **Home** | The feature menu — each button is one line: `page.go('…')`. `{{pages}}` / `{{where}}` labels via `pageEnter`. |
+| **Store** | `store.set`/`store.get`, `{{key}}` live labels, an input with `input` + `change` handlers, click counting with a `dblclick` reset, `enabled` toggling. |
+| **Self** | `{{self.name}}` name tags (duplicate a button — the copy shows its own name), `self` in scripts, `self` vs `target`, the `this` alias. |
+| **Groups** | A group holding two buttons **and a nested group**: the `forward()` rule (a handler stops unless it forwards; script-less objects let the event pass up), `target` = member, `self` = group. |
+| **Motion** | Scripted geometry (`x`/`y`/`width`/`height`), an `await` drop-in animation in `pageEnter`, `pageLeave` recording the visit, a shared page function (`resetBox`). |
+| **Events** | `click` / `dblclick` / `mouseenter` / `mouseleave` on one button, `input` / `change` on a field — all writing to the store. |
+| **Editor** | Design-mode features with a practice group: undo/redo, duplicate (⧉ / ⌥D), group/ungroup (⌥G / ⌥U), Copy JSON, drill-in navigation. |
 
-**Playground** page:
-
-- an `await`-based drop-in animation driven by `x`/`y` in `pageEnter`
-- `pageLeave` recording that you visited (visible back on Home)
-- `Math.random()` + geometry in a click script
-
-Open any object's **Script** section to see the code behind each behaviour.
+A runtime deep-dive of everything the demos touch lives in
+[../docs/runtime-internals.md](../docs/runtime-internals.md).
