@@ -61,7 +61,8 @@ export interface DesignController {
   onRendered(selection: string[]): void
   dragOver(control: ControlKind, rect: Rect): void
   dragEnd(): void
-  /** clear the selection (Escape) — leaves "inside the group" mode */
+  /** Escape: steps out one group level (selecting the group you were in); at
+   *  the outermost level it does nothing — Esc never deselects */
   escape(): void
   readonly selectedIds: string[]
   readonly enabled: boolean
@@ -117,6 +118,9 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   let selBoxes = new Map<string, HTMLElement>()
   let pageRoot: HTMLElement | null = null
   let selected = new Set<string>()
+  // groups we've drilled into, outermost→innermost. Objects at the "current
+  // level" live at chain[drillPath.length] under the pointer.
+  let drillPath: string[] = []
   let rects = new Map<string, Rect>()
   let drag: DragState = null
   let enabled = false
@@ -171,37 +175,74 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     }
   }
 
-  /** true for objects living inside a group (an ANCESTOR — not self — is a group) */
-  function isMember(el: HTMLElement): boolean {
-    return !!el.parentElement?.closest('[data-tb-id]')
-  }
-
   /** group wrapper element of an object (null for top-level) */
   function groupElOf(id: string): HTMLElement | null {
     return objectEl(id)?.parentElement?.closest('[data-tb-id]') ?? null
   }
 
-  /** the group we are "inside" (derived from the selection: any selected member) */
-  function enteredGroupEl(): HTMLElement | null {
-    for (const id of selected) {
-      const el = objectEl(id)
-      if (el && isMember(el)) return el.parentElement?.closest('[data-tb-id]') ?? null
+  /** group ids from the page down to the object's nearest ancestor, outermost→innermost */
+  function ancestorChainOf(el: HTMLElement): string[] {
+    const ids: string[] = []
+    let cur = el.parentElement?.closest<HTMLElement>('[data-tb-id]') ?? null
+    while (cur) {
+      ids.unshift(cur.dataset.tbId!)
+      cur = cur.parentElement?.closest<HTMLElement>('[data-tb-id]') ?? null
     }
-    return null
+    return ids
   }
 
-  function objectAt(x: number, y: number, descend = false): { id: string; rect: Rect } | null {
-    if (!pageRoot) return null
+  /** number of group ancestors (0 = top-level object) */
+  function depthOf(el: HTMLElement): number {
+    let d = 0
+    let cur = el.parentElement?.closest<HTMLElement>('[data-tb-id]') ?? null
+    while (cur) {
+      d++
+      cur = cur.parentElement?.closest<HTMLElement>('[data-tb-id]') ?? null
+    }
+    return d
+  }
+
+  function isPrefix(prefix: string[], chain: string[]): boolean {
+    if (prefix.length > chain.length) return false
+    for (let i = 0; i < prefix.length; i++) if (prefix[i] !== chain[i]) return false
+    return true
+  }
+
+  /** full ancestor chain (outermost→innermost) of the deepest object under (x,y) */
+  function chainAt(x: number, y: number): string[] {
+    if (!pageRoot) return []
     const els = pageRoot.querySelectorAll<HTMLElement>('[data-tb-id]')
     for (let i = els.length - 1; i >= 0; i--) {
       const el = els[i]!
-      if (!descend && isMember(el)) continue
       const id = el.dataset.tbId
       if (!id) continue
       const r = rects.get(id)
-      if (r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return { id, rect: r }
+      if (r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+        return [...ancestorChainOf(el), id]
+      }
     }
-    return null
+    return []
+  }
+
+  /** the drilled context (group chain) a restored selection represents */
+  function contextOf(id: string): string[] {
+    const el = objectEl(id)
+    if (!el) return []
+    return ancestorChainOf(el)
+  }
+
+  /** object a plain/alt click under the pointer selects, plus the drill path
+   *  that selection implies (null = nothing at the current level → marquee) */
+  function resolveClickTarget(
+    chain: string[],
+    alt: boolean,
+  ): { id: string; path: string[] } | null {
+    if (alt) return { id: chain[chain.length - 1]!, path: chain.slice(0, -1) }
+    if (drillPath.length && isPrefix(drillPath, chain)) {
+      if (chain.length > drillPath.length) return { id: chain[drillPath.length]!, path: drillPath }
+      return null // on the drilled group's own box, nothing deeper → empty
+    }
+    return { id: chain[0]!, path: [] }
   }
 
   function objectEl(id: string): HTMLElement | null {
@@ -316,6 +357,11 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
 
   function onPointerDown(e: PointerEvent): void {
     if (!overlay || e.button !== 0) return
+    // pointer presses preventDefault the default focus action, so the iframe
+    // never gains keyboard focus on its own — without it the canvas-side key
+    // handlers (Esc drill-out, F3, ⌘Z, ⌥D/⌥G/⌥U, z-order, delete) never fire
+    // after clicking into the canvas. Claim focus explicitly.
+    window.focus()
     const target = e.target as HTMLElement
     const dir = target?.dataset?.dir as HandleDir | undefined
     if (dir && selected.size === 1) {
@@ -339,18 +385,10 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     }
 
     const pt = pointerPos(e)
-    let hit = objectAt(pt.x, pt.y, e.altKey)
-    // only descend to members on an EXPLICIT drill-in: alt-click, or a
-    // concerted double-click (entered = a member is currently selected).
-    // Gentle single clicks always select the group itself.
-    if (hit && !e.altKey) {
-      const entered = enteredGroupEl()
-      if (entered && objectEl(hit.id) === entered) {
-        const member = objectAt(pt.x, pt.y, true)
-        if (member) hit = member
-      }
-    }
+    const chain = chainAt(pt.x, pt.y)
+    const hit = chain.length ? resolveClickTarget(chain, e.altKey) : null
     if (hit) {
+      drillPath = hit.path
       if (e.shiftKey) {
         if (selected.has(hit.id)) selected.delete(hit.id)
         else selected.add(hit.id)
@@ -380,9 +418,13 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
         moved: false,
       }
     } else {
-      // empty space: marquee selection (shift adds to the current selection)
+      // no object at the current level under the pointer: marquee selection
+      // (shift adds to the current selection). A truly-empty point (nothing
+      // anywhere) exits the drill; a point on the drilled group's own box
+      // keeps the context so the marquee can select at the current level.
       if (!e.shiftKey) {
         selected = new Set()
+        if (chain.length === 0) drillPath = []
         sendSelection()
         redrawSelection()
       }
@@ -480,7 +522,9 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
         const y2 = Math.max(drag.startY, e.clientY) - base.top
         const hits: string[] = []
         for (const el of Array.from(pageRoot?.querySelectorAll<HTMLElement>('[data-tb-id]') ?? [])) {
-          if (isMember(el)) continue
+          // marquee selects objects at the current level (drilled: direct
+          // members of the innermost group; page level: top-level objects)
+          if (depthOf(el) !== drillPath.length) continue
           const id = el.dataset.tbId
           const r = id ? rects.get(id) : undefined
           if (!id || !r) continue
@@ -499,9 +543,33 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   function onDblClick(e: MouseEvent): void {
     if (!overlay || !enabled) return
     const pt = pointerPos(e)
-    const hit = objectAt(pt.x, pt.y, true)
-    setSelected(hit ? [hit.id] : [])
+    const chain = chainAt(pt.x, pt.y)
+    if (!chain.length) return
+    const selId = selected.size === 1 ? [...selected][0]! : null
+    const atLevel = chain[drillPath.length]
+
+    let target: string
+    let path: string[]
+    if (drillPath.length && !isPrefix(drillPath, chain)) {
+      // clicked outside the drilled context: start over at the top level
+      target = chain[0]!
+      path = []
+    } else if (selId && atLevel === selId && chain.length > drillPath.length + 1) {
+      // descend exactly one level past the selected object
+      target = chain[drillPath.length + 1]!
+      path = [...drillPath, selId]
+    } else if (chain.length > drillPath.length) {
+      // (re)select the object at the current level — never deeper, so the
+      // drilled selection is stable under gentle clicks
+      target = atLevel!
+      path = drillPath
+    } else {
+      return // nothing at this level under the pointer
+    }
+    drillPath = path
+    selected = new Set([target])
     sendSelection()
+    redrawSelection()
   }
 
   function applyEnabled(on: boolean): void {
@@ -513,6 +581,7 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       drag = null
       removePhantom()
       selected = new Set()
+      drillPath = []
       redrawSelection()
     }
   }
@@ -559,11 +628,17 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     onRendered(selection: string[]): void {
       pageRoot = wrapper?.querySelector<HTMLElement>('.tb-page') ?? null
       refreshRects()
+      drillPath = selection.length ? contextOf(selection[0]!) : []
       setSelected(selection)
     },
     escape(): void {
-      if (selected.size === 0) return
-      selected = new Set()
+      // at the outermost level Esc is ignored — it never deselects the
+      // top-level selection
+      if (!drillPath.length) return
+      // step out one level: select the group we were inside
+      const stepped = drillPath[drillPath.length - 1]!
+      drillPath.pop()
+      selected = new Set([stepped])
       sendSelection()
       redrawSelection()
     },

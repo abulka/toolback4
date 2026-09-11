@@ -148,6 +148,9 @@ function onArrangeKey(e: KeyboardEvent): void {
 }
 
 function onDocKey(e: KeyboardEvent): void {
+  // Escape closes the settings popup only — it never touches the selection
+  // (Esc stepping out of groups is handled canvas-side, and the outermost
+  // selection is deliberately immune to Esc)
   if (e.key === 'Escape') settingsOpen.value = false
 }
 

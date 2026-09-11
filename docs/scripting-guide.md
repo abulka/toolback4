@@ -56,6 +56,14 @@ the shortcut again duplicates the duplicates (each one cascades further).
   groups behave exactly alike
 - Undoable in one step (and redoable)
 
+## Copy JSON
+
+The Selection panel has a **{ } JSON** button (next to the object name; the
+multi-selection panel has a **Copy JSON** action). It copies the selected
+object — including any sub-objects — to the clipboard as pretty-printed JSON
+(a multi-selection copies an array). Handy for inspecting and describing
+structures, and the seed of a future copy/paste feature.
+
 ## Undo / redo
 
 Every design edit is undoable: adding, moving, resizing, duplicating or
@@ -317,12 +325,18 @@ if (target.name === 'okButton') {
   names and `controls.<name>` reach them wherever they sit. A member's `x`/`y`
   are relative to the group. The group's box always hugs its members: moving
   or resizing a member recomputes it to the minimum bounds.
-- **Editing inside a group** — drilling in takes a **concerted double-click**
-  (or alt-click) on a member. While inside, single clicks select members so you
-  can move them individually; the group's box always snaps to the minimum
-  bounds of its members. Click empty canvas (or press `Esc`) to step back
-  out — gentle single clicks always select the whole group, so click-and-drag
-  moves the group, never a member, unless you deliberately drilled in.
+- **Editing inside a group** — drilling in is **one level per double-click**:
+  click a group, then double-click to descend past it — keep double-clicking to
+  work your way down to the member you want. Gentle single clicks always
+  (re)select the object at the drilled level and never descend further, so once
+  a level is selected it stays selected while you click around on deeper
+  content. Alt-click jumps straight to the deepest object under the pointer.
+  `Esc` steps back out one level at a time (selecting the group you were in);
+  at the outermost level `Esc` does nothing — it never deselects. Clicking
+  empty canvas steps all the way out. Gentle single clicks always select the
+  whole group, so click-and-drag moves the group, never a member, unless you
+  deliberately drilled in — and once a member is selected, dragging it moves
+  only that member, never its enclosing groups.
 - **Nesting** — groups can contain groups.
 - **Ungrouping** discards the group's own scripts — the editor asks first.
 

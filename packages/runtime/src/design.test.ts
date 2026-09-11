@@ -522,6 +522,259 @@ it('resizing a group scales member rects around the fixed corner (batched commit
   })
 })
 
+describe('nested group drill-in', () => {
+  function nestedBook(): Book {
+    const btn = createObject('button', 'btn', { desktop: { x: 10, y: 30, w: 40, h: 20 } })
+    const inner = createGroup('inner', { desktop: { x: 40, y: 40, w: 200, h: 100 } }, [btn])
+    const outer = createGroup('outer', { desktop: { x: 0, y: 0, w: 300, h: 300 } }, [inner])
+    return {
+      id: 'bn',
+      title: 'N',
+      canvas: { desktop: { width: 800, height: 600 } },
+      pages: [{ id: 'p', name: 'P', script: '', background: '#fff', objects: [outer] }],
+    }
+  }
+  // btn sits at page (50, 70)
+  const BTN = { x: 55, y: 75 }
+
+  function dbl(root: HTMLElement): void {
+    overlayOf(root).dispatchEvent(new MouseEvent('dblclick', { clientX: BTN.x, clientY: BTN.y, bubbles: true }))
+  }
+
+  it('repeated double-clicks descend one level at a time to the target member', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const sent: Array<{ type: string; ids?: string[] }> = []
+    const cleanup = listenForEditor(root, (m) => sent.push(m as never))
+    try {
+      const book = nestedBook()
+      const [outer] = book.pages[0]!.objects
+      const inner = outer!.children![0]!
+      const btn = inner.children![0]!
+      load(root, book)
+
+      dbl(root)
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([outer!.id])
+      dbl(root)
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([inner.id])
+      dbl(root)
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([btn.id])
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('dragging a drilled member moves only that member, not the outer group', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const sent: Array<{ type: string; ids?: string[]; objects?: Array<{ id: string; rect: Rect }> }> = []
+    const cleanup = listenForEditor(root, (m) => sent.push(m as never))
+    try {
+      const book = nestedBook()
+      const btn = book.pages[0]!.objects[0]!.children![0]!.children![0]!
+      load(root, book)
+
+      // drill all the way down: 3 double-clicks select the member
+      for (let i = 0; i < 3; i++) dbl(root)
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([btn.id])
+
+      // plain press-and-drag on the member moves ONLY the member
+      pointer(root, 'pointerdown', BTN.x, BTN.y)
+      pointer(root, 'pointermove', BTN.x + 48, BTN.y)
+      pointer(root, 'pointerup', BTN.x + 48, BTN.y)
+
+      const commit = sent.filter((m) => m.type === 'toolback:commit').at(-1) as unknown as {
+        objects: Array<{ id: string; rect: Rect }>
+      }
+      expect(commit.objects).toHaveLength(1)
+      expect(commit.objects[0]!.id).toBe(btn.id)
+      expect(commit.objects[0]!.rect).toEqual({ x: 98, y: 70, w: 40, h: 20 })
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('a gentle click after drilling keeps the drilled group selected', () => {
+    // user scenario: double-clicking over a member selects the sub-group; a
+    // follow-up gentle click on a deeper button must NOT drill further
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const sent: Array<{ type: string; ids?: string[] }> = []
+    const cleanup = listenForEditor(root, (m) => sent.push(m as never))
+    try {
+      const book = nestedBook()
+      const inner = book.pages[0]!.objects[0]!.children![0]!
+      load(root, book)
+
+      dbl(root) // selects the outer group
+      dbl(root) // descends past it: selects the inner group
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([inner.id])
+
+      // a gentle click on the member point keeps the INNER group selected
+      pointer(root, 'pointerdown', BTN.x, BTN.y)
+      pointer(root, 'pointerup', BTN.x, BTN.y)
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([inner.id])
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('dragging a drilled sub-group moves only that sub-group', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const sent: Array<{ type: string; ids?: string[]; objects?: Array<{ id: string; rect: Rect }> }> = []
+    const cleanup = listenForEditor(root, (m) => sent.push(m as never))
+    try {
+      const book = nestedBook()
+      const inner = book.pages[0]!.objects[0]!.children![0]!
+      load(root, book)
+
+      dbl(root)
+      dbl(root) // inner group selected
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([inner.id])
+
+      pointer(root, 'pointerdown', BTN.x, BTN.y)
+      pointer(root, 'pointermove', BTN.x + 48, BTN.y)
+      pointer(root, 'pointerup', BTN.x + 48, BTN.y)
+      const commit = sent.filter((m) => m.type === 'toolback:commit').at(-1) as unknown as {
+        objects: Array<{ id: string; rect: Rect }>
+      }
+      expect(commit.objects).toHaveLength(1)
+      expect(commit.objects[0]!.id).toBe(inner.id)
+      expect(commit.objects[0]!.rect).toEqual({ x: 88, y: 40, w: 200, h: 100 })
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('Escape steps out one level at a time and ignores the outermost selection', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const sent: Array<{ type: string; ids?: string[] }> = []
+    const cleanup = listenForEditor(root, (m) => sent.push(m as never))
+    try {
+      const book = nestedBook()
+      const [outer] = book.pages[0]!.objects
+      const inner = outer!.children![0]!
+      load(root, book)
+
+      for (let i = 0; i < 3; i++) dbl(root)
+      expect(selectionMsgs(sent).at(-1)!.ids).not.toEqual([])
+
+      const esc = (): void => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      }
+      esc()
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([inner.id])
+      esc()
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([outer!.id])
+      // at the outermost level Esc is ignored — it never deselects
+      esc()
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([outer!.id])
+      esc()
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([outer!.id])
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('a sync re-load restores the drilled context from the selection', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const sent: Array<{ type: string; ids?: string[] }> = []
+    const cleanup = listenForEditor(root, (m) => sent.push(m as never))
+    try {
+      const book = nestedBook()
+      const inner = book.pages[0]!.objects[0]!.children![0]!
+      const btn = inner.children![0]!
+      load(root, book)
+
+      // alt-click fast-drills to the member
+      pointer(root, 'pointerdown', BTN.x, BTN.y, { altKey: true })
+      pointer(root, 'pointerup', BTN.x, BTN.y)
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([btn.id])
+
+      // editor sync re-renders with the member selected (as if after a commit)
+      load(root, book, [btn.id])
+
+      // the context survived: the gentle click keeps the member selected
+      pointer(root, 'pointerdown', BTN.x, BTN.y)
+      pointer(root, 'pointerup', BTN.x, BTN.y)
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([btn.id])
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('single-level dblclick from a selected group reaches the member in one dblclick', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const sent: Array<{ type: string; ids?: string[] }> = []
+    const cleanup = listenForEditor(root, (m) => sent.push(m as never))
+    try {
+      const child = createObject('button', 'kid', { desktop: { x: 10, y: 10, w: 100, h: 40 } })
+      const group = createGroup('grp', { desktop: { x: 40, y: 40, w: 200, h: 100 } }, [child])
+      const book: Book = {
+        id: 'bg',
+        title: 'G',
+        canvas: { desktop: { width: 800, height: 600 } },
+        pages: [{ id: 'p', name: 'P', script: '', background: '#fff', objects: [group] }],
+      }
+      load(root, book)
+
+      // gentle click selects the group; one dblclick then reaches the member
+      pointer(root, 'pointerdown', 60, 60)
+      pointer(root, 'pointerup', 60, 60)
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([group.id])
+
+      overlayOf(root).dispatchEvent(new MouseEvent('dblclick', { clientX: 60, clientY: 60, bubbles: true }))
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([child.id])
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('marquee at the drilled level selects direct members of the drilled group', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const sent: Array<{ type: string; ids?: string[] }> = []
+    const cleanup = listenForEditor(root, (m) => sent.push(m as never))
+    try {
+      const book = nestedBook()
+      const inner = book.pages[0]!.objects[0]!.children![0]!
+      load(root, book)
+
+      // descend into the outer group (inner group is selected, drilled one level)
+      dbl(root)
+      dbl(root)
+
+      // sweep a marquee over the inner group, starting from outer's empty area
+      pointer(root, 'pointerdown', 280, 280)
+      pointer(root, 'pointermove', 20, 20)
+      pointer(root, 'pointerup', 20, 20)
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([inner.id])
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+})
+
 function absRect(el: HTMLElement): DOMRect {
     let x = 0
     let y = 0

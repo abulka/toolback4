@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import type { Rect } from '@toolback/format'
 import { useBookStore } from '../stores/book'
 import { collectStoreKeys } from '../storeKeys'
+import { copyText, objectsToJson } from '../copyJson'
 import ScriptEditor from './ScriptEditor.vue'
 import HelpButton from './HelpButton.vue'
 import DynamicTextEditor from './DynamicTextEditor.vue'
@@ -89,6 +90,18 @@ function onUngroup(): void {
   }
   store.ungroupSelected()
 }
+
+// copy the selection's JSON (debugging aid — also the seed of copy/paste)
+const copied = ref(false)
+let copiedTimer: ReturnType<typeof setTimeout> | undefined
+async function copyJson(): Promise<void> {
+  const objs = store.selectedObjects
+  if (!objs.length) return
+  const ok = await copyText(objectsToJson(objs))
+  copied.value = ok
+  clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => (copied.value = false), 1500)
+}
 </script>
 
 <template>
@@ -106,6 +119,7 @@ function onUngroup(): void {
     <div class="actions">
       <button class="action" :disabled="!store.groupEligible" @click="store.groupSelected()">Group</button>
       <button class="action" :disabled="!store.ungroupEligible" @click="onUngroup">Ungroup</button>
+      <button class="action" @click="copyJson">{{ copied ? '✓ Copied' : 'Copy JSON' }}</button>
       <button class="action danger" @click="store.removeSelected()">Delete</button>
     </div>
     <p v-if="store.selectionIds.length >= 2 && !store.groupEligible" class="hint warn">
@@ -116,6 +130,12 @@ function onUngroup(): void {
     <div class="head">
       <span class="obj-kind">{{ sel!.control }}</span>
       <span class="obj-name">{{ sel!.name }}</span>
+      <button
+        class="copy-json"
+        :class="{ ok: copied }"
+        title="Copy this object's JSON (including sub-objects) to the clipboard"
+        @click="copyJson"
+      >{{ copied ? '✓ Copied' : '{ } JSON' }}</button>
     </div>
 
     <h2>Content</h2>
@@ -218,6 +238,28 @@ function onUngroup(): void {
 .obj-name {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 13px;
+}
+
+.copy-json {
+  margin-left: auto;
+  font: 500 10px/1 system-ui, sans-serif;
+  color: var(--ed-text-dim);
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 4px;
+  padding: 3px 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.copy-json:hover {
+  color: var(--ed-text);
+  border-color: var(--ed-accent);
+}
+
+.copy-json.ok {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.5);
 }
 
 .field {
