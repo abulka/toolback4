@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import type { Rect } from '@toolback/format'
 import { useBookStore } from '../stores/book'
 import { collectStoreKeys } from '../storeKeys'
+import { FONT_FAMILIES } from '@toolback/format'
 import { copyText, objectsToJson } from '../copyJson'
 import ScriptEditor from './ScriptEditor.vue'
 import HelpButton from './HelpButton.vue'
@@ -31,14 +32,12 @@ function onScript(code: string): void {
 }
 
 const textFields = computed(() => {
-  if (!sel.value) return []
+  if (!sel.value || isGroupSel()) return []
   switch (sel.value.control) {
     case 'button':
     case 'label':
-      return [
-        { key: 'text', label: 'Text' },
-        { key: 'fontSize', label: 'Font size (px)' },
-      ]
+    case 'switch':
+      return [{ key: 'text', label: 'Text' }]
     case 'input':
       return [{ key: 'placeholder', label: 'Placeholder' }]
     case 'image':
@@ -56,19 +55,63 @@ const textFields = computed(() => {
   }
 })
 
+// font + colour live on a compact shared row, not full-width fields
+const hasStyleRow = computed(() =>
+  ['button', 'label', 'switch', 'card', 'input'].includes(sel.value?.control ?? ''),
+)
+const hasColor = computed(() =>
+  ['button', 'label', 'switch', 'card', 'container', 'input'].includes(sel.value?.control ?? ''),
+)
+const isButtonSel = computed(() => sel.value?.control === 'button')
+
 function propValue(key: string): string {
   const v = sel.value?.props[key]
   return typeof v === 'string' ? v : ''
 }
 
 function numPropValue(key: string): string {
+  if (key === 'fontSize') return effectiveFontSize()
   const v = sel.value?.props[key]
   return typeof v === 'number' && Number.isFinite(v) ? String(v) : ''
 }
 
+/** the rendered font size: the stored fontSize, else the CSS baseline (15px) */
+function effectiveFontSize(): string {
+  const v = sel.value?.props['fontSize']
+  if (typeof v === 'number' && Number.isFinite(v)) return String(v)
+  if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) {
+    return String(Math.round(Number(v)))
+  }
+  return '15'
+}
+
+/** value for the <input type=color> swatch: the stored colour, else the
+ *  colour the object actually renders with (never a made-up grey) */
+function swatchFor(key: string): string {
+  const v = sel.value?.props[key]
+  if (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) return v
+  const control = sel.value?.control ?? ''
+  if (control === 'button' || control === 'switch') return '#4f46e5' // --tb-accent
+  if (control === 'label') return '#111827' // --tb-text
+  if (control === 'card') return '#ffffff'
+  if (control === 'container') return '#f9fafb'
+  return '#9ca3af'
+}
+
 function onProp(key: string, e: Event): void {
   if (!sel.value) return
-  store.updateProps(sel.value.id, { [key]: (e.target as HTMLInputElement).value })
+  const raw = (e.target as HTMLInputElement).value
+  let value: unknown = raw
+  if (key === 'fontSize') {
+    // store a real number (or remove the prop when cleared) so the field
+    // keeps showing what was typed
+    if (raw.trim() === '') value = undefined
+    else {
+      const n = Math.round(Number(raw))
+      value = Number.isFinite(n) && n >= 8 ? n : undefined
+    }
+  }
+  store.updateProps(sel.value.id, { [key]: value })
 }
 
 function onPropValue(key: string, v: string): void {
@@ -157,14 +200,49 @@ async function copyJson(): Promise<void> {
         :store-keys="storeKeyList"
         @update:model-value="onPropValue(f.key, $event)"
       />
+      <input v-else :value="propValue(f.key)" @input="onProp(f.key, $event)" />
+    </div>
+    <div v-if="hasStyleRow" class="field">
+      <label>Font size · Font</label>
+      <div class="pair-row">
+        <input
+          type="number"
+          min="8"
+          placeholder="size"
+          :value="numPropValue('fontSize')"
+          @input="onProp('fontSize', $event)"
+        />
+        <select :value="propValue('fontFamily')" @change="onProp('fontFamily', $event)">
+          <option value="">default</option>
+          <option v-for="fam in FONT_FAMILIES" :key="fam" :value="fam">{{ fam }}</option>
+        </select>
+      </div>
+    </div>
+    <div v-if="hasColor" class="field">
+      <label>{{ isButtonSel ? 'Colour' : 'Text colour' }}</label>
+      <div class="color-row">
+        <input
+          class="color-input"
+          :value="propValue('color')"
+          placeholder="red, #3b82f6…"
+          @input="onProp('color', $event)"
+        />
+        <input
+          type="color"
+          class="color-swatch"
+          :value="swatchFor('color')"
+          @input="onProp('color', $event)"
+        />
+      </div>
+    </div>
+    <div v-if="sel!.control === 'switch'" class="field">
+      <label>Checked</label>
       <input
-        v-else-if="f.key === 'fontSize' && !isGroupSel()"
-        type="number"
-        min="8"
-        :value="numPropValue(f.key)"
-        @input="onProp(f.key, $event)"
+        type="checkbox"
+        class="switch-checked"
+        :checked="sel!.props['checked'] === true"
+        @change="store.updateProps(sel!.id, { checked: ($event.target as HTMLInputElement).checked })"
       />
-      <input v-else-if="f.key !== 'text' && !isGroupSel()" :value="propValue(f.key)" @input="onProp(f.key, $event)" />
     </div>
     <p v-if="textFields.length === 0 || isGroupSel()" class="hint">
       {{ isGroupSel() ? 'Groups have no content — members do. Use Script for shared behaviour.' : 'No content properties.' }}
@@ -286,6 +364,7 @@ async function copyJson(): Promise<void> {
   flex-direction: column;
   gap: 4px;
   margin-bottom: 10px;
+  color-scheme: dark;
 }
 
 .field label {
@@ -305,6 +384,74 @@ async function copyJson(): Promise<void> {
 
 .field input:focus {
   outline: 1px solid var(--ed-accent);
+}
+
+/* compact rows: nothing stretches to the panel width (selectors are
+   higher-specificity than `.field input`, whose width: 100% would win) */
+.pair-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.field .pair-row input[type='number'] {
+  width: 72px;
+  flex: 0 0 auto;
+  font: inherit;
+}
+
+.field .pair-row select {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 130px;
+  width: auto;
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  color: var(--ed-text);
+  padding: 6px;
+  font: inherit;
+}
+
+.color-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.field .color-row .color-input {
+  flex: 0 1 auto;
+  width: 120px;
+  min-width: 0;
+}
+
+.field .color-row .color-swatch {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.color-swatch::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.color-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+
+/* beats `.field input`'s width: 100% */
+.field input.switch-checked {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  accent-color: var(--ed-accent);
 }
 
 .geo {

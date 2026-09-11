@@ -12,8 +12,8 @@ interface TBControl {
   readonly name: string
   /** Text of a button or label (an input's current value) */
   text: string
-  /** Current value of an input */
-  value: string
+  /** Current value of an input; a switch's checked state (true/false) */
+  value: any
   /** Show or hide the object */
   visible: boolean
   /** Enable or disable the object (buttons and inputs) */
@@ -26,6 +26,10 @@ interface TBControl {
   width: number
   /** Height (px) — resizes the object */
   height: number
+  /** Colour: a name (red, green, navy…) or any CSS colour; '' = default */
+  color: string
+  /** Font family: 'system' | 'sans' | 'serif' | 'mono' | 'rounded' */
+  fontFamily: string
   /** Attach an extra event handler, e.g. on('click', (e) => { ... }) */
   on(event: string, fn: TBListener): void
 }

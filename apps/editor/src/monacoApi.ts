@@ -80,6 +80,8 @@ const CONTROL_MEMBERS: Array<{
   { label: 'y', detail: 'top position (px) — moves the object', body: 'y', kind: 'prop' },
   { label: 'width', detail: 'width (px) — resizes the object', body: 'width', kind: 'prop' },
   { label: 'height', detail: 'height (px) — resizes the object', body: 'height', kind: 'prop' },
+  { label: 'color', detail: "colour: 'red', 'navy', '#3b82f6', rgb(…); '' = default", body: "color", kind: 'prop' },
+  { label: 'fontFamily', detail: "font: 'system' | 'sans' | 'serif' | 'mono' | 'rounded'", body: "fontFamily", kind: 'prop' },
   { label: 'name', detail: "this object's name", body: 'name', kind: 'prop' },
   {
     label: 'on',

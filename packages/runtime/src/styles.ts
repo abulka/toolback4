@@ -40,11 +40,27 @@ body {
   border-radius: var(--tb-radius);
   padding: 0 20px;
   cursor: pointer;
-  transition: background 120ms ease;
+  transition: filter 100ms ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
 .tb-button:hover {
   background: var(--tb-accent-hover);
+}
+
+/* a whisper of a press: slightly darker, shadow eases away — nothing moves */
+.tb-button:active {
+  filter: brightness(0.92);
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+}
+
+/* coloured buttons keep a themed hover/press (background overridden inline) */
+.tb-button.tb-colored:hover {
+  filter: brightness(1.06);
+}
+
+.tb-button.tb-colored:active {
+  filter: brightness(0.85);
 }
 
 .tb-label {
@@ -122,6 +138,64 @@ body {
   background: #f9fafb;
   border: 1.5px dashed #d1d5db;
   border-radius: 12px;
+}
+
+/* switch: pill toggle + label; the input is visually hidden but keeps focus */
+.tb-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  --tb-switch-on: var(--tb-accent);
+}
+
+.tb-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.tb-switch-track {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex: 0 0 auto;
+  background: #d1d5db;
+  border-radius: 12px;
+  transition: background 140ms ease;
+}
+
+.tb-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: left 140ms ease;
+}
+
+.tb-switch input:checked + .tb-switch-track {
+  background: var(--tb-switch-on);
+}
+
+.tb-switch input:checked + .tb-switch-track::after {
+  left: 22px;
+}
+
+.tb-switch input:focus-visible + .tb-switch-track {
+  outline: 2px solid var(--tb-switch-on);
+  outline-offset: 2px;
+}
+
+.tb-switch-text {
+  font: 500 15px/1.2 var(--tb-font);
+  color: var(--tb-text);
 }
 
 /* groups: invisible wrapper around members; clicks pass to members only,

@@ -7,6 +7,7 @@ export const CONTROL_KINDS = [
   'image',
   'card',
   'container',
+  'switch',
   'group',
 ] as const
 export type ControlKind = (typeof CONTROL_KINDS)[number]
@@ -89,16 +90,36 @@ export const DEFAULT_SIZES: Record<ControlKind, { w: number; h: number }> = {
   image: { w: 280, h: 200 },
   card: { w: 360, h: 220 },
   container: { w: 400, h: 280 },
+  switch: { w: 160, h: 40 },
   group: { w: 200, h: 200 },
 }
 
+/** simplified web-safe font families offered in the editor */
+export const FONT_FAMILIES = [
+  'system',
+  'sans',
+  'serif',
+  'mono',
+  'rounded',
+] as const
+export type FontFamily = (typeof FONT_FAMILIES)[number]
+
+export const FONT_STACKS: Record<FontFamily, string> = {
+  system: "system-ui, -apple-system, 'Segoe UI', sans-serif",
+  sans: "'Helvetica Neue', Arial, sans-serif",
+  serif: "Georgia, 'Times New Roman', serif",
+  mono: "ui-monospace, 'SF Mono', Menlo, 'Courier New', monospace",
+  rounded: "'Trebuchet MS', 'Comic Sans MS', 'Segoe UI', sans-serif",
+}
+
 export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
-  button: { text: 'Button' },
-  label: { text: 'Label' },
+  button: { text: 'Button', fontSize: 15 },
+  label: { text: 'Label', fontSize: 15 },
   input: { placeholder: 'Type here' },
   image: {},
   card: { title: 'Card', text: 'Card body' },
   container: {},
+  switch: { text: 'Switch', checked: false, fontSize: 15 },
   group: {},
 }
 
@@ -162,6 +183,30 @@ export function createGroup(name: string, rects: Rects, children: PageObject[]):
     on: {},
     children,
   })
+}
+
+/**
+ * Resolve a colour prop: accepts CSS colour names (red, green, …) and any
+ * CSS colour string (hex, rgb/rgba, hsl). Empty/unknown values return null
+ * so the object keeps its default styling.
+ */
+const NAMED_COLOURS: Record<string, string> = {
+  red: '#ef4444', green: '#22c55e', blue: '#3b82f6', yellow: '#eab308',
+  orange: '#f97316', purple: '#a855f7', pink: '#ec4899', teal: '#0d9488',
+  gray: '#6b7280', grey: '#6b7280', black: '#111827', white: '#ffffff',
+  dark: '#1f2937', light: '#f3f4f6', navy: '#1e3a8a', indigo: '#4f46e5',
+  brown: '#92400e', crimson: '#dc2626', gold: '#d97706', lime: '#84cc16',
+}
+const RGB_RE = /^(rgb|rgba|hsl|hsla)\(/
+export function resolveColor(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const v = value.trim().toLowerCase()
+  if (!v) return null
+  if (NAMED_COLOURS[v]) return NAMED_COLOURS[v]
+  if (/^#[0-9a-f]{3,8}$/.test(v)) return v
+  if (RGB_RE.test(v)) return v
+  if (/^[a-z]+$/.test(v)) return null // unknown name — let the default stand
+  return null
 }
 
 /** Pre-order walk: every object on the page, including group members. */

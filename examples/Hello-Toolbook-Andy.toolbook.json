@@ -20,14 +20,17 @@
           "control": "label",
           "rects": {
             "desktop": {
-              "x": 96,
-              "y": 88,
-              "w": 280,
+              "x": 120,
+              "y": 32,
+              "w": 400,
               "h": 56
             }
           },
           "props": {
-            "text": "Hello, Toolbook nostalgia!"
+            "text": "Hello, Toolbook nostalgia!",
+            "color": "#968bbb",
+            "fontSize": 22,
+            "fontFamily": "mono"
           },
           "on": {
             "click": "\n\nbutt"
@@ -66,6 +69,43 @@
           },
           "props": {
             "src": "https://dummyimage.com/600x400/000/fff&text=hi+there"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_d1697f755",
+          "name": "button1",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 96,
+              "y": 320,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "Button",
+            "fontSize": 15,
+            "color": "#5f89d3"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_0d2854a46",
+          "name": "button2",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 304,
+              "y": 320,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "Button",
+            "fontSize": 15
           },
           "on": {}
         }
@@ -115,6 +155,141 @@
           "on": {
             "click": "page.go('Page 1')"
           }
+        },
+        {
+          "id": "obj_95c623a15",
+          "name": "switch1",
+          "control": "switch",
+          "rects": {
+            "desktop": {
+              "x": 88,
+              "y": 320,
+              "w": 160,
+              "h": 40
+            }
+          },
+          "props": {
+            "text": "Switch",
+            "checked": true,
+            "fontFamily": "mono",
+            "color": "yellow"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_c198e8546",
+          "name": "switch2",
+          "control": "switch",
+          "rects": {
+            "desktop": {
+              "x": 88,
+              "y": 384,
+              "w": 160,
+              "h": 40
+            }
+          },
+          "props": {
+            "text": "Switch",
+            "checked": false
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_cc8b8cb37",
+          "name": "button3",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 296,
+              "y": 312,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "Button",
+            "fontFamily": "mono",
+            "color": "#1fad96",
+            "fontSize": 28
+          },
+          "on": {
+            "click": "button3.color = 'red'"
+          }
+        },
+        {
+          "id": "obj_b3bea12a5",
+          "name": "button4",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 296,
+              "y": 376,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "Button",
+            "fontFamily": "mono",
+            "color": "#51ad1f"
+          },
+          "on": {
+            "click": "button3.color = 'red'"
+          }
+        },
+        {
+          "id": "obj_b6f0e7158",
+          "name": "label1",
+          "control": "label",
+          "rects": {
+            "desktop": {
+              "x": 328,
+              "y": 40,
+              "w": 240,
+              "h": 208
+            }
+          },
+          "props": {
+            "text": "A \"kitchen sink\" demo in JavaScript refers to a comprehensive sample application or showcase that displays all available UI controls, components, or library features in a single place.Popular JavaScript and web libraries provide these kitchen sink demos to let developers test components like buttons, sliders, switches, and tabs interactively:",
+            "fontFamily": "rounded",
+            "fontSize": 14,
+            "color": "#d80e0e"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_d07151926",
+          "name": "button5",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 88,
+              "y": 480,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "Button"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_8feef39f7",
+          "name": "label2",
+          "control": "label",
+          "rects": {
+            "desktop": {
+              "x": 304,
+              "y": 480,
+              "w": 240,
+              "h": 40
+            }
+          },
+          "props": {
+            "text": "Label"
+          },
+          "on": {}
         }
       ]
     }

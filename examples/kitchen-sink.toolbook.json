@@ -138,7 +138,7 @@
     {
       "id": "page_ks_store",
       "name": "Store",
-      "script": "function pageEnter() {\n  store.set('where', page.name)\n  if (store.get('clicks') === undefined) store.set('clicks', 0)\n  if (store.get('who') === undefined) store.set('who', 'stranger')\n}\n",
+      "script": "function pageEnter() {\n  store.set('where', page.name)\n  if (store.get('clicks') === undefined) store.set('clicks', 0)\n  if (store.get('who') === undefined) store.set('who', 'stranger')\n  if (store.get('dark') === undefined) store.set('dark', true)\n}\n",
       "background": "#f6f7fb",
       "objects": [
         {
@@ -218,6 +218,46 @@
           "control": "label",
           "rects": { "desktop": { "x": 96, "y": 432, "w": 360, "h": 36 } },
           "props": { "text": "Clicks: {{clicks}}", "fontSize": 16 },
+          "on": {}
+        }
+,
+        {
+          "id": "obj_ks_modeSwitch",
+          "name": "modeSwitch",
+          "control": "switch",
+          "rects": { "desktop": { "x": 480, "y": 368, "w": 260, "h": 48 } },
+          "props": { "text": "Dark mode", "checked": true, "color": "purple", "fontFamily": "mono", "fontSize": 18 },
+          "on": {
+            "change": "store.set('dark', self.value)"
+          }
+        }
+,
+        {
+          "id": "obj_ks_stColorBtn",
+          "name": "stColorBtn",
+          "control": "button",
+          "rects": { "desktop": { "x": 480, "y": 264, "w": 240, "h": 48 } },
+          "props": { "text": "I turn green" },
+          "on": {
+            "click": "self.color = 'green'"
+          }
+        }
+,
+        {
+          "id": "obj_ks_stColorTip",
+          "name": "stColorTip",
+          "control": "label",
+          "rects": { "desktop": { "x": 480, "y": 200, "w": 600, "h": 64 } },
+          "props": { "text": "Colours & fonts: set the Colour / Font fields in the Selection panel — 'red', 'navy', '#3b82f6', rgb(…) — or from scripts: try the green button (its click script runs self.color = 'green').", "fontSize": 14 },
+          "on": {}
+        }
+,
+        {
+          "id": "obj_ks_stDark",
+          "name": "stDark",
+          "control": "label",
+          "rects": { "desktop": { "x": 480, "y": 432, "w": 260, "h": 36 } },
+          "props": { "text": "Dark mode is: {{dark}}", "fontSize": 16 },
           "on": {}
         }
 ,

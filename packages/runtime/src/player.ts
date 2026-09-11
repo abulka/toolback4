@@ -1,5 +1,5 @@
 import type { Book, Breakpoint, PageObject, Rect } from '@toolback/format'
-import { flattenObjects } from '@toolback/format'
+import { flattenObjects, FONT_STACKS, resolveColor } from '@toolback/format'
 import { renderBookPage } from './index'
 
 export interface ToolbackStore {
@@ -30,7 +30,8 @@ export interface ControlApi {
   readonly el: HTMLElement
   readonly name: string
   text: string
-  value: string
+  /** input text, or a switch's checked state */
+  value: unknown
   visible: boolean
   enabled: boolean
   /** Left edge (px) on the canvas */
@@ -41,6 +42,10 @@ export interface ControlApi {
   width: number
   /** Height (px) */
   height: number
+  /** colour name (red, navy…) or any CSS colour; '' = default */
+  color: string
+  /** simplified font family (system, sans, serif, mono, rounded) */
+  fontFamily: string
   on(event: string, fn: (e: Event) => void): void
 }
 
@@ -69,6 +74,8 @@ function makeControlApi(
   listeners: Array<() => void>,
 ): ControlApi {
   const input = el instanceof HTMLInputElement ? el : null
+  // switches render as a <label> wrapping a checkbox
+  const checkbox = el.querySelector<HTMLInputElement>('input[type="checkbox"]')
   // groups have no content of their own — writing textContent would wipe
   // the member DOM, so text/value are inert for them
   const isGroup = obj.control === 'group'
@@ -93,18 +100,29 @@ function makeControlApi(
     el,
     name: obj.name,
     get text() {
-      return isGroup ? '' : input ? input.value : (el.textContent ?? '')
+      if (isGroup) return ''
+      if (input) return input.value
+      // switches keep their label text in a separate span
+      const span = el.querySelector('.tb-switch-text')
+      if (span) return span.textContent ?? ''
+      return el.textContent ?? ''
     },
     set text(v: string) {
       if (isGroup) return
       if (input) input.value = String(v)
-      else el.textContent = String(v)
+      else {
+        const span = el.querySelector('.tb-switch-text')
+        if (span) span.textContent = String(v)
+        else el.textContent = String(v)
+      }
     },
     get value() {
+      if (checkbox) return checkbox.checked
       return input ? input.value : ''
     },
-    set value(v: string) {
-      if (input) input.value = String(v)
+    set value(v: unknown) {
+      if (checkbox) checkbox.checked = v === true || v === 'true'
+      else if (input) input.value = String(v)
     },
     get visible() {
       return el.style.display !== 'none'
@@ -113,9 +131,14 @@ function makeControlApi(
       el.style.display = v ? '' : 'none'
     },
     get enabled() {
+      if (checkbox) return !checkbox.disabled
       return !((el as HTMLButtonElement).disabled ?? false)
     },
     set enabled(v: boolean) {
+      if (checkbox) {
+        checkbox.disabled = !v
+        return
+      }
       if (el instanceof HTMLButtonElement || el instanceof HTMLInputElement) {
         el.disabled = !v
       }
@@ -143,6 +166,32 @@ function makeControlApi(
     },
     set height(v: number) {
       setRectPart('h', v)
+    },
+    get color() {
+      return typeof obj.props['color'] === 'string' ? (obj.props['color'] as string) : ''
+    },
+    set color(v: string) {
+      obj.props = { ...obj.props, color: v }
+      const resolved = resolveColor(v)
+      if (!resolved) return
+      // surface controls paint their background; labels/switches paint text
+      if (el.classList.contains('tb-card') || el.classList.contains('tb-container')) {
+        el.style.background = resolved
+      } else if (el.classList.contains('tb-button')) {
+        el.style.background = resolved
+      } else if (checkbox) {
+        el.style.setProperty('--tb-switch-on', resolved)
+      } else {
+        el.style.color = resolved
+      }
+    },
+    get fontFamily() {
+      return typeof obj.props['fontFamily'] === 'string' ? (obj.props['fontFamily'] as string) : ''
+    },
+    set fontFamily(v: string) {
+      if (!(v in FONT_STACKS)) return
+      obj.props = { ...obj.props, fontFamily: v }
+      el.style.fontFamily = FONT_STACKS[v as keyof typeof FONT_STACKS]
     },
     on(event: string, fn: (e: Event) => void) {
       el.addEventListener(event, fn)

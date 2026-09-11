@@ -1,4 +1,5 @@
 import type { ControlKind, PageObject } from '@toolback/format'
+import { FONT_STACKS, resolveColor, type FontFamily } from '@toolback/format'
 
 export type ControlRenderer = (obj: PageObject) => HTMLElement
 
@@ -35,6 +36,19 @@ export function numProp(obj: PageObject, key: string): number | null {
   return null
 }
 
+/** shared prop styling: color (names + CSS strings) and fontFamily */
+export function applyStyleProps(el: HTMLElement, obj: PageObject, kind: 'surface' | 'text'): void {
+  const color = resolveColor(obj.props['color'])
+  const font = obj.props['fontFamily']
+  if (color) {
+    if (kind === 'surface') el.style.background = color
+    else el.style.color = color
+  }
+  if (typeof font === 'string' && font in FONT_STACKS) {
+    el.style.fontFamily = FONT_STACKS[font as FontFamily]
+  }
+}
+
 export function renderButton(obj: PageObject): HTMLElement {
   const el = document.createElement('button')
   el.type = 'button'
@@ -42,6 +56,9 @@ export function renderButton(obj: PageObject): HTMLElement {
   el.textContent = textProp(obj, 'text', 'Button')
   const fs = numProp(obj, 'fontSize')
   if (fs) el.style.fontSize = `${fs}px`
+  // coloured buttons get a themed hover/press via the tb-colored class
+  if (resolveColor(obj.props['color'])) el.classList.add('tb-colored')
+  applyStyleProps(el, obj, 'surface')
   return el
 }
 
@@ -51,6 +68,43 @@ export function renderLabel(obj: PageObject): HTMLElement {
   el.textContent = textProp(obj, 'text', 'Label')
   const fs = numProp(obj, 'fontSize')
   if (fs) el.style.fontSize = `${fs}px`
+  applyStyleProps(el, obj, 'text')
+  return el
+}
+
+/** switch: a real checkbox styled as a pill toggle + its label */
+export function renderSwitch(obj: PageObject): HTMLElement {
+  const el = document.createElement('label')
+  el.className = 'tb-switch'
+  const box = document.createElement('input')
+  box.type = 'checkbox'
+  el.appendChild(box)
+  const track = document.createElement('span')
+  track.className = 'tb-switch-track'
+  track.appendChild(document.createElement('span'))
+  el.appendChild(track)
+  const text = textProp(obj, 'text')
+  if (text) {
+    const txt = document.createElement('span')
+    txt.className = 'tb-switch-text'
+    txt.textContent = text
+    el.appendChild(txt)
+  }
+  el.classList.toggle('tb-switch-on', obj.props['checked'] === true)
+  box.checked = obj.props['checked'] === true
+  const color = resolveColor(obj.props['color'])
+  if (color) el.style.setProperty('--tb-switch-on', color)
+  // text styling goes ON the text span — its own `font` shorthand would
+  // otherwise override anything inherited from the switch element
+  const font = obj.props['fontFamily']
+  const fs = numProp(obj, 'fontSize')
+  const txtEl = el.querySelector<HTMLElement>('.tb-switch-text')
+  if (txtEl) {
+    if (typeof font === 'string' && font in FONT_STACKS) {
+      txtEl.style.fontFamily = FONT_STACKS[font as FontFamily]
+    }
+    if (fs) txtEl.style.fontSize = `${fs}px`
+  }
   return el
 }
 
@@ -59,6 +113,12 @@ export function renderInput(obj: PageObject): HTMLElement {
   el.type = 'text'
   el.className = 'tb-input'
   el.placeholder = textProp(obj, 'placeholder', 'Type here')
+  const fs = numProp(obj, 'fontSize')
+  if (fs) el.style.fontSize = `${fs}px`
+  const font = obj.props['fontFamily']
+  if (typeof font === 'string' && font in FONT_STACKS) {
+    el.style.fontFamily = FONT_STACKS[font as FontFamily]
+  }
   return el
 }
 
@@ -89,12 +149,19 @@ export function renderCard(obj: PageObject): HTMLElement {
   body.textContent = textProp(obj, 'text')
   el.appendChild(title)
   el.appendChild(body)
+  const fs = numProp(obj, 'fontSize')
+  if (fs) {
+    body.style.fontSize = `${fs}px`
+    title.style.fontSize = `${Math.round(fs * 1.15)}px`
+  }
+  applyStyleProps(el, obj, 'surface')
   return el
 }
 
 export function renderContainer(obj: PageObject): HTMLElement {
   const el = document.createElement('div')
   el.className = 'tb-container'
+  applyStyleProps(el, obj, 'surface')
   return el
 }
 
@@ -118,5 +185,6 @@ export function registerControls(): void {
   registerControl('image', renderImage)
   registerControl('card', renderCard)
   registerControl('container', renderContainer)
+  registerControl('switch', renderSwitch)
   registerControl('group', renderGroup)
 }

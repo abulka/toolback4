@@ -108,12 +108,21 @@ scripts and object scripts, and you can read too (`if (input1.value === '') …`
 
 Get/set properties:
 
-- `text` — the text of a button or label (for an input, this is its value)
-- `value` — the value of an input
+- `text` — the text of a button or label (for an input, this is its value; for
+  a switch, its label text)
+- `value` — the value of an input; for a **switch**, the checked state
+  (`true`/`false` — reading and writing both work)
 - `visible` — `true`/`false`, show or hide the object
 - `enabled` — `true`/`false`, enable or disable (buttons and inputs)
 - `x`, `y` — the object's position on the canvas, in pixels (moving it)
 - `width`, `height` — the object's size, in pixels (resizing it; minimum 1)
+- `color` — a colour for the object: names like `'red'`, `'green'`, `'navy'`,
+  `'gold'`… or any CSS colour (`'#3b82f6'`, `'rgb(59 130 246)'`). Buttons,
+  cards and containers paint their surface; labels and switches paint their
+  text/toggle. `''` restores the default. Also settable from the Selection
+  panel's Colour field (with a colour swatch).
+- `fontFamily` — `'system' | 'sans' | 'serif' | 'mono' | 'rounded'` (a
+  simplified, web-safe set; works on switches too)
 
 Geometry changes apply immediately, and they stick for the whole run — even
 across `page.go` navigations. Each breakpoint (desktop/tablet/mobile) keeps its

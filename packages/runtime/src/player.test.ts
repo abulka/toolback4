@@ -268,7 +268,7 @@ describe('groups', () => {
 
 function makeBook(opts: {
   pageScript?: string
-  objects?: Array<{ name: string; control: 'button' | 'label'; text?: string; on?: Record<string, string> }>
+  objects?: Array<{ name: string; control: 'button' | 'label' | 'switch' | 'card'; text?: string; props?: Record<string, unknown>; on?: Record<string, string> }>
 }): Book {
   return {
     id: 'book1',
@@ -285,7 +285,7 @@ function makeBook(opts: {
             o.control,
             o.name,
             { desktop: { x: 0, y: 0, w: 100, h: 40 } },
-            o.text !== undefined ? { text: o.text } : {},
+            o.text !== undefined ? { text: o.text, ...(o.props ?? {}) } : (o.props ?? {}),
           )
           return { ...obj, on: o.on ?? {} }
         }),
@@ -415,6 +415,54 @@ describe('player', () => {
     const handle = runBook(book, root, 'desktop')
     root.querySelector('[data-tb-name="mirror"] div')!.dispatchEvent(new MouseEvent('click'))
     expect(handle.controls['mirror']!.text).toBe('hello')
+    handle.stop()
+    root.remove()
+  })
+
+  it('switches read/write checked via value and fire change events', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = makeBook({
+      objects: [
+        { name: 'mode', control: 'switch', props: { text: 'Dark', checked: true }, on: {} },
+        {
+          name: 'btn',
+          control: 'button',
+          on: {
+            click: "controls.mode.value = !controls.mode.value\nstore.set('isOn', controls.mode.value)",
+          },
+        },
+      ],
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    expect(handle.controls['mode']!.value).toBe(true)
+    const box = root.querySelector('[data-tb-name="mode"] input') as HTMLInputElement
+    expect(box.checked).toBe(true)
+    root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
+    expect(errors).toEqual([])
+    expect(handle.store.get('isOn')).toBe(false)
+    expect(box.checked).toBe(false)
+    handle.stop()
+    root.remove()
+  })
+
+  it('colours and fonts are scriptable (self.color assignments)', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = makeBook({
+      objects: [
+        { name: 'chip', control: 'card', props: { title: 'chip' }, on: {} },
+        { name: 'btn', control: 'button', on: { click: "chip.color = 'green'\nchip.fontFamily = 'mono'" } },
+      ],
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const cardEl = root.querySelector('[data-tb-name="chip"] .tb-card') as HTMLElement
+    root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
+    expect(errors).toEqual([])
+    expect(cardEl.style.background).toBe('#22c55e')
+    expect(cardEl.style.fontFamily).toContain('monospace')
     handle.stop()
     root.remove()
   })

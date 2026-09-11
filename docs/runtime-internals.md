@@ -35,7 +35,7 @@ Book    { id, title, canvas: { desktop: {w,h}, tablet?, mobile? }, pages: Page[]
 Page    { id, name, script, background, objects: PageObject[] }
 PageObject {
   id, name,                       // name = unique per page; the `controls[name]` handle
-  control: 'button'|'label'|'input'|'image'|'card'|'container'|'group',
+  control: 'button'|'label'|'input'|'image'|'card'|'container'|'switch'|'group',
   rects: { desktop: Rect, tablet?: Rect, mobile?: Rect },
   props: Record<string, unknown>, // control-specific, e.g. { text }
   on: Record<string, string>,     // eventName -> script source
@@ -50,6 +50,14 @@ PageObject {
   its own rect inherits desktop.
 - Groups are **parent objects**: a member's rect is relative to its group; a
   group's rect is the tight union of its members (see §5.3).
+- Style props: `color` (colour names via `resolveColor` — a curated map plus
+  any CSS colour string — or raw CSS) and `fontFamily` (one of the five
+  simplified stacks in `FONT_STACKS`) are applied at render
+  (`applyStyleProps`) and are also live accessors on `ControlApi`
+  (`color`/`fontFamily` getters/setters that write the prop AND the inline
+  style, surface vs text depending on the control). Switches apply
+  fontFamily/size to their text span and `color` to the toggle track
+  (`--tb-switch-on`).
 - Pinia reactive proxies are **not structured-cloneable** — the book always
   crosses the iframe boundary as `JSON.parse(JSON.stringify(book))`.
 

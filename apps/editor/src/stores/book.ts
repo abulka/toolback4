@@ -475,7 +475,10 @@ export const useBookStore = defineStore('book', () => {
     const obj = locateObj(id)?.obj
     if (!obj) return
     record('Edit properties', `props:${id}`)
-    obj.props = { ...obj.props, ...patch }
+    const next = { ...obj.props, ...patch }
+    // a patch value of undefined removes the key (e.g. a cleared font size)
+    for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k]
+    obj.props = next
     sync()
   }
 
