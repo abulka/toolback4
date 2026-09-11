@@ -191,6 +191,20 @@
           "on": {
             "click": "page.go('Playground')"
           }
+        },
+        {
+          "id": "obj_hs_nametag",
+          "name": "nameTag",
+          "control": "button",
+          "rects": {
+            "desktop": { "x": 640, "y": 620, "w": 240, "h": 44 },
+            "tablet": { "x": 400, "y": 620, "w": 240, "h": 44 },
+            "mobile": { "x": 75, "y": 620, "w": 240, "h": 44 }
+          },
+          "props": { "text": "I am {{self.name}}" },
+          "on": {
+            "click": "store.set('selfName', self.name)"
+          }
         }
       ]
     },

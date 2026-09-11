@@ -51,13 +51,32 @@ describe('groups', () => {
     root.remove()
   })
 
-  it('a click on a member bubbles to the group handler with the member as target', () => {
+  it('a member handler without forward() stops the message at the member', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
     const errors: string[] = []
     const book = groupBook({
-      groupOn: { click: `store.set('groupSaw', store.get('groupSaw') ? groupSaw++ : 1)` },
-      childOn: { click: `store.set('childSaw', (store.get('childSaw') ?? 0) + 1)` },
+      groupOn: { click: `store.set('groupSaw', 1)` },
+      childOn: { click: `store.set('childSaw', 1)` },
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
+    kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(errors).toEqual([])
+    expect(handle.store.get('childSaw')).toBe(1)
+    // the member caught the event and did not forward — the group never runs
+    expect(handle.store.get('groupSaw')).toBeUndefined()
+    stopRun()
+    root.remove()
+  })
+
+  it('forward() continues to the group: target = member, self = group', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = groupBook({
+      groupOn: { click: `store.set('groupSaw', 1)\nstore.set('who', target.name)\nstore.set('owner', self.name)` },
+      childOn: { click: `store.set('childSaw', 1)\nforward()` },
     })
     const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
     const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
@@ -65,6 +84,73 @@ describe('groups', () => {
     expect(errors).toEqual([])
     expect(handle.store.get('childSaw')).toBe(1)
     expect(handle.store.get('groupSaw')).toBe(1)
+    expect(handle.store.get('who')).toBe('kidBtn')
+    expect(handle.store.get('owner')).toBe('myGroup')
+    stopRun()
+    root.remove()
+  })
+
+  it('forward() still works after an await', async () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = groupBook({
+      groupOn: { click: `store.set('groupSaw', 1)` },
+      childOn: { click: `await Promise.resolve()\nforward()` },
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
+    kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(errors).toEqual([])
+    expect(handle.store.get('groupSaw')).toBe(1)
+    stopRun()
+    root.remove()
+  })
+
+  it('self is the script owner: the object itself, the group for group scripts', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = groupBook({
+      groupOn: { click: `store.set('groupSelf', self.name)` },
+      childOn: { click: `store.set('childSelf', self.name)` },
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
+    kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(errors).toEqual([])
+    expect(handle.store.get('childSelf')).toBe('kidBtn')
+    // the member handler did not forward, so the group script never ran;
+    // self === the group is checked via the auto-continue case below
+    expect(handle.store.get('groupSelf')).toBeUndefined()
+
+    const book2 = groupBook({
+      groupOn: { click: `store.set('groupSelf', self.name)` },
+    })
+    const handle2 = runBook(book2, root, 'desktop', (m) => errors.push(m))
+    // the re-render rebuilt the DOM — re-query the button
+    const kid2 = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
+    kid2.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(errors).toEqual([])
+    // no member handler: the message auto-continues, self = the group itself
+    expect(handle2.store.get('groupSelf')).toBe('myGroup')
+    stopRun()
+    root.remove()
+  })
+
+  it('this inside a script is the script owner (strict-mode call binding)', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = groupBook({
+      childOn: { click: `store.set('who', this.name)` },
+    })
+    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
+    kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(errors).toEqual([])
+    expect(handle.store.get('who')).toBe('kidBtn')
     stopRun()
     root.remove()
   })
@@ -248,6 +334,46 @@ describe('player', () => {
     const handle = runBook(book, root, 'desktop')
     handle.store.set('ok', 7)
     expect(root.querySelector('.tb-label')?.textContent).toBe('A  B {{...}} C 7')
+    handle.stop()
+  })
+
+  it('{{self.name}} labels show each object its own name (and survive duplication)', () => {
+    const root = document.createElement('div')
+    const book = makeBook({
+      objects: [
+        { name: 'button1', control: 'button', text: 'I am {{self.name}}' },
+        { name: 'button2', control: 'button', text: 'I am {{self.name}}' },
+        { name: 'tag', control: 'label', text: '{{this.name}}' },
+      ],
+    })
+    const handle = runBook(book, root, 'desktop')
+    const buttons = root.querySelectorAll('button.tb-button')
+    expect(buttons[0]!.textContent).toBe('I am button1')
+    expect(buttons[1]!.textContent).toBe('I am button2')
+    // the {{this.name}} alias works in templates too
+    expect(root.querySelector('.tb-label')?.textContent).toBe('tag')
+    // unknown members render empty, like unset store keys
+    handle.stop()
+  })
+
+  it('{{self.<unknown>}} renders empty while plain {{key}} stays store-bound', () => {
+    const root = document.createElement('div')
+    const book = makeBook({
+      objects: [{ name: 'out', control: 'label', text: 'A {{self.nme}} B {{who}}' }],
+    })
+    const handle = runBook(book, root, 'desktop')
+    handle.store.set('who', 'sam')
+    expect(root.querySelector('.tb-label')?.textContent).toBe('A  B sam')
+    handle.stop()
+  })
+
+  it('self in a page script is the page API', () => {
+    const root = document.createElement('div')
+    const book = makeBook({
+      pageScript: `function pageEnter() { store.set('pg', self.name) }`,
+    })
+    const handle = runBook(book, root, 'desktop')
+    expect(handle.store.get('pg')).toBe('Page 1')
     handle.stop()
   })
 

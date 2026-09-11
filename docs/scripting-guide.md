@@ -3,6 +3,9 @@
 Scripts are **plain modern JavaScript**. No special language to learn — if you can
 write JavaScript, you already know toolback scripting. This guide covers everything
 you can use inside a script, plus recipes you can copy straight into your book.
+(For how it all works under the hood — script compilation, the forward
+dispatch chain, the editor↔canvas protocol — see
+[runtime-internals.md](./runtime-internals.md).)
 
 ## Where scripts live
 
@@ -154,6 +157,46 @@ DOM element.
 console.log('you clicked', target.name)
 ```
 
+### self
+
+**`self` is the object that owns the script you're writing** — ToolBook
+heritage. Like `target` it is a full control API, and it cannot be set.
+
+- In an **object's own script**, `self` is the object itself (so `target ===
+  self` there)
+- In a **group's script**, `self` is the **group itself** — while `target` is
+  the member that was clicked. That distinction is the whole point: a group
+  can act on itself (`self.x += 8`) while still knowing which member was
+  clicked (`target.name`)
+- In a **page script**, `self` is the page API (`self.name` is the page name)
+- `this` works as an alias for `self` anywhere in a script, for the
+  TypeScript-flavoured (`this.name === self.name`)
+
+```js
+// a button's click script — nudge *itself* right
+self.x += 8
+```
+
+### forward
+
+Event handling in groups follows the ToolBook rule: the innermost handler for
+an event runs and **stops there** unless it calls `forward()` — which sends
+the same event to the next enclosing script (the parent group's handler, where
+`target` is still the member and `self` is that group). An object with **no
+handler** for the event lets the message pass to its parent automatically.
+
+```js
+// in a member's click script — let the group's handler also run
+store.set('clicked', self.name)
+forward()
+```
+
+```js
+// in the group's click script — runs only if some member forwarded,
+// or if a member without its own click script was clicked
+store.set('who', target.name)
+```
+
 ## Object scripts
 
 Select an object → **Script** → pick the event → write the body. The body runs
@@ -202,6 +245,14 @@ Put `{{key}}` in a label or button's **Text** property and it stays live:
 
 - label text: `Count: {{count}}` → re-renders every time `store.set('count', …)` runs
 - a key that was never set renders as empty text
+
+And the self-binding: **`{{self.name}}`** (or `{{this.name}}`) shows the
+object's **own name**. Duplicate the object and every copy displays its own
+fresh name with no edits:
+
+```text
+I am {{self.name}}
+```
 
 This is how object state becomes visible text.
 
@@ -308,17 +359,27 @@ What a group gives you:
 - **Move as one** — dragging the group (or setting its `x`/`y`) moves every
   member. Resizing the group scales members proportionally.
 - **Hide as one** — `myGroup.visible = false` hides the whole group.
-- **Shared scripts with bubbling** — a group's event handlers fire when the
-  event happens on *any* member. The member's own handler runs first, then the
-  group's. In a group's script, **`target` is the member that received the
-  event** — a full object, so `target.name` tells you which one:
+- **Shared scripts with `forward`** — a group's event handlers fire when the
+  event happens on *any* member **that lets the message through**. The
+  ToolBook rule: the innermost handler for an event runs and stops there
+  unless it calls **`forward()`** — an object with no handler for that event
+  lets the message pass to its parent automatically. So a group script runs
+  when a member without its own handler is clicked, or when a member's script
+  ends with `forward()`. In a group's script, **`target` is the member that
+  received the event** and **`self` is the group itself** (see
+  [self](#self)):
 
 ```js
-// myGroup's click script — responds to a click on any member
+// okButton's click script — handle it, then let the group react too
+store.set('clicked', 'the OK button')
+forward()
+```
+
+```js
+// myGroup's click script — runs after okButton forwards, or when any
+// member without its own click script is clicked
 console.log('you clicked', target.name)
-if (target.name === 'okButton') {
-  store.set('clicked', 'the OK button')
-}
+self.x += 2 // the group itself nudges over
 ```
 
 - **Members stay addressable** — group members are ordinary objects: bare
@@ -348,20 +409,20 @@ members carry content, the group carries behaviour and position.
 The script editors help as you type:
 
 - **Ctrl+Space** opens a short, curated list — *only* toolback things: your
-  objects (first), the API (`store`, `page`, `controls`, `event`), and
-  ready-made templates. No thousands of irrelevant browser globals. Filter by
-  typing; **Tab** (or Enter/click) inserts.
+  objects (first), the API (`store`, `page`, `controls`, `event`, `target`,
+  `self`), and ready-made templates. No thousands of irrelevant browser
+  globals. Filter by typing; **Tab** (or Enter/click) inserts.
 - **Typing `.` after an object** lists that object's properties — `button2.`
   offers `text`, `value`, `visible`, `enabled`, `x`, `y`, `width`, `height`,
   `on`, `el` — with short descriptions of each. `store.`, `page.`, `controls.`,
-  `event.` and `target.` all have their own member lists.
+  `event.`, `target.`, `self.` and `this.` all have their own member lists.
 - **Templates**: `pageEnter`, `pageLeave`, `store.set`, `store.get`, `page.go`,
   `onEvent`, `input-to-store`, `fetch-to-store`, `log-clicked-member`,
   `console.log`. They expand into ready-to-fill code with tab stops.
 - **Typing `{{` in a script** offers your store keys and inserts
   `store.get('key')` (the script-side way to read a value — `{{key}}` bindings
   themselves belong in Text properties). In a Text property, `{{` lists keys
-  and adds the closing `}}` for you.
+  plus the built-in `self.name` and adds the closing `}}` for you.
 - **Red squiggles** underline syntax errors (like a stray `}`) before you even
   press Run. A squiggle is a hint — you can still run the page, and any error
   will also appear in the status bar when it actually happens.

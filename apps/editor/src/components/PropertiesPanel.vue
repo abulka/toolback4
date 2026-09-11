@@ -9,7 +9,9 @@ import HelpButton from './HelpButton.vue'
 import DynamicTextEditor from './DynamicTextEditor.vue'
 
 const store = useBookStore()
-const storeKeyList = computed(() => collectStoreKeys(store.book))
+// store keys plus the built-in self binding — {{self.name}} makes every copy
+// of an object show its own name (duplicates included)
+const storeKeyList = computed(() => [...collectStoreKeys(store.book), 'self.name'])
 const sel = computed(() => store.selectedObject)
 const multi = computed(() => store.selectionIds.length > 1)
 const rect = computed<Rect | null>(() =>
@@ -170,7 +172,9 @@ async function copyJson(): Promise<void> {
       @update:model-value="onScript"
     />
     <p v-if="isGroupSel()" class="hint">
-      Group handlers fire when any member is clicked — <code>event.target</code> is the member.
+      A group handler runs when a member without its own handler is clicked, or
+      when a member's script ends with <code>forward()</code>. Here
+      <code>target</code> is the member, <code>self</code> the group.
     </p>
 
     <h2>Arrange</h2>

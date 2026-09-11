@@ -151,9 +151,9 @@ function makeControlApi(
   }
 }
 
-const DYN_RE = /\{\{\s*([\w$]+)\s*\}\}/g
+const DYN_RE = /\{\{\s*([\w$]+(?:\.[\w$]+)*)\s*\}\}/g
 
-const NAME_RESERVED = new Set(['page', 'controls', 'store', 'event', 'target'])
+const NAME_RESERVED = new Set(['page', 'controls', 'store', 'event', 'target', 'self', 'this'])
 const IDENT_RE = /^[A-Za-z_$][\w$]*$/
 
 /**
@@ -171,18 +171,27 @@ function wireDynamicText(
   store: ToolbackStore,
   listeners: Array<() => void>,
 ): void {
-  const entries: Array<{ el: HTMLElement; template: string }> = []
+  const entries: Array<{ el: HTMLElement; template: string; obj: PageObject }> = []
   for (const obj of flattenObjects(page.objects)) {
     const t = obj.props['text']
     if (typeof t !== 'string' || !t.includes('{{')) continue
     const el = controlElement(pageRoot, obj.name)
     if (!el) continue
-    entries.push({ el, template: t })
+    entries.push({ el, template: t, obj })
   }
   if (entries.length === 0) return
+  const resolveDyn = (path: string, obj: PageObject): string => {
+    const dot = path.indexOf('.')
+    if (dot === -1) return String(store.get(path) ?? '')
+    // dotted paths resolve against the object itself: {{self.name}} /
+    // {{this.name}} — every copy of an object shows its own name
+    const [head, member] = [path.slice(0, dot), path.slice(dot + 1)]
+    if ((head === 'self' || head === 'this') && member === 'name') return obj.name
+    return '' // unsupported member — renders empty, like an unset store key
+  }
   const render = () => {
     for (const e of entries) {
-      e.el.textContent = e.template.replace(DYN_RE, (_, k: string) => String(store.get(k) ?? ''))
+      e.el.textContent = e.template.replace(DYN_RE, (_, path: string) => resolveDyn(path, e.obj))
     }
   }
   render()
@@ -255,9 +264,11 @@ function runPage(st: RunState, idx: number): void {
         const shortNames = bare.length > 0 ? `const { ${bare.join(', ')} } = controls;` : ''
         const factory = new Function(
           'api',
+          'self',
           `"use strict";\nconst { page, controls, store } = api;\n${shortNames}\n${page.script}\n;return { ${returnObj} };`,
         )
-        st.pageFns = (factory(api) ?? {}) as Record<string, (e?: unknown) => unknown>
+        // `self` in a page script is the page API (self.name = the page name)
+        st.pageFns = (factory(api, st.pageApi) ?? {}) as Record<string, (e?: unknown) => unknown>
       })
     }
     const fnNames = Object.keys(st.pageFns)
@@ -276,43 +287,101 @@ function runPage(st: RunState, idx: number): void {
       return fallback
     }
 
+    // ---- ToolBook event model: an explicit owner chain, not DOM bubbling ----
+    // The innermost handler runs and STOPS unless it calls forward(); an
+    // owner with no handler for the event auto-continues to its parent group.
+    // Each owner's `self` is its own ControlApi (the group itself for group
+    // scripts) while `target` stays the member that received the event.
+    // Walking the chain explicitly (instead of relying on DOM bubbling) also
+    // makes non-bubbling events like mouseenter reach group handlers.
+
+    const parentOf = new Map<string, PageObject | null>()
+    const walkTree = (objs: PageObject[], parent: PageObject | null): void => {
+      for (const o of objs) {
+        parentOf.set(o.name, parent)
+        if (o.children?.length) walkTree(o.children, o)
+      }
+    }
+    walkTree(page.objects, null)
+
+    // compile every owner's event scripts once per page render
+    const compiled = new Map<string, Map<string, (e: Event, self: ControlApi, forward: () => void) => void>>()
     for (const obj of flat) {
       const ctl = st.controls[obj.name]
       if (!ctl) continue
+      const perEvent = new Map<string, (e: Event, self: ControlApi, forward: () => void) => void>()
       for (const [eventName, script] of Object.entries(obj.on)) {
         if (!script || !script.trim()) continue
         try {
           const bare = shortNamesFor(flat.map((o) => o.name), fnNames)
           const shortNames =
             bare.length > 0 ? `const { ${bare.join(', ')} } = controls;` : ''
-          // `target` = the object that received the event: in a group script
-          // it is the member that was clicked (events bubble); in a member's
-          // own script it is the object itself. Page functions with colliding
-          // names win, so the param list is deduped and args aligned.
-          const paramNames = [...new Set([...fnNames, 'event', 'target'])]
+          // `target` = the member that received the event; `self` = the
+          // script owner (in a group script: the group itself); `forward()`
+          // continues the message to the next enclosing handler. Page
+          // functions with colliding names lose the reserved slots.
+          const paramNames = [...new Set([...fnNames, 'event', 'target', 'self', 'forward'])]
           const factory = new Function(
             'api',
             ...paramNames,
             `"use strict";\nconst { page, controls, store } = api;\nreturn (async () => {\n${shortNames}\n${script}\n})();`,
           )
-          const handler = (e: Event) => {
+          perEvent.set(eventName, (e, self, forward) => {
             const args: unknown[] = [api]
             for (const p of paramNames) {
               if (p === 'event') args.push(e)
               else if (p === 'target') args.push(resolveTarget(e, ctl))
+              else if (p === 'self') args.push(self)
+              else if (p === 'forward') args.push(forward)
               else args.push(st.pageFns[p])
             }
             safeRun(st, `${obj.name}.${eventName}`, () => {
-              Promise.resolve(factory(...args)).catch((err) =>
+              // `this` inside the script is the script owner (=== self)
+              Promise.resolve(factory.call(self, ...args)).catch((err) =>
                 st.onError?.(`${obj.name}.${eventName}: ${String(err)}`),
               )
             })
-          }
-          ctl.el.addEventListener(eventName, handler)
-          st.listeners.push(() => ctl.el.removeEventListener(eventName, handler))
+          })
         } catch (err) {
           st.onError?.(`${obj.name}.${eventName}: ${String(err)}`)
         }
+      }
+      if (perEvent.size) compiled.set(obj.name, perEvent)
+    }
+
+    // attach one dispatcher per leaf element per event type used anywhere in
+    // its owner chain — the chain walk decides which handlers actually run
+    const chainOf = (obj: PageObject): PageObject[] => {
+      const chain: PageObject[] = []
+      let cur: PageObject | null = obj
+      while (cur) {
+        chain.push(cur)
+        cur = parentOf.get(cur.name) ?? null
+      }
+      return chain
+    }
+    for (const obj of flat) {
+      // group wrappers have pointer-events: none — events originate on
+      // members, and group handlers are reached through the chain walk
+      if (obj.control === 'group') continue
+      const ctl = st.controls[obj.name]
+      if (!ctl) continue
+      const chain = chainOf(obj)
+      const types = new Set<string>()
+      for (const o of chain) for (const t of Object.keys(o.on)) types.add(t)
+      for (const eventName of types) {
+        const dispatch = (e: Event): void => {
+          let i = 0
+          const forward = (): void => {
+            while (i < chain.length && !compiled.get(chain[i]!.name)?.has(eventName)) i++
+            if (i >= chain.length) return
+            const owner = chain[i++]!
+            compiled.get(owner.name)!.get(eventName)!(e, st.controls[owner.name]!, forward)
+          }
+          forward()
+        }
+        ctl.el.addEventListener(eventName, dispatch)
+        st.listeners.push(() => ctl.el.removeEventListener(eventName, dispatch))
       }
     }
 

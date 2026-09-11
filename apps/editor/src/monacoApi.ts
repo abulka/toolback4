@@ -173,7 +173,9 @@ function buildProvider(monaco: typeof Monaco): Monaco.languages.CompletionItemPr
           item('preventDefault', 'prevent the default behaviour', 'preventDefault()', K.Method, false),
           item('stopPropagation', 'stop the event bubbling up', 'stopPropagation()', K.Method, false),
         ]
-      } else if (recv === 'target') {
+      } else if (recv === 'target' || recv === 'self' || recv === 'this') {
+        // self/this are the script owner (a group script: the group itself) —
+        // same control API as target
         list = CONTROL_MEMBERS.map((m) =>
           item(m.label, m.detail, m.body, m.kind === 'method' ? K.Method : K.Property, m.kind === 'method'),
         )
@@ -242,6 +244,7 @@ function buildProvider(monaco: typeof Monaco): Monaco.languages.CompletionItemPr
       ['controls', 'all objects on this page, by name'],
       ['event', 'the DOM event (in object scripts)'],
       ['target', 'the object that received the event (group scripts: the member)'],
+      ['self', 'the object that owns this script (group scripts: the group) — {{self.name}} in Text shows its own name'],
     ] as const) {
       suggestions.push({
         label: api,
