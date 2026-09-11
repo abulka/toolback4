@@ -2,17 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { createObject, type Book } from '@toolback/format'
 import { runBook } from './player'
 
+const BG = { id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', objects: [] }
+
 function twoPageBook(page2Script: string): Book {
   return {
     id: 'b',
     title: 't',
     canvas: { desktop: { width: 100, height: 100 } },
+    backgrounds: [BG],
     pages: [
       {
         id: 'p1',
         name: 'One',
         script: '',
-        background: '#fff',
+        backgroundId: 'bg1',
         objects: [
           { ...createObject('button', 'nav', { desktop: { x: 0, y: 0, w: 80, h: 30 } }), on: { click: `page.go('Two')` } },
         ],
@@ -21,7 +24,7 @@ function twoPageBook(page2Script: string): Book {
         id: 'p2',
         name: 'Two',
         script: page2Script,
-        background: '#fff',
+        backgroundId: 'bg1',
         objects: [
           { ...createObject('label', 'lbl', { desktop: { x: 0, y: 0, w: 80, h: 30 } }), props: { text: 'x' } },
         ],

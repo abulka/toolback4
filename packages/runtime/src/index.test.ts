@@ -3,6 +3,8 @@ import { createObject, type Book } from '@toolback/format'
 import { sampleBook } from '@toolback/format/src/sample'
 import { getObjectRects, isGroupKey, listenForEditor, renderBook, renderObjectInto, shouldToggleRun } from './index'
 
+const BG = { id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', objects: [] }
+
 function key(key: string, code: string, init: KeyboardEventInit = {}): KeyboardEvent {
   return new KeyboardEvent('keydown', { key, code, ...init })
 }
@@ -135,12 +137,13 @@ describe('runtime', () => {
         id: 'b',
         title: 'T',
         canvas: { desktop: { width: 400, height: 300 } },
+        backgrounds: [BG],
         pages: [
           {
             id: 'p',
             name: 'P',
             script: `function pageEnter() { store.set('seed', 1) }`,
-            background: '#ffffff',
+            backgroundId: 'bg1',
             objects: [obj],
           },
         ],
@@ -188,6 +191,7 @@ describe('runtime', () => {
         id: 'b2',
         title: 'T',
         canvas: { desktop: { width: 400, height: 300 } },
+        backgrounds: [BG],
         pages: [
           {
             id: 'p',
@@ -201,7 +205,7 @@ describe('runtime', () => {
               `  store.set('fn', function greet() {})`,
               `}`,
             ].join('\n'),
-            background: '#ffffff',
+            backgroundId: 'bg1',
             objects: [obj],
           },
         ],

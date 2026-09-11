@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { createGroup, createObject, type Book, type PageObject } from '@toolback/format'
 import { createStore, extractFunctionNames, runBook, stopRun } from './player'
 
+const BG = { id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', objects: [] }
+
 describe('store', () => {
   it('snapshots key/value pairs in insertion order', () => {
     const store = createStore()
@@ -31,7 +33,8 @@ describe('groups', () => {
       id: 'bg',
       title: 'Groups',
       canvas: { desktop: { width: 800, height: 600 } },
-      pages: [{ id: 'p', name: 'P', script: '', background: '#fff', objects: [group] }],
+      backgrounds: [BG],
+      pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [group] }],
     }
     return book
   }
@@ -254,7 +257,8 @@ describe('groups', () => {
       id: 'bn',
       title: 'N',
       canvas: { desktop: { width: 400, height: 300 } },
-      pages: [{ id: 'p', name: 'P', script: '', background: '#fff', objects: [outer] }],
+      backgrounds: [BG],
+      pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [outer] }],
     }
     runBook(book, root, 'desktop')
     const leafEl = root.querySelector('[data-tb-name="leaf"]') as HTMLElement
@@ -274,12 +278,13 @@ function makeBook(opts: {
     id: 'book1',
     title: 'Test',
     canvas: { desktop: { width: 1280, height: 800 } },
+    backgrounds: [BG],
     pages: [
       {
         id: 'p1',
         name: 'Page 1',
         script: opts.pageScript ?? '',
-        background: '#ffffff',
+        backgroundId: 'bg1',
         objects: (opts.objects ?? []).map((o) => {
           const obj = createObject(
             o.control,
@@ -635,12 +640,13 @@ describe('player', () => {
         id: 'book2',
         title: 'Quiz',
         canvas: { desktop: { width: 1280, height: 800 } },
+        backgrounds: [BG],
         pages: [
           {
             id: 'p1',
             name: 'Quiz',
             script: `function pageLeave() { store.set('left1', true) }`,
-            background: '#ffffff',
+            backgroundId: 'bg1',
             objects: [
               {
                 ...createObject('button', 'answer', { desktop: { x: 0, y: 0, w: 100, h: 40 } }),
@@ -652,7 +658,7 @@ describe('player', () => {
             id: 'p2',
             name: 'Results',
             script: `function pageEnter() { store.set('entered2', true) }`,
-            background: '#ffffff',
+            backgroundId: 'bg1',
             objects: [
               {
                 ...createObject('label', 'scoreLabel', { desktop: { x: 0, y: 0, w: 200, h: 40 } }),

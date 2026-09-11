@@ -17,6 +17,7 @@ There are two places a script can live:
 - **Page script** — the **Page script** panel in the properties sidebar. Define
   functions once here and call them from any object script. Also the home of
   `pageEnter()`, which runs when you press **Run** (shortcut: `F3` or `⌥3`).
+  On a plugin page (⚡ author mode), `pageEnter()` fires when the plugin opens.
 
 ## How names work
 
@@ -447,16 +448,127 @@ The script editors help as you type:
 - The store resets every time you press **Run**. Edits made while running re-run
   the page, so it's a live-coding loop.
 
+## Backgrounds
+
+A **background** is a shared page resource, in the grand ToolBook tradition: every
+object on a background appears on **all pages that use it**, and the background
+decides the **size of its pages**.
+
+The **Backgrounds panel** (left sidebar) shows one group per background with its
+pages nested underneath:
+
+- **click a background** to edit it — the canvas shows only the background's own
+  objects; drag, script and restyle them like page objects. The background of
+  the page you're editing stays outlined; the one being edited is highlighted
+- **⚙** opens the background properties: name, colour, **page size**, and
+  **Delete…** (backgrounds with pages take them along — confirmed first)
+- **double-click a background name** to rename it; ⧉ duplicates
+- **drag pages** to rearrange them, or drop them on another background to move
+  them there
+- **+ Add background** / **+ Add page** — new pages join the background you're
+  currently editing (or the current page's background)
+
+### Background properties & page size
+
+By default a page is as big as the **book** page size (set per breakpoint in the
+top-right Desktop/Tablet/Mobile switch). A background can override it per
+breakpoint — e.g. make a small **320 × 240** background; every page on it
+becomes a dialog-sized page. In the properties dialog, untick *"Use the book
+default page size"*, then pick a preset, type exact width/height, or **drag the
+corner of the preview** — the size follows your drag, snapped to the grid.
+
+### Scripting backgrounds
+
+Background objects are first-class: they get `controls.<name>` handles, can carry
+event scripts, and their `{{key}}` dynamic labels work like any other object. A
+button that lives on the background works on **every page** that shows it — the
+classic way to build a shared nav bar.
+
+Backgrounds also have a **script** (edit a background, then use *Background
+script* in the Page tab): define shared functions here and every page on that
+background can call them. A `backgroundEnter()` hook fires **once per run**, on
+the first page using the background:
+
+```js
+// background script
+function helper() { return 'shared' }
+
+function backgroundEnter() {
+  store.set('startedAt', Date.now())
+}
+```
+
+Two things to know:
+
+- names are shared in one namespace per run: a background's object names and its
+  pages' object names must not collide (the editor keeps them unique when you add
+  and duplicate)
+- editing a background's objects changes **every page using it** — objects on a
+  page view are shown ghosted and locked; the editor tells you where to edit them
+  if you click one
+
+## Popups and dialogs
+
+Any page can open another page as a **popup dialog** at run time:
+
+```js
+// open the page named 'Dialog' (modal, with a title bar, centred)
+page.popupOpen('Dialog')
+
+// with options
+page.popupOpen('Palette', { modal: false, chrome: 'none', x: 100, y: 60 })
+
+page.popupClose('Dialog')  // by name…
+page.popupClose()          // …or the topmost popup
+page.popupCloseAll()
+page.popups                // names of the open popups (bottom → top)
+```
+
+The **size of the popup comes from the page's background** — make a background
+with a small page size (e.g. 320 × 240, see [Backgrounds](#backgrounds)) and
+every page on it becomes a dialog-sized page. That's the whole trick:
+
+1. **Backgrounds → + Add background** (call it "Dialog"), open its ⚙
+   properties, untick *Use the book default page size* and drag the preview to
+   320 × 240
+2. build the dialog on a page using that background — inputs, buttons, scripts
+3. from anywhere: `page.popupOpen('Dialog')`
+
+Details worth knowing:
+
+- the popup is **live**: it fires its own `pageEnter()`/`pageLeave()`, its
+  objects are scriptable, and `store` is shared with the page underneath
+- `page.go(...)` **inside a popup script navigates that popup** (from the base
+  page it navigates the book); opening the same page twice reports an error
+- navigating the base page closes all popups first (their `pageLeave` runs)
+- options: `modal` (default `true` — dims the page behind; a backdrop click or
+  `Esc` closes the topmost modal), `chrome: 'none'` for a bare page rect,
+  `x`/`y` in canvas coordinates (default: centred)
+- `page.popupOpen` returns a handle: `const dlg = page.popupOpen('D')` then
+  `dlg.close()`
+
+### Recipe: a modal settings dialog
+
+**Dialog background** sized 320 × 240. Page **Settings** on it: a switch named
+`mode`, and an OK button with the click script:
+
+```js
+store.set('applyTheme', controls.mode.value)
+page.popupClose()
+```
+
+Any button anywhere opens it: `page.popupOpen('Settings')`
+
 ## Pages and navigation
 
-The **Pages** panel (left sidebar) manages the book's pages:
+The **Backgrounds** panel (left sidebar) groups pages under their backgrounds:
 
 - click a page to edit it; press **Run** to play the page you're editing
   (shortcut: `F3` or `⌥3` — works even when the canvas has focus)
 - **double-click a page name** to rename it
 - ⧉ duplicates a page — objects, properties and scripts included
 - ✕ deletes it (a book always keeps at least one page)
-- **+ Add page** appends a fresh page
+- **+ Add page** appends a fresh page on the background in context
 
 ### The `page` API
 
@@ -508,6 +620,130 @@ function pageEnter() {
 ```
 
 A "Play again" button's `click` script: `page.go('Quiz')`
+
+## Author plugins
+
+The grand ToolBook trick, complete: **a page can run as a plugin while you
+author**. Its scripts get the regular API **plus `author`** — an async bridge
+to the editor itself. The book stays fully editable underneath while the
+plugin floats on top.
+
+To make one:
+
+1. create a page (a compact one — put it on a small background like a
+   320 × 240 "Dialog" background), and tick **Plugin page** in the Page tab
+2. build its UI: buttons, inputs, labels — all interactive while you author
+3. click **⚡** (top right) → the menu lists **only plugin pages** — pick yours
+
+The plugin's `pageEnter()` fires when it opens; its object event scripts run
+as usual. `page.go` is disabled (the book is being edited); `store` is a
+plugin-local store, fresh each session.
+
+**Scripts hot-reload**: change the plugin's script (or an object's event
+handlers) while the plugin is running and just click again — the new code
+takes effect. The restart re-runs `pageEnter()` and resets the plugin's
+session store; the window stays where you dragged it.
+
+### The `author` API
+
+Anything that creates or selects objects returns a **handle** — a live
+reference that works like the objects you already know from run mode. Methods
+are async (every call is a fresh round-trip to the editor, so values never go
+stale):
+
+```js
+// handles for the current selection (what you clicked / shift-clicked)
+const objs = await author.selected()
+
+// add something — you get its handle straight back
+const card = await author.insertControl('card', {
+  x: 80, y: 480, w: 480, h: 160,
+  props: { title: 'Stamped', color: 'navy' },
+})
+
+// group the selection — the handle IS the new group
+const g = await author.command('group')
+
+// handles understand props AND geometry (x/y/width/height resolved
+// editor-side, group-aware — moving a group moves its members)
+await g.move(20, 0)                       // offset by (dx, dy)
+await card.set({ color: 'teal', y: 120 }) // write props + geometry
+const y = await card.get('y')             // read one value
+const all = await card.get()              // …or the whole snapshot
+```
+
+Everything a plugin does is ordinary book mutation: **undo (⌘Z) reverts it**,
+autosave and save/open cover it, and publish is unaffected.
+
+A working demo ships as `examples/author-plugin.toolbook.json` — the
+plugin-flagged **Poster** page with both recipes below as buttons, and a
+**Playground** page of objects to practise on.
+
+### Recipe: recolour the selection
+
+A plugin-page button with the `click` script:
+
+```js
+const objs = await author.selected()
+if (!objs.length) {
+  await author.message('Select an object first, then press me')
+} else {
+  const colors = ['red', 'orange', 'gold', 'green', 'teal', 'navy', 'indigo', 'purple']
+  const c = colors[Math.floor(Math.random() * colors.length)]
+  for (const o of objs) await o.set({ color: c })
+  await author.message('Coloured ' + objs.length + ' object(s) ' + c)
+}
+```
+
+`color` accepts any colour name or CSS colour. Every patched object is one
+undoable book edit.
+
+### Recipe: group the selection and nudge it
+
+```js
+const sel = await author.getSelection()
+if (sel.ids.length < 2) {
+  await author.message('Select two or more objects, then press me')
+} else {
+  const g = await author.command('group')   // the handle IS the new group
+  await g.move(20, 0)
+  await author.message('Grouped ' + sel.ids.length + ' objects, nudged 20px right')
+}
+```
+
+### Power primitives (id-based)
+
+Handles cover the everyday flow. When you need more, these work with plain
+ids (the `id` field of any handle):
+
+- `await author.updateProps(id, patch)` — same as `handle.set(patch)`; pass
+  `null` as the id to patch **every** selected object
+- `await author.selectionJson()` — deep JSON of the whole selection
+  (`Copy JSON` equivalent), rects and props included
+- `await author.getSelection()` — `{ ids, names, kinds, pageName, target }`
+- `await author.pageInfo()` — page/background names, plugin pages, object
+  count and the active breakpoint
+- `await author.command(action)` — also `'delete' | 'duplicate' | 'ungroup' |
+  'front' | 'back' | 'forward' | 'backward'`; `ungroup` returns the freed ids
+
+**Design note:** the bridge is deliberately small. Handles (selected /
+insertControl / command) plus `set`/`get`/`move` cover what the editor does
+to a selection; there is no per-need `move()`-style op at the top level —
+geometry is just properties, applied by `set`.
+
+### Recipe: a "title card" stamper
+
+Plugin page **Stamper** (plugin-flagged, on a small background): an input
+named `titleIn`, and a button with the click script:
+
+```js
+const t = controls.titleIn.value || 'Untitled'
+const made = await author.insertControl('card', {
+  x: 80, y: 480, w: 480, h: 160,
+  props: { title: t, color: 'navy' },
+})
+await author.message(`Stamped "${t}" (${made.name})`)
+```
 
 ## Sandbox notes
 

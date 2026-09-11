@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import {
+  backgroundFor,
+  createBackground,
   createBook,
   createGroup,
   createObject,
@@ -10,11 +12,14 @@ import {
   newId,
   parseBook,
   rebaseRect,
+  resolvePageSize,
   unionRects,
   unrebaseRect,
   BREAKPOINTS,
+  type Background,
   type Book,
   type Breakpoint,
+  type CanvasSize,
   type ControlKind,
   type PageObject,
   type Rect,
@@ -31,9 +36,16 @@ import {
 } from '../persist'
 
 let sendSync: ((msg: EditorToCanvasMessage) => void) | null = null
+/** posts a protocol message verbatim (sendSync is the load-only sync —
+ * its implementation ignores the argument and builds its own load) */
+let sendDirect: ((msg: EditorToCanvasMessage) => void) | null = null
 
 export function setSyncSender(fn: (msg: EditorToCanvasMessage) => void): void {
   sendSync = fn
+}
+
+export function setDirectSender(fn: (msg: EditorToCanvasMessage) => void): void {
+  sendDirect = fn
 }
 
 export const useBookStore = defineStore('book', () => {
@@ -47,19 +59,54 @@ export const useBookStore = defineStore('book', () => {
   const isRunning = ref(false)
   const scriptError = ref('')
   const storeEntries = ref<Array<[string, string]>>([])
+  const popupsOpen = ref<string[]>([])
   const currentPageIndex = ref(0)
+  /** what the canvas is editing: a page, or a background's own objects */
+  const editing = ref<{ kind: 'page' } | { kind: 'background'; id: string }>({ kind: 'page' })
+  const backgroundDialogId = ref<string | null>(null)
+  /** author-mode plugin: null, or the running plugin page's name */
+  const authorActive = ref<null | string>(null)
   const recents = ref<RecentEntry[]>([])
   const autosaveAt = ref<number | null>(null)
   const fileNote = ref('')
   const propsWidth = ref<number>(
     Number(localStorage.getItem('toolback.propsWidth')) || 330,
   )
+  const paletteWidth = ref<number>(
+    Number(localStorage.getItem('toolback.paletteWidth')) || 220,
+  )
 
   const activePage = computed(
     () => book.value.pages[currentPageIndex.value] ?? book.value.pages[0]!,
   )
-  const objectCount = computed(() => flattenObjects(activePage.value.objects).length)
-  const allObjects = computed(() => flattenObjects(activePage.value.objects))
+  const activeBackground = computed<Background | null>(() => {
+    const target = editing.value
+    return target.kind === 'background'
+      ? (book.value.backgrounds.find((b) => b.id === target.id) ?? null)
+      : null
+  })
+  /** the object container currently being edited (page objects or background objects) */
+  const targetObjects = computed<PageObject[]>(() =>
+    editing.value.kind === 'background'
+      ? (activeBackground.value?.objects ?? [])
+      : activePage.value.objects,
+  )
+  /** pages that render on the background being edited */
+  const backgroundPageCount = computed<number>(() => {
+    if (editing.value.kind !== 'background') return 0
+    const id = activeBackground.value?.id
+    return id ? book.value.pages.filter((p) => p.backgroundId === id).length : 0
+  })
+  /** canvas (iframe) size of the current edit target at the current breakpoint */
+  const activeCanvasSize = computed<CanvasSize>(() => {
+    const bg =
+      editing.value.kind === 'background'
+        ? (activeBackground.value ?? undefined)
+        : backgroundFor(book.value, activePage.value)
+    return resolvePageSize(book.value, bg, breakpoint.value)
+  })
+  const objectCount = computed(() => flattenObjects(targetObjects.value).length)
+  const allObjects = computed(() => flattenObjects(targetObjects.value))
   const selectedObjects = computed(() =>
     allObjects.value.filter((o) => selectionIds.value.includes(o.id)),
   )
@@ -84,6 +131,17 @@ export const useBookStore = defineStore('book', () => {
   )
 
   let autosaveTimer: ReturnType<typeof setTimeout> | undefined
+  let noteTimer: ReturnType<typeof setTimeout> | undefined
+
+  /** transient status-bar hint (e.g. clicking a background-locked object) */
+  const canvasNote = ref('')
+  function flashCanvasNote(message: string): void {
+    canvasNote.value = message
+    clearTimeout(noteTimer)
+    noteTimer = setTimeout(() => {
+      canvasNote.value = ''
+    }, 3200)
+  }
 
   // ---- undo/redo: whole-book snapshots. The store is the single source of
   // truth for every content mutation, so a pre-mutation deep clone of the
@@ -94,6 +152,7 @@ export const useBookStore = defineStore('book', () => {
     book: Book
     selectionIds: string[]
     currentPageIndex: number
+    editing: { kind: 'page' } | { kind: 'background'; id: string }
   }
   interface HistoryEntry {
     label: string
@@ -111,6 +170,7 @@ export const useBookStore = defineStore('book', () => {
       book: JSON.parse(JSON.stringify(book.value)) as Book,
       selectionIds: [...selectionIds.value],
       currentPageIndex: currentPageIndex.value,
+      editing: JSON.parse(JSON.stringify(editing.value)),
     }
   }
 
@@ -138,8 +198,18 @@ export const useBookStore = defineStore('book', () => {
       0,
       Math.min(snapshot.currentPageIndex, book.value.pages.length - 1),
     )
-    const page = book.value.pages[currentPageIndex.value]
-    const valid = new Set((page ? flattenObjects(page.objects) : []).map((o) => o.id))
+    const restored = snapshot.editing
+    editing.value =
+      restored.kind === 'background' && book.value.backgrounds.some((b) => b.id === restored.id)
+        ? restored
+        : { kind: 'page' }
+    // validate selection against the restored edit target's objects
+    const target = editing.value
+    const container =
+      target.kind === 'background'
+        ? (book.value.backgrounds.find((b) => b.id === target.id)?.objects ?? [])
+        : (book.value.pages[currentPageIndex.value]?.objects ?? [])
+    const valid = new Set(flattenObjects(container).map((o) => o.id))
     selectionIds.value = snapshot.selectionIds.filter((id) => valid.has(id))
     sync()
   }
@@ -172,6 +242,10 @@ export const useBookStore = defineStore('book', () => {
       book: JSON.parse(JSON.stringify(book.value)),
       breakpoint: breakpoint.value,
       pageIndex: currentPageIndex.value,
+      view:
+        editing.value.kind === 'background'
+          ? { kind: 'background', id: editing.value.id }
+          : { kind: 'page', index: currentPageIndex.value },
       design: !isRunning.value,
       selection: selectionIds.value,
     })
@@ -208,14 +282,14 @@ export const useBookStore = defineStore('book', () => {
       }
       return null
     }
-    return walk(activePage.value.objects, null)
+    return walk(targetObjects.value, null)
   }
 
   function parentIdOf(id: string): string | null {
     return locateObj(id)?.parent?.id ?? null
   }
 
-  /** chain from the page root to the object (for accumulated group origins) */
+  /** chain from the edit target root to the object (for accumulated group origins) */
   function locateChain(id: string): PageObject[] | null {
     const walk = (objs: PageObject[], chain: PageObject[]): PageObject[] | null => {
       for (const o of objs) {
@@ -227,7 +301,7 @@ export const useBookStore = defineStore('book', () => {
       }
       return null
     }
-    return walk(activePage.value.objects, [])
+    return walk(targetObjects.value, [])
   }
 
   /** absolute page-space origin of an object (sum of ancestor group origins) */
@@ -246,14 +320,32 @@ export const useBookStore = defineStore('book', () => {
   }
 
   function selectPage(i: number): void {
+    editing.value = { kind: 'page' }
     currentPageIndex.value = Math.max(0, Math.min(i, book.value.pages.length - 1))
+    selectionIds.value = []
+    sync()
+  }
+
+  function editPage(i: number): void {
+    selectPage(i)
+  }
+
+  function editBackground(id: string): void {
+    if (!book.value.backgrounds.some((b) => b.id === id)) return
+    editing.value = { kind: 'background', id }
     selectionIds.value = []
     sync()
   }
 
   function addPage(): void {
     record('Add page')
-    book.value.pages.push(createPage(uniquePageName()))
+    // new pages join the background in context (the one being edited, else
+    // the current page's background)
+    const backgroundId =
+      editing.value.kind === 'background'
+        ? editing.value.id
+        : backgroundFor(book.value, activePage.value).id
+    book.value.pages.push(createPage(uniquePageName(), backgroundId))
     selectPage(book.value.pages.length - 1)
   }
 
@@ -293,6 +385,150 @@ export const useBookStore = defineStore('book', () => {
     sync()
   }
 
+  // ---- backgrounds ----
+
+  function uniqueBackgroundName(): string {
+    const existing = new Set(book.value.backgrounds.map((b) => b.name))
+    let n = book.value.backgrounds.length + 1
+    while (existing.has(`Background ${n}`)) n++
+    return `Background ${n}`
+  }
+
+  function addBackground(): void {
+    record('Add background')
+    const bg = createBackground(uniqueBackgroundName())
+    book.value.backgrounds.push(bg)
+    editing.value = { kind: 'background', id: bg.id }
+    selectionIds.value = []
+    sync()
+  }
+
+  function duplicateBackground(id: string): void {
+    const src = book.value.backgrounds.find((b) => b.id === id)
+    if (!src) return
+    record('Duplicate background')
+    const copy = JSON.parse(JSON.stringify(src)) as Background
+    copy.id = newId('bg')
+    copy.name = uniqueBackgroundName()
+    const reid = (objs: PageObject[]): void => {
+      for (const o of objs) {
+        o.id = newId('obj')
+        if (o.children?.length) reid(o.children)
+      }
+    }
+    reid(copy.objects)
+    book.value.backgrounds.push(copy)
+    editBackground(copy.id)
+  }
+
+  /**
+   * Delete a background. When pages still use it, `deletePages` removes them
+   * too (the UI confirms first); the last remaining background cannot go.
+   */
+  function removeBackground(id: string, deletePages = false): void {
+    if (book.value.backgrounds.length <= 1) return
+    const usedBy = book.value.pages.filter((p) => p.backgroundId === id)
+    if (usedBy.length > 0 && !deletePages) return
+    record('Delete background')
+    book.value.backgrounds = book.value.backgrounds.filter((b) => b.id !== id)
+    if (usedBy.length > 0) {
+      const ids = new Set(usedBy.map((p) => p.id))
+      book.value.pages = book.value.pages.filter((p) => !ids.has(p.id))
+    }
+    if (book.value.pages.length === 0) {
+      // a book always keeps at least one page — park it on the first
+      // surviving background
+      book.value.pages.push(createPage(uniquePageName(), book.value.backgrounds[0]!.id))
+    }
+    if (editing.value.kind === 'background' && editing.value.id === id) {
+      editing.value = { kind: 'page' }
+      currentPageIndex.value = 0
+    } else {
+      currentPageIndex.value = Math.min(currentPageIndex.value, book.value.pages.length - 1)
+    }
+    selectionIds.value = []
+    sync()
+  }
+
+  function renameBackground(id: string, name: string): void {
+    const bg = book.value.backgrounds.find((b) => b.id === id)
+    if (!bg) return
+    const trimmed = name.trim()
+    if (trimmed) {
+      record('Rename background')
+      bg.name = trimmed
+    }
+    sync()
+  }
+
+  function setBackgroundProp(id: string, patch: Partial<Pick<Background, 'name' | 'color'>>): void {
+    const bg = book.value.backgrounds.find((b) => b.id === id)
+    if (!bg) return
+    record('Edit background', `bg:${id}`)
+    Object.assign(bg, patch)
+    sync()
+  }
+
+  function setBackgroundScript(code: string): void {
+    const bg = activeBackground.value
+    if (!bg) return
+    record('Edit background script', `bgscript:${bg.id}`)
+    bg.script = code
+    sync()
+  }
+
+  /** null removes the per-breakpoint override (falls back to the book size) */
+  function setBackgroundSize(id: string, bp: Breakpoint, size: CanvasSize | null): void {
+    const bg = book.value.backgrounds.find((b) => b.id === id)
+    if (!bg) return
+    record('Background size', `bgsize:${id}:${bp}`)
+    if (size === null) {
+      if (bg.size) {
+        const next = { ...bg.size }
+        delete next[bp]
+        bg.size = Object.keys(next).length ? next : undefined
+      }
+    } else {
+      bg.size = { ...bg.size, [bp]: size }
+    }
+    sync()
+  }
+
+  /** move a page onto another background */
+  function movePageToBackground(pageIndex: number, backgroundId: string): void {
+    const page = book.value.pages[pageIndex]
+    if (!page || !book.value.backgrounds.some((b) => b.id === backgroundId)) return
+    if (page.backgroundId === backgroundId) return
+    record('Move page to background')
+    page.backgroundId = backgroundId
+    sync()
+  }
+
+  /**
+   * Drag-reorder from the panel: reposition `from` at `to` (indices in the
+   * pages array, `to` in original terms) and optionally re-home it onto
+   * another background. The edited page follows its content.
+   */
+  function reorderPage(from: number, to: number, backgroundId?: string): void {
+    const pages = book.value.pages
+    if (from < 0 || from >= pages.length) return
+    const bgChange =
+      !!backgroundId &&
+      book.value.backgrounds.some((b) => b.id === backgroundId) &&
+      pages[from]!.backgroundId !== backgroundId
+    // `to` is in original-array terms (0..length; length = append at end)
+    const originalTarget = Math.max(0, Math.min(to, pages.length))
+    if (originalTarget === from && !bgChange) return
+    record('Rearrange page')
+    const [page] = pages.splice(from, 1)
+    let insertAt = originalTarget
+    if (from < originalTarget) insertAt -= 1
+    pages.splice(Math.max(0, Math.min(insertAt, pages.length)), 0, page!)
+    if (bgChange) page!.backgroundId = backgroundId
+    currentPageIndex.value = pages.indexOf(page!)
+    sync()
+  }
+
   function setBreakpoint(bp: Breakpoint): void {
     if (isRunning.value) return
     // upgrade pre-M4 books that only have a desktop canvas size
@@ -322,12 +558,27 @@ export const useBookStore = defineStore('book', () => {
     savePropsWidth()
   }
 
+  function setPaletteWidth(w: number): void {
+    paletteWidth.value = Math.round(Math.min(480, Math.max(160, w)))
+  }
+
+  function savePaletteWidth(): void {
+    localStorage.setItem('toolback.paletteWidth', String(paletteWidth.value))
+  }
+
+  function resetPaletteWidth(): void {
+    paletteWidth.value = 220
+    savePaletteWidth()
+  }
+
   function newBook(): void {
     clearHistory()
     book.value = createBook('Untitled book')
     currentPageIndex.value = 0
     selectionIds.value = []
+    editing.value = { kind: 'page' }
     isRunning.value = false
+    popupsOpen.value = []
     sync()
   }
 
@@ -341,7 +592,9 @@ export const useBookStore = defineStore('book', () => {
     clearHistory()
     currentPageIndex.value = 0
     selectionIds.value = []
+    editing.value = { kind: 'page' }
     isRunning.value = false
+    popupsOpen.value = []
     sync()
     return true
   }
@@ -357,6 +610,7 @@ export const useBookStore = defineStore('book', () => {
     clearHistory()
     currentPageIndex.value = 0
     selectionIds.value = []
+    editing.value = { kind: 'page' }
     autosaveAt.value = saved.at
     sync()
     return true
@@ -377,8 +631,52 @@ export const useBookStore = defineStore('book', () => {
   }
 
   function toggleRun(): void {
+    if (!isRunning.value) stopAuthor()
     isRunning.value = !isRunning.value
-    if (isRunning.value) scriptError.value = ''
+    if (isRunning.value) {
+      scriptError.value = ''
+    } else {
+      // a stopped run tears its popup stack down with it
+      popupsOpen.value = []
+    }
+    sync()
+  }
+
+  // ---- author mode (M6c): a page runs as a plugin over the editable book ----
+
+  function setAuthorActive(name: null | string): void {
+    authorActive.value = name
+  }
+
+  /** the page to run as a plugin (index into book.pages) */
+  function startAuthor(pageIndex: number): void {
+    if (isRunning.value) return
+    const page = book.value.pages[pageIndex]
+    if (!page) return
+    authorActive.value = page.name
+    if (sendDirect) {
+      sendDirect({
+        type: 'toolback:authorStart',
+        book: JSON.parse(JSON.stringify(book.value)),
+        pageIndex,
+        breakpoint: breakpoint.value,
+      })
+    }
+  }
+
+  function stopAuthor(): void {
+    if (authorActive.value === null) return
+    authorActive.value = null
+    if (sendDirect) sendDirect({ type: 'toolback:authorStop' })
+  }
+
+  /** flag/unflag the page as a plugin (⭐ shown in the Author menu) */
+  function setPageAuthorFlag(pageIndex: number, author: boolean): void {
+    const page = book.value.pages[pageIndex]
+    if (!page) return
+    record(author ? 'Mark plugin page' : 'Unmark plugin page')
+    if (author) page.author = true
+    else delete page.author
     sync()
   }
 
@@ -398,7 +696,20 @@ export const useBookStore = defineStore('book', () => {
   }
 
   function uniqueName(control: ControlKind): string {
-    const existing = new Set(flattenObjects(activePage.value.objects).map((o) => o.name))
+    // names are script handles (controls[name]): a background's objects and
+    // its member pages' objects share one namespace at run time, so both
+    // sides are reserved in either editing context
+    const existing = new Set(flattenObjects(targetObjects.value).map((o) => o.name))
+    if (editing.value.kind === 'background') {
+      for (const p of book.value.pages) {
+        if (p.backgroundId === editing.value.id) {
+          for (const o of flattenObjects(p.objects)) existing.add(o.name)
+        }
+      }
+    } else {
+      const bg = backgroundFor(book.value, activePage.value)
+      if (bg) for (const o of flattenObjects(bg.objects)) existing.add(o.name)
+    }
     let n = 1
     while (existing.has(`${control}${n}`)) n++
     return `${control}${n}`
@@ -407,7 +718,7 @@ export const useBookStore = defineStore('book', () => {
   function addObject(control: ControlKind, rect: Rect): void {
     record('Add ' + control)
     const obj = createObject(control, uniqueName(control), { desktop: rect }, { ...DEFAULT_PROPS[control] })
-    activePage.value.objects.push(obj)
+    targetObjects.value.push(obj)
     selectionIds.value = [obj.id]
     sync()
   }
@@ -525,7 +836,22 @@ export const useBookStore = defineStore('book', () => {
     record('Duplicate')
     // fresh names computed once so nested group levels never collide (the
     // clones aren't on the page until the recursion is done)
-    const usedNames = new Set(flattenObjects(activePage.value.objects).map((o) => o.name))
+    const usedNames = (() => {
+      // same namespace rule as uniqueName: page + its background (either
+      // editing direction) share script handles
+      const names = new Set(flattenObjects(targetObjects.value).map((o) => o.name))
+      if (editing.value.kind === 'background') {
+        for (const p of book.value.pages) {
+          if (p.backgroundId === editing.value.id) {
+            for (const o of flattenObjects(p.objects)) names.add(o.name)
+          }
+        }
+      } else {
+        const bg = backgroundFor(book.value, activePage.value)
+        if (bg) for (const o of flattenObjects(bg.objects)) names.add(o.name)
+      }
+      return names
+    })()
     const freshName = (control: ControlKind): string => {
       let n = 1
       while (usedNames.has(`${control}${n}`)) n++
@@ -675,12 +1001,21 @@ export const useBookStore = defineStore('book', () => {
     isRunning,
     scriptError,
     storeEntries,
+    popupsOpen,
     currentPageIndex,
+    editing,
+    backgroundDialogId,
+    authorActive,
     recents,
     autosaveAt,
     fileNote,
     propsWidth,
+    paletteWidth,
     activePage,
+    activeBackground,
+    targetObjects,
+    backgroundPageCount,
+    activeCanvasSize,
     allObjects,
     objectCount,
     selectedObjects,
@@ -690,17 +1025,35 @@ export const useBookStore = defineStore('book', () => {
     ungroupEligible,
     sync,
     toggleRun,
+    setAuthorActive,
+    startAuthor,
+    stopAuthor,
+    setPageAuthorFlag,
     setBreakpoint,
     setPropsWidth,
     savePropsWidth,
     resetPropsWidth,
+    setPaletteWidth,
+    savePaletteWidth,
+    resetPaletteWidth,
     setEventScript,
     setPageScript,
     selectPage,
+    editPage,
+    editBackground,
     addPage,
     duplicatePage,
     removePage,
     renamePage,
+    reorderPage,
+    addBackground,
+    duplicateBackground,
+    removeBackground,
+    renameBackground,
+    setBackgroundProp,
+    setBackgroundScript,
+    setBackgroundSize,
+    movePageToBackground,
     newBook,
     hydrate,
     restoreAutosave,
@@ -718,6 +1071,8 @@ export const useBookStore = defineStore('book', () => {
     ungroupSelected,
     setSelection,
     applySelection,
+    flashCanvasNote,
+    canvasNote,
     undo,
     redo,
     canUndo,

@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import type { Book } from '@toolback/format'
 import { buildStandaloneHtml, standaloneFileName } from './publish'
+const BG = { id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', objects: [] }
 
 const book: Book = {
   id: 'b',
   title: 'My Quiz',
   canvas: { desktop: { width: 100, height: 100 } },
+  backgrounds: [BG],
   pages: [
     {
       id: 'p1',
       name: 'One',
       script: '',
-      background: '#fff',
+      backgroundId: 'bg1',
       objects: [
         {
           id: 'o1',

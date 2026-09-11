@@ -1,8 +1,16 @@
 import type { Book, Breakpoint, ControlKind, Rect } from '@toolback/format'
-import { getObjectRects, renderBookPage } from './index'
+import { getObjectRects, renderBackgroundView, renderBookPage } from './index'
 import { createDesignController, type DesignOutMessage } from './design'
-import { runBook, stopRun } from './player'
+import { popupEscape, runBook, stopRun } from './player'
+import { startAuthorMode, stopAuthor, syncAuthorScripts } from './author'
 import type { ObjectRects } from './index'
+
+/**
+ * What the canvas is showing: a page (runtime + design), or a background's
+ * own objects in design view. Run mode always resolves to a page — the first
+ * page using that background.
+ */
+export type ToolbackView = { kind: 'page'; index: number } | { kind: 'background'; id: string }
 
 export type EditorToCanvasMessage =
   | {
@@ -10,11 +18,15 @@ export type EditorToCanvasMessage =
       book: Book
       breakpoint?: Breakpoint
       pageIndex?: number
+      view?: ToolbackView
       design?: boolean
       selection?: string[] | null
     }
   | { type: 'toolback:dragOver'; control: ControlKind; rect: Rect }
   | { type: 'toolback:dragEnd' }
+  | { type: 'toolback:esc' }
+  | { type: 'toolback:authorStart'; book: Book; pageIndex: number; breakpoint?: Breakpoint }
+  | { type: 'toolback:authorStop' }
 
 export type CanvasToEditorMessage =
   | { type: 'toolback:ready' }
@@ -25,6 +37,10 @@ export type CanvasToEditorMessage =
   | { type: 'toolback:error'; message: string }
   | { type: 'toolback:runToggle' }
   | { type: 'toolback:store'; entries: Array<[string, string]> }
+  | { type: 'toolback:popups'; open: string[] }
+  | { type: 'toolback:bgClick' }
+  | { type: 'toolback:authorCall'; id: number; op: string; args: unknown }
+  | { type: 'toolback:authorState'; active: boolean; pageName?: string }
   | { type: 'toolback:reorder'; action: 'front' | 'back' | 'forward' | 'backward' }
   | { type: 'toolback:deleteSelection' }
   | { type: 'toolback:undo' }
@@ -32,6 +48,15 @@ export type CanvasToEditorMessage =
   | { type: 'toolback:duplicate' }
   | { type: 'toolback:group' }
   | { type: 'toolback:ungroup' }
+
+/** reply leg of the author bridge (editor → canvas) */
+export type AuthorReplyMessage = {
+  type: 'toolback:authorReply'
+  id: number
+  ok: boolean
+  result?: unknown
+  error?: string
+}
 
 export type CanvasMessageSender = (msg: CanvasToEditorMessage) => void
 
@@ -135,6 +160,27 @@ export function listenForEditor(
     send({ type: 'toolback:store', entries: [] })
   }
 
+  // ---- author-mode bridge: plugin scripts call author.<op>(args) which
+  // round-trips through the editor; replies resolve the pending promise ----
+  let authorCallId = 0
+  const authorPending = new Map<number, { resolve: (v: unknown) => void; reject: (e: unknown) => void }>()
+
+  function authorCaller(op: string, args: unknown): Promise<unknown> {
+    const id = ++authorCallId
+    return new Promise((resolve, reject) => {
+      authorPending.set(id, { resolve, reject })
+      send({ type: 'toolback:authorCall', id, op, args })
+    })
+  }
+
+  function handleAuthorReply(data: { id: number; ok: boolean; result?: unknown; error?: string }): void {
+    const pending = authorPending.get(data.id)
+    if (!pending) return
+    authorPending.delete(data.id)
+    if (data.ok) pending.resolve(data.result)
+    else pending.reject(new Error(data.error ?? 'author op failed'))
+  }
+
   function ensureStructure(): void {
     if (wrapper && wrapper.isConnected && holder) return
     const doc = root.ownerDocument
@@ -158,18 +204,68 @@ export function listenForEditor(
       design.dragEnd()
       return
     }
+    if (data.type === 'toolback:esc') {
+      // editor-window Esc: close the topmost modal popup in run mode
+      popupEscape()
+      return
+    }
+    if (data.type === 'toolback:authorStart') {
+      try {
+        ensureStructure()
+        const handle = startAuthorMode(
+          data.book,
+          data.pageIndex,
+          holder!,
+          data.breakpoint ?? 'desktop',
+          (message) => send({ type: 'toolback:scriptError', message }),
+          (op, args) => authorCaller(op, args),
+          (active) => send({ type: 'toolback:authorState', active }),
+        )
+        // the sync onState(true) above has no page name — send the full state
+        send({ type: 'toolback:authorState', active: true, pageName: handle.pageName })
+      } catch (err) {
+        send({ type: 'toolback:error', message: String(err) })
+      }
+      return
+    }
+    if (data.type === 'toolback:authorStop') {
+      stopAuthor()
+      return
+    }
+    // the bridge reply path (typed loosely — it's a distinct message kind)
+    if ((data as { type?: string }).type === 'toolback:authorReply') {
+      handleAuthorReply(data as unknown as { id: number; ok: boolean; result?: unknown; error?: string })
+      return
+    }
     if (data.type !== 'toolback:load') return
     try {
       ensureStructure()
-      const pageIndex = Number.isInteger(data.pageIndex) ? (data.pageIndex as number) : 0
+      // note: design re-renders (undo, prop edits, plugin-driven inserts)
+      // must NOT tear the author plugin down — the box lives in its own
+      // layer beside the page holder; it stops via authorStop/toggleRun
+      const fallbackIndex = Number.isInteger(data.pageIndex) ? (data.pageIndex as number) : 0
+      const view: ToolbackView = data.view ?? { kind: 'page', index: fallbackIndex }
+      // run mode always plays a page: a background view resolves to the first
+      // page using that background
+      const runIndexFor = (): number => {
+        if (view.kind === 'page') return view.index
+        const i = data.book.pages.findIndex((p) => p.backgroundId === view.id)
+        return i === -1 ? 0 : i
+      }
       if (data.design) {
         stopStoreStream()
         stopRun()
-        renderBookPage(data.book, pageIndex, holder!, data.breakpoint ?? 'desktop')
+        if (view.kind === 'background') {
+          renderBackgroundView(data.book, view.id, holder!, data.breakpoint ?? 'desktop')
+        } else {
+          renderBookPage(data.book, view.index, holder!, data.breakpoint ?? 'desktop')
+        }
         const pageRoot = holder!.querySelector<HTMLElement>('.tb-page')
         send({ type: 'toolback:rects', rects: pageRoot ? getObjectRects(pageRoot) : {} })
         design.setEnabled(true)
         design.onRendered(data.selection ?? [])
+        // a running author plugin hot-reloads when its page's scripts changed
+        syncAuthorScripts(data.book)
       } else {
         design.setEnabled(false)
         const handle = runBook(
@@ -177,7 +273,8 @@ export function listenForEditor(
           holder!,
           data.breakpoint ?? 'desktop',
           (message) => send({ type: 'toolback:scriptError', message }),
-          pageIndex,
+          runIndexFor(),
+          (open) => send({ type: 'toolback:popups', open }),
         )
         const pageRoot = holder!.querySelector<HTMLElement>('.tb-page')
         send({ type: 'toolback:rects', rects: pageRoot ? getObjectRects(pageRoot) : {} })
@@ -203,55 +300,61 @@ export function listenForEditor(
 // after clicking Run and interacting with the page). Z-order and Delete only
 // apply in design mode.
 const onKey = (e: KeyboardEvent): void => {
-    if (e.repeat) return
-    if (shouldToggleRun(e)) {
+  if (e.repeat) return
+  if (shouldToggleRun(e)) {
+    e.preventDefault()
+    e.stopPropagation()
+    send({ type: 'toolback:runToggle' })
+    return
+  }
+  if (design.enabled) {
+    if (e.key === 'Escape') {
       e.preventDefault()
       e.stopPropagation()
-      send({ type: 'toolback:runToggle' })
+      design.escape()
       return
     }
-    if (design.enabled) {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        design.escape()
-        return
-      }
-      const ur = isUndoKey(e)
-      if (ur) {
-        e.preventDefault()
-        e.stopPropagation()
-        send({ type: ur === 'undo' ? 'toolback:undo' : 'toolback:redo' })
-        return
-      }
-      if (isDuplicateKey(e)) {
-        e.preventDefault()
-        e.stopPropagation()
-        send({ type: 'toolback:duplicate' })
-        return
-      }
-      const gk = isGroupKey(e)
-      if (gk) {
-        e.preventDefault()
-        e.stopPropagation()
-        send({ type: gk === 'group' ? 'toolback:group' : 'toolback:ungroup' })
-        return
-      }
-      const action = zOrderActionOf(e)
-      if (action) {
-        e.preventDefault()
-        e.stopPropagation()
-        send({ type: 'toolback:reorder', action })
-        return
-      }
-      if (isDeleteSelectionKey(e)) {
-        e.preventDefault()
-        e.stopPropagation()
-        send({ type: 'toolback:deleteSelection' })
-        return
-      }
+    const ur = isUndoKey(e)
+    if (ur) {
+      e.preventDefault()
+      e.stopPropagation()
+      send({ type: ur === 'undo' ? 'toolback:undo' : 'toolback:redo' })
+      return
+    }
+    if (isDuplicateKey(e)) {
+      e.preventDefault()
+      e.stopPropagation()
+      send({ type: 'toolback:duplicate' })
+      return
+    }
+    const gk = isGroupKey(e)
+    if (gk) {
+      e.preventDefault()
+      e.stopPropagation()
+      send({ type: gk === 'group' ? 'toolback:group' : 'toolback:ungroup' })
+      return
+    }
+    const action = zOrderActionOf(e)
+    if (action) {
+      e.preventDefault()
+      e.stopPropagation()
+      send({ type: 'toolback:reorder', action })
+      return
+    }
+    if (isDeleteSelectionKey(e)) {
+      e.preventDefault()
+      e.stopPropagation()
+      send({ type: 'toolback:deleteSelection' })
+      return
+    }
+  } else {
+    // run mode: Esc closes the topmost modal popup
+    if (e.key === 'Escape' && popupEscape()) {
+      e.preventDefault()
+      e.stopPropagation()
     }
   }
+}
   window.addEventListener('keydown', onKey, true)
 
   window.addEventListener('message', onMessage)

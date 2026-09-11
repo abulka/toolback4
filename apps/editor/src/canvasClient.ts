@@ -1,5 +1,6 @@
 import type { CanvasToEditorMessage, EditorToCanvasMessage } from '@toolback/runtime'
-import { setSyncSender, useBookStore } from './stores/book'
+import { executeAuthorOp } from './authorBridge'
+import { setDirectSender, setSyncSender, useBookStore } from './stores/book'
 
 let wired = false
 
@@ -14,12 +15,17 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
       book: JSON.parse(JSON.stringify(store.book)),
       breakpoint: store.breakpoint,
       pageIndex: store.currentPageIndex,
+      view:
+        store.editing.kind === 'background'
+          ? { kind: 'background', id: store.editing.id }
+          : { kind: 'page', index: store.currentPageIndex },
       design: !store.isRunning,
       selection: [...store.selectionIds],
     }
     iframe.contentWindow?.postMessage(msg, '*')
   }
   setSyncSender(sendLoad)
+  setDirectSender((msg) => iframe.contentWindow?.postMessage(msg, '*'))
 
   window.addEventListener('message', (e: MessageEvent) => {
     const msg = e.data as CanvasToEditorMessage | undefined
@@ -50,6 +56,26 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
         break
       case 'toolback:store':
         store.storeEntries = msg.entries
+        break
+      case 'toolback:popups':
+        store.popupsOpen = msg.open
+        break
+      case 'toolback:authorCall': {
+        try {
+          const result = executeAuthorOp(store, msg.op, msg.args)
+          // JSON round-trip: Pinia-proxied results are not structured-cloneable
+          const plain = JSON.parse(JSON.stringify(result ?? null))
+          iframe.contentWindow?.postMessage({ type: 'toolback:authorReply', id: msg.id, ok: true, result: plain }, '*')
+        } catch (err) {
+          iframe.contentWindow?.postMessage({ type: 'toolback:authorReply', id: msg.id, ok: false, error: String(err) }, '*')
+        }
+        break
+      }
+      case 'toolback:authorState':
+        store.setAuthorActive(msg.active ? (msg.pageName ?? store.authorActive) : null)
+        break
+      case 'toolback:bgClick':
+        store.flashCanvasNote('That object lives on the background — edit it from the Backgrounds panel')
         break
       case 'toolback:reorder':
         store.reorderSelection(msg.action)

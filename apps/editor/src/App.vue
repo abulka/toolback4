@@ -13,6 +13,7 @@ import ScriptEditor from './components/ScriptEditor.vue'
 import HelpButton from './components/HelpButton.vue'
 import PagesPanel from './components/PagesPanel.vue'
 import StoreBrowser from './components/StoreBrowser.vue'
+import BackgroundDialog from './components/BackgroundDialog.vue'
 
 const store = useBookStore()
 const iframe = ref<HTMLIFrameElement | null>(null)
@@ -80,6 +81,30 @@ function toggleRight(): void {
 
 const settingsOpen = ref(false)
 const settingsPop = ref<HTMLElement | null>(null)
+const authorMenuOpen = ref(false)
+const authorMenu = ref<HTMLElement | null>(null)
+
+const pluginPages = computed(() => store.book.pages.filter((p) => p.author))
+
+function bookIndexOf(page: { id: string }): number {
+  return store.book.pages.findIndex((p) => p.id === page.id)
+}
+
+function runPlugin(page: { id: string; name: string }): void {
+  authorMenuOpen.value = false
+  if (store.authorActive === page.name) {
+    store.stopAuthor()
+    return
+  }
+  store.startAuthor(bookIndexOf(page))
+}
+
+function onDocClickAuthor(e: MouseEvent): void {
+  if (!authorMenuOpen.value) return
+  if (authorMenu.value && !authorMenu.value.contains(e.target as Node)) {
+    authorMenuOpen.value = false
+  }
+}
 
 function setAutoHide(v: boolean): void {
   autoHide.value = v
@@ -148,10 +173,15 @@ function onArrangeKey(e: KeyboardEvent): void {
 }
 
 function onDocKey(e: KeyboardEvent): void {
-  // Escape closes the settings popup only — it never touches the selection
-  // (Esc stepping out of groups is handled canvas-side, and the outermost
-  // selection is deliberately immune to Esc)
-  if (e.key === 'Escape') settingsOpen.value = false
+  // Escape closes the settings popup, and in run mode also closes the
+  // topmost modal popup on the canvas (Esc never deselects in design mode —
+  // that path is handled canvas-side)
+  if (e.key === 'Escape') {
+    settingsOpen.value = false
+    if (store.isRunning && iframe.value) {
+      iframe.value.contentWindow?.postMessage({ type: 'toolback:esc' }, '*')
+    }
+  }
 }
 
 // duplicate: ⌥D (Alt+D). isDuplicateKey already skips editable targets
@@ -187,6 +217,8 @@ onMounted(async () => {
   document.addEventListener('keydown', onDocKey)
   document.addEventListener('keydown', onDuplicateKey)
   document.addEventListener('keydown', onGroupKey)
+  document.addEventListener('click', onDocClickAuthor)
+  document.addEventListener('click', onDocClick)
   if (iframe.value) wireCanvas(iframe.value)
   await store.restoreAutosave()
   await store.refreshRecents()
@@ -200,9 +232,20 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onDuplicateKey)
   document.removeEventListener('keydown', onGroupKey)
   document.removeEventListener('click', onDocClick)
+  document.removeEventListener('click', onDocClickAuthor)
 })
 
-const objectRows = computed(() => treeRows(store.activePage.objects))
+const objectRows = computed(() => treeRows(store.targetObjects))
+
+// the background of the page being edited (for the Page tab's selector)
+const pageBackgroundId = computed(
+  () => store.activePage.backgroundId || store.book.backgrounds[0]?.id || '',
+)
+
+function onPageBackgroundChange(e: Event): void {
+  const id = (e.target as HTMLSelectElement).value
+  if (id) store.movePageToBackground(store.currentPageIndex, id)
+}
 
 function selectInList(obj: PageObject): void {
   store.setSelection([obj.id])
@@ -264,12 +307,19 @@ async function onPublish(): Promise<void> {
 }
 
 const canvasStyle = computed(() => {
-  const size = store.book.canvas[store.breakpoint] ?? store.book.canvas.desktop
+  const size = store.activeCanvasSize
   return { width: `${size.width}px`, height: `${size.height}px` }
 })
 
+/** what the status bar calls the thing being edited */
+const targetLabel = computed(() =>
+  store.editing.kind === 'background'
+    ? `background "${store.activeBackground?.name ?? '?'}"`
+    : `page ${store.currentPageIndex + 1}/${store.book.pages.length}`,
+)
+
 const shellStyle = computed(() => ({
-  gridTemplateColumns: `${showLeft.value ? '220px' : '0px'} 1fr ${showRight.value ? '6px' : '0px'} ${showRight.value ? `${store.propsWidth}px` : '0px'}`,
+  gridTemplateColumns: `${showLeft.value ? `${store.paletteWidth}px` : '0px'} ${showLeft.value ? '6px' : '0px'} 1fr ${showRight.value ? '6px' : '0px'} ${showRight.value ? `${store.propsWidth}px` : '0px'}`,
 }))
 
 function startSplitDrag(e: PointerEvent): void {
@@ -285,6 +335,27 @@ function startSplitDrag(e: PointerEvent): void {
     window.removeEventListener('pointermove', move)
     window.removeEventListener('pointerup', up)
     store.savePropsWidth()
+  }
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', up)
+}
+
+function startPaletteSplitDrag(e: PointerEvent): void {
+  const startX = e.clientX
+  const startW = store.paletteWidth
+  const target = e.currentTarget as HTMLElement
+  try {
+    target.setPointerCapture(e.pointerId)
+  } catch {
+    // window listeners below track the drag regardless
+  }
+  const move = (ev: PointerEvent): void => {
+    store.setPaletteWidth(startW + (ev.clientX - startX))
+  }
+  const up = (): void => {
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', up)
+    store.savePaletteWidth()
   }
   window.addEventListener('pointermove', move)
   window.addEventListener('pointerup', up)
@@ -326,8 +397,29 @@ function startSplitDrag(e: PointerEvent): void {
           </button>
         </div>
       </div>
-      <div class="right-group">
-        <button
+        <div class="right-group">
+          <div class="author-wrap">
+            <button
+              class="author"
+              :class="{ on: !!store.authorActive }"
+              :disabled="store.isRunning"
+              :title="store.authorActive ? `Stop plugin '${store.authorActive}'` : 'Run a plugin page in author mode'"
+              @click.stop="authorMenuOpen = !authorMenuOpen"
+            >⚡</button>
+            <div v-if="authorMenuOpen" ref="authorMenu" class="author-menu" @click.stop>
+              <h3>Author plugins</h3>
+              <template v-if="pluginPages.length">
+                <button
+                  v-for="p in pluginPages"
+                  :key="p.id"
+                  class="author-item"
+                  @click="runPlugin(p)"
+                >⚡ {{ p.name }}</button>
+              </template>
+              <p v-else class="hint">No plugin pages yet. Open a page and tick “Plugin page” in the Page tab — its scripts then run with the author API.</p>
+            </div>
+          </div>
+          <button
           class="panel-toggle"
           :class="{ off: !showLeft }"
           title="Hide/show the left panel (palette + pages)"
@@ -372,7 +464,7 @@ function startSplitDrag(e: PointerEvent): void {
 
     <aside v-show="showLeft" class="palette">
       <h2>Palette</h2>
-      <ul>
+      <ul class="palette-list">
         <li v-for="kind in palette" :key="kind" @pointerdown="onPaletteDown(kind, $event)">
           <span class="swatch"></span>
           <span class="name">{{ kind }}</span>
@@ -381,6 +473,14 @@ function startSplitDrag(e: PointerEvent): void {
       <p class="hint">Drag onto the canvas →</p>
       <PagesPanel />
     </aside>
+
+    <div
+      v-show="showLeft"
+      class="splitter split-l"
+      title="Drag to resize · double-click to reset"
+      @pointerdown="startPaletteSplitDrag"
+      @dblclick="store.resetPaletteWidth()"
+    ></div>
 
     <main class="canvas-area" :class="{ active: store.dragOverCanvas }">
       <iframe
@@ -407,32 +507,105 @@ function startSplitDrag(e: PointerEvent): void {
           :key="t.id"
           :class="{ on: propsTab === t.id }"
           @click="setTab(t.id)"
-        >{{ t.label }}</button>
+        >{{ t.id === 'page' && store.editing.kind === 'background' ? 'Background' : t.label }}</button>
       </div>
 
       <div v-show="propsTab === 'page'">
-        <div class="field">
-          <label>Title</label>
-          <input :value="store.book.title" disabled />
-        </div>
-        <div class="field">
-          <label>Page name</label>
-          <input :value="store.activePage.name" disabled />
-        </div>
+        <template v-if="store.editing.kind === 'page'">
+          <div class="field">
+            <label>Title</label>
+            <input :value="store.book.title" disabled />
+          </div>
+          <div class="field">
+            <label>Page name</label>
+            <input :value="store.activePage.name" disabled />
+          </div>
+          <div class="field">
+            <label>Background (shared objects + page size)</label>
+            <div class="bg-row">
+              <select :value="pageBackgroundId" @change="onPageBackgroundChange">
+                <option v-for="b in store.book.backgrounds" :key="b.id" :value="b.id">
+                  {{ b.name }}
+                </option>
+              </select>
+              <button
+                class="bg-props"
+                title="Background properties"
+                @click="store.backgroundDialogId = pageBackgroundId"
+              >Properties…</button>
+            </div>
+          </div>
+          <label class="check-row" title="Offer this page in the ⚡ Author menu — its scripts get the author API at authoring time">
+            <input
+              type="checkbox"
+              :checked="!!store.activePage.author"
+              @change="store.setPageAuthorFlag(store.currentPageIndex, ($event.target as HTMLInputElement).checked)"
+            />
+            Plugin page (runs in author mode with the author API)
+          </label>
 
-        <div class="row">
-          <h2 class="tab-head">Page script</h2>
-          <HelpButton anchor="page-script" />
-        </div>
-        <p class="hint mono-hint">
-          Shared functions + <code>pageEnter()</code>. Object scripts can call these directly.
-        </p>
-        <ScriptEditor
-          editor-class="page-script"
-          :model-value="store.activePage.script"
-          height="190px"
-          @update:model-value="store.setPageScript"
-        />
+          <div class="row">
+            <h2 class="tab-head">Page script</h2>
+            <HelpButton anchor="page-script" />
+          </div>
+          <p class="hint mono-hint">
+            Shared functions + <code>pageEnter()</code>. Object scripts can call these directly.
+          </p>
+          <ScriptEditor
+            editor-class="page-script"
+            :model-value="store.activePage.script"
+            height="190px"
+            @update:model-value="store.setPageScript"
+          />
+        </template>
+
+        <template v-else>
+          <p class="hint bg-banner">
+            Editing background <strong>"{{ store.activeBackground?.name }}"</strong> — its objects
+            appear on all {{ store.backgroundPageCount }} page(s) that use it. Page-size:
+            {{ store.activeCanvasSize.width }} × {{ store.activeCanvasSize.height }}.
+          </p>
+          <div class="field">
+            <label>Background name</label>
+            <input
+              :value="store.activeBackground?.name"
+              @change="store.renameBackground(store.editing.id, ($event.target as HTMLInputElement).value)"
+            />
+          </div>
+          <div class="field">
+            <label>Colour</label>
+            <input
+              type="color"
+              class="bg-color"
+              :value="store.activeBackground?.color"
+              @input="store.setBackgroundProp(store.editing.id, { color: ($event.target as HTMLInputElement).value })"
+            />
+          </div>
+          <button
+            class="bg-props full"
+            title="Page size, per breakpoint"
+            @click="store.backgroundDialogId = store.editing.id"
+          >Page size & properties…</button>
+
+          <div class="row">
+            <h2 class="tab-head">Background script</h2>
+            <HelpButton anchor="background-scripts" />
+          </div>
+          <p class="hint mono-hint">
+            Shared functions + <code>backgroundEnter()</code>. Pages on this background can call these.
+          </p>
+          <ScriptEditor
+            editor-class="background-script"
+            kind="background"
+            :model-value="store.activeBackground?.script ?? ''"
+            height="190px"
+            @update:model-value="store.setBackgroundScript"
+          />
+
+          <p class="hint">
+            Pages always play at run time — Run shows the first page on this background.
+          </p>
+        </template>
       </div>
 
       <div v-show="propsTab === 'selection'">
@@ -460,6 +633,8 @@ function startSplitDrag(e: PointerEvent): void {
       </div>
     </aside>
 
+    <BackgroundDialog v-if="store.backgroundDialogId" />
+
     <footer class="status">
       <template v-if="store.error">
         <span class="err">canvas error: {{ store.error }}</span>
@@ -467,10 +642,13 @@ function startSplitDrag(e: PointerEvent): void {
       <template v-else-if="store.canvasReady">
         <span class="ok">● canvas ready</span>
         <span class="mode" :class="{ running: store.isRunning }">{{ store.isRunning ? 'RUNNING' : 'design' }}</span>
-        <span>page {{ store.currentPageIndex + 1 }}/{{ store.book.pages.length }} · {{ store.objectCount }} objects · "{{ store.book.title }}"</span>
+        <span>{{ targetLabel }} · {{ store.objectCount }} objects · "{{ store.book.title }}"</span>
+        <span v-if="store.popupsOpen.length" class="popups">popup: {{ store.popupsOpen.join(', ') }}</span>
+        <span v-if="store.authorActive" class="author-chip">⚡ plugin: {{ store.authorActive }}</span>
         <span v-if="store.autosaveAt" class="dim">autosaved {{ new Date(store.autosaveAt).toLocaleTimeString() }}</span>
         <span v-if="store.fileNote" class="dim">{{ store.fileNote }}</span>
         <span v-if="store.scriptError" class="err">script: {{ store.scriptError }}</span>
+        <span v-else-if="store.canvasNote" class="note">{{ store.canvasNote }}</span>
       </template>
       <template v-else>
         <span>waiting for canvas…</span>
@@ -523,11 +701,11 @@ body.tb-palette-dragging * {
 .shell {
   display: grid;
   grid-template-rows: 48px 1fr 28px;
-  grid-template-columns: 220px 1fr 6px 330px;
+  grid-template-columns: 220px 6px 1fr 6px 330px;
   grid-template-areas:
-    'top top top top'
-    'palette canvas split props'
-    'status status status status';
+    'top top top top top'
+    'palette splitl canvas split props'
+    'status status status status status';
   height: 100vh;
 }
 
@@ -537,6 +715,10 @@ body.tb-palette-dragging * {
   background: var(--ed-border);
   touch-action: none;
   user-select: none;
+}
+
+.splitter.split-l {
+  grid-area: splitl;
 }
 
 .splitter:hover {
@@ -831,6 +1013,177 @@ body.tb-palette-dragging * {
   color: var(--ed-accent);
 }
 
+.bg-row {
+  display: flex;
+  gap: 6px;
+}
+
+.bg-row select {
+  flex: 1;
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  color: var(--ed-text);
+  padding: 6px 8px;
+  font: inherit;
+}
+
+.bg-props {
+  font: 500 12px/1 system-ui, sans-serif;
+  color: var(--ed-text);
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bg-props:hover {
+  border-color: var(--ed-accent);
+  color: #fff;
+}
+
+.bg-props.full {
+  width: 100%;
+  padding: 9px 10px;
+  margin: 4px 0 8px;
+}
+
+.bg-banner {
+  margin: 4px 2px 12px;
+  padding: 9px 11px;
+  border: 1px solid var(--ed-accent);
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--ed-text);
+  line-height: 1.5;
+}
+
+.bg-banner strong {
+  color: var(--ed-accent);
+}
+
+.bg-color {
+  width: 64px;
+  height: 34px;
+  padding: 2px;
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.status .note {
+  color: var(--ed-accent);
+}
+
+.status .popups {
+  color: var(--ed-ok);
+  border: 1px solid var(--ed-ok);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+}
+
+.status .author-chip {
+  color: #c7d2fe;
+  border: 1px solid var(--ed-accent);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ed-text-dim);
+  cursor: pointer;
+  margin: 2px 0 10px;
+}
+
+.check-row input {
+  accent-color: var(--ed-accent);
+}
+
+.author-wrap {
+  position: relative;
+}
+
+.author {
+  font: 600 13px/1 system-ui, sans-serif;
+  color: var(--ed-text);
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.author.on,
+.author:hover:not(:disabled) {
+  border-color: var(--ed-accent);
+  color: #fff;
+}
+
+.author.on {
+  background: rgba(99, 102, 241, 0.2);
+}
+
+.author:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.author-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 80;
+  width: 260px;
+  background: var(--ed-panel);
+  border: 1px solid var(--ed-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.author-menu h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--ed-text-dim);
+}
+
+.author-menu .hint {
+  margin: 6px 2px 2px;
+  font-size: 10.5px;
+}
+
+.author-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: 500 12.5px/1 system-ui, sans-serif;
+  color: var(--ed-text);
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  margin-top: 4px;
+  cursor: pointer;
+}
+
+.author-item:hover {
+  border-color: var(--ed-accent);
+}
+
 .palette {
   grid-area: palette;
   background: var(--ed-panel);
@@ -860,7 +1213,7 @@ h2:first-child {
   margin-top: 2px;
 }
 
-.palette ul,
+.palette-list,
 .objects {
   list-style: none;
   margin: 0;
@@ -870,7 +1223,8 @@ h2:first-child {
   gap: 6px;
 }
 
-.palette li {
+/* only the palette's own control list — panel li's (pages/backgrounds) style themselves */
+.palette-list > li {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -881,7 +1235,7 @@ h2:first-child {
   cursor: grab;
 }
 
-.palette li:hover {
+.palette-list > li:hover {
   border-color: var(--ed-accent);
 }
 

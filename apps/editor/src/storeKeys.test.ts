@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Book } from '@toolback/format'
 import { collectStoreKeys } from './storeKeys'
+const BG = { id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', objects: [] }
 
 describe('collectStoreKeys', () => {
   it('collects keys from scripts and templates across all pages', () => {
@@ -8,12 +9,13 @@ describe('collectStoreKeys', () => {
       id: 'b',
       title: 't',
       canvas: { desktop: { width: 10, height: 10 } },
+      backgrounds: [BG],
       pages: [
         {
           id: 'p1',
           name: 'One',
           script: "store.set('score', 0)",
-          background: '#fff',
+          backgroundId: 'bg1',
           objects: [
             {
               id: 'o1',
@@ -29,7 +31,7 @@ describe('collectStoreKeys', () => {
           id: 'p2',
           name: 'Two',
           script: "store.set('max', 5)",
-          background: '#fff',
+          backgroundId: 'bg1',
           objects: [],
         },
       ],
@@ -42,12 +44,13 @@ describe('collectStoreKeys', () => {
       id: 'b',
       title: 't',
       canvas: { desktop: { width: 10, height: 10 } },
+      backgrounds: [BG],
       pages: [
         {
           id: 'p1',
           name: 'One',
           script: '',
-          background: '#fff',
+          backgroundId: 'bg1',
           objects: [],
         },
       ],

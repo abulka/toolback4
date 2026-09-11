@@ -49,6 +49,7 @@ function scaleOriginFor(dir: HandleDir): string {
 
 export type DesignOutMessage =
   | { type: 'toolback:selection'; ids: string[] }
+  | { type: 'toolback:bgClick' }
   | {
       type: 'toolback:commit'
       kind: 'move' | 'resize'
@@ -122,6 +123,9 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   // level" live at chain[drillPath.length] under the pointer.
   let drillPath: string[] = []
   let rects = new Map<string, Rect>()
+  // locked background objects (page view): not selectable, but remembered so
+  // clicking one can explain why nothing got selected
+  let bgRects = new Map<string, Rect>()
   let drag: DragState = null
   let enabled = false
   let phantom: HTMLElement | null = null
@@ -165,13 +169,16 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
 
   function refreshRects(): void {
     rects = new Map()
+    bgRects = new Map()
     if (!wrapper || !pageRoot) return
     const base = wrapper.getBoundingClientRect()
     for (const el of Array.from(pageRoot.querySelectorAll<HTMLElement>('[data-tb-id]'))) {
       const id = el.dataset.tbId
       if (!id) continue
       const r = el.getBoundingClientRect()
-      rects.set(id, { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height })
+      const rel = { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height }
+      if (el.closest('[data-tb-bg]')) bgRects.set(id, rel)
+      else rects.set(id, rel)
     }
   }
 
@@ -387,8 +394,7 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     const pt = pointerPos(e)
     const chain = chainAt(pt.x, pt.y)
     const hit = chain.length ? resolveClickTarget(chain, e.altKey) : null
-    if (hit) {
-      drillPath = hit.path
+    if (hit) {      drillPath = hit.path
       if (e.shiftKey) {
         if (selected.has(hit.id)) selected.delete(hit.id)
         else selected.add(hit.id)
@@ -418,6 +424,14 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
         moved: false,
       }
     } else {
+      // nothing selectable here — if the pointer is on a background-locked
+      // object, tell the editor so it can explain the lock
+      for (const r of bgRects.values()) {
+        if (pt.x >= r.x && pt.x <= r.x + r.w && pt.y >= r.y && pt.y <= r.y + r.h) {
+          send({ type: 'toolback:bgClick' })
+          break
+        }
+      }
       // no object at the current level under the pointer: marquee selection
       // (shift adds to the current selection). A truly-empty point (nothing
       // anywhere) exits the drill; a point on the drilled group's own box

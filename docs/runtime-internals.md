@@ -251,6 +251,9 @@ iframe.
 |---|---|---|
 | `toolback:load` | book, breakpoint, pageIndex, design, selection | full re-render (the only sync; idempotent) |
 | `toolback:dragOver` / `dragEnd` | control, rect | palette ghost preview |
+| `toolback:authorStart` | book, pageIndex, breakpoint | run a plugin page in author mode (M6c) |
+| `toolback:authorStop` | — | stop the running plugin |
+| `toolback:authorReply` | id, ok, result / error | resolves one pending bridge call |
 
 | Canvas → editor | payload | meaning |
 |---|---|---|
@@ -261,6 +264,9 @@ iframe.
 | `toolback:scriptError` / `toolback:error` | message | status bar |
 | `toolback:runToggle` | — | F3/⌥3 pressed inside the canvas |
 | `toolback:store` | entries | run-mode store browser stream |
+| `toolback:popups` | open names | run-mode popup stack changed |
+| `toolback:authorCall` | id, op, args | plugin script called `author.<op>` (async bridge) |
+| `toolback:authorState` | active, pageName | plugin started/stopped (✕ in the box) |
 | `toolback:reorder` / `deleteSelection` / `undo` / `redo` / `duplicate` / `group` / `ungroup` | — | canvas-focused shortcuts forwarded |
 
 Keyboard routing: canvas-side keydowns never reach the editor window, so

@@ -1,7 +1,6 @@
 import type * as Monaco from 'monaco-editor'
-import { flattenObjects, type Book } from '@toolback/format'
+import { backgroundFor, flattenObjects, type Book } from '@toolback/format'
 import { extractFunctionNames, shortNamesFor } from '@toolback/runtime'
-
 export const TOOLBACK_BASE_LIB = `
 type TBListener = (e: Event) => void
 
@@ -48,6 +47,17 @@ interface TBPage {
   readonly names: string[]
   /** Navigate to another page; fires pageLeave then the target's pageEnter */
   go(name: string): void
+  /**
+   * Open a page as a popup dialog. Options: { modal = true, chrome = 'auto' | 'none', x?, y? }.
+   * The popup's size comes from its background. Returns a handle with close().
+   */
+  popupOpen(name: string, options?: { modal?: boolean; chrome?: 'auto' | 'none'; x?: number; y?: number }): { readonly name: string; close(): void } | null
+  /** Close a popup by page name (topmost when omitted) */
+  popupClose(name?: string): void
+  /** Close every open popup */
+  popupCloseAll(): void
+  /** Names of the currently open popups (bottom → top) */
+  readonly popups: string[]
 }
 
 declare const store: TBStore
@@ -60,6 +70,53 @@ declare const event: Event & { target: any }
  * object itself. Only available in object event scripts.
  */
 declare const target: TBControl
+
+/**
+ * A live reference to an object in the book being edited. Returned by
+ * author.selected(), author.insertControl() and author.command('group').
+ * Every method is a fresh async round-trip (no stale snapshots).
+ */
+declare interface TBAuthorObject {
+  /** stable id — usable with author.updateProps */
+  readonly id: string
+  readonly name: string
+  readonly control: string
+  /** read one property (x, y, width, height, text, color, …) or all (no key) */
+  get(key?: string): Promise<any>
+  /** write props AND geometry (x/y/width/height resolved editor-side) */
+  set(patch: Record<string, any>): Promise<{ id: string }>
+  /** offset this object by (dx, dy) — one undoable step */
+  move(dx: number, dy: number): Promise<{ id: string }>
+}
+
+/**
+ * Author-mode bridge (plugin pages only, at authoring time): async calls to
+ * the editor. Prefer handles (author.selected(), the return of insertControl
+ * and command('group')); updateProps/selectionJson are the id-based tools.
+ */
+declare const author: {
+  /** live handles for the current selection */
+  selected(): Promise<TBAuthorObject[]>
+  /** ids/names/kinds of the current selection + where the plugin is running */
+  getSelection(): Promise<{ ids: string[]; names: string[]; kinds: string[]; pageName?: string; target: 'page' | 'background' }>
+  /** deep JSON of the selected objects (Copy JSON equivalent) */
+  selectionJson(): Promise<any[]>
+  /** add a control to the page being edited; returns its live handle */
+  insertControl(kind: 'button' | 'label' | 'input' | 'image' | 'card' | 'container' | 'switch' | 'group', options?: { x?: number; y?: number; w?: number; h?: number; props?: Record<string, any> }): Promise<TBAuthorObject>
+  /**
+   * Patch any object: props (text, color, title, …) AND geometry (x/y/width/
+   * height resolved editor-side, group-aware). Omit the id (null) to patch
+   * EVERY selected object.
+   */
+  updateProps(id: string | null, patch: Record<string, any>): Promise<{ id: string } | { ids: string[] }>
+  /** 'delete' | 'duplicate' | 'group' | 'ungroup' | 'front' | 'back' | 'forward' | 'backward'.
+   * 'group' returns the new group as a live handle (it also becomes the selection). */
+  command(action: string): Promise<{ ok: boolean; id?: string; name?: string; control?: string; ids?: string[] }>
+  /** editing context: page/background names, plugin pages, object count, active breakpoint */
+  pageInfo(): Promise<{ editing: string; pageName?: string; pageIndex?: number; backgroundName?: string; pageNames: string[]; backgroundNames: string[]; pluginPages: string[]; objectCount: number; canvas: { width: number; height: number }; breakpoint: string }>
+  /** flash a note in the editor status bar */
+  message(text: string): Promise<{ ok: boolean }>
+}
 `
 
 function controlsInterface(names: string[]): string {
@@ -68,18 +125,29 @@ function controlsInterface(names: string[]): string {
 }
 
 /**
+ * Every object name addressable from a page's scripts: the page's own objects
+ * plus its background's (background objects get ControlApis at run time).
+ */
+function pageScopeNames(book: Book, pageIndex: number): string[] {
+  const page = book.pages[pageIndex] ?? book.pages[0]!
+  const bg = backgroundFor(book, page)
+  return flattenObjects([...(bg?.objects ?? []), ...page.objects]).map((o) => o.name)
+}
+
+/**
  * Build the Monaco extra-lib for the script editors of `pageIndex`:
  * - TBControl/store/page/event API
- * - controls.<name> typed for every object on the page
+ * - controls.<name> typed for every object on the page (and its background)
  * - bare `declare const <name>` for names the runtime actually binds
  *   (valid identifiers, not API-reserved, not colliding with the page's
  *   own function declarations) — single source of truth: shortNamesFor.
  */
 export function buildApiLib(book: Book, pageIndex: number): string {
   const page = book.pages[pageIndex] ?? book.pages[0]!
-  const objectNames = flattenObjects(page.objects).map((o) => o.name)
+  const objectNames = pageScopeNames(book, pageIndex)
   const fns = extractFunctionNames(page.script)
-  const bare = shortNamesFor(objectNames, fns)
+  const bgFns = extractFunctionNames(backgroundFor(book, page)?.script ?? '')
+  const bare = shortNamesFor(objectNames, [...fns, ...bgFns])
 
   const controls = `declare const controls: {\n  ${objectNames
     .map((n) => `${n}: TBControl`)
@@ -87,7 +155,13 @@ export function buildApiLib(book: Book, pageIndex: number): string {
 
   const bareDecl = bare.map((n) => `declare const ${n}: TBControl`).join('\n')
 
-  return `${TOOLBACK_BASE_LIB}${controls}\n${bareDecl}\n`
+  // background functions are callable from page scripts (runtime-injected)
+  const bgDecl = bgFns
+    .filter((n) => NAME_RE.test(n))
+    .map((n) => `declare function ${n}(...args: any[]): any`)
+    .join('\n')
+
+  return `${TOOLBACK_BASE_LIB}${controls}\n${bareDecl}\n${bgDecl}\n`
 }
 
 export interface EditorIntellisenseContext {
@@ -97,19 +171,45 @@ export interface EditorIntellisenseContext {
   bareNames: string[]
   /** store keys found across the book, for {{ }} and store.get help */
   storeKeys: string[]
+  /** which script kind the completions are for (drives lifecycle snippets) */
+  scriptKind?: 'page' | 'background' | 'object'
 }
 
+const NAME_RE = /^[A-Za-z_$][\w$]*$/
+
+/**
+ * API lib for a background script: the base API (store/page/controls) plus
+ * the background's own functions (mutual references). Objects are addressable
+ * at run time via the page that hosts them; the background script itself
+ * compiles before page controls exist, so nothing else is pre-declared.
+ */
+export function buildBackgroundApiLib(bg: { script?: string } | null): string {
+  const bgFns = extractFunctionNames(bg?.script ?? '')
+  const bgDecl = bgFns
+    .filter((n) => NAME_RE.test(n))
+    .map((n) => `declare function ${n}(...args: any[]): any`)
+    .join('\n')
+  return `${TOOLBACK_BASE_LIB}${bgDecl}\n`
+}
+
+export function buildBackgroundEditorContext(
+  storeKeys: string[],
+): EditorIntellisenseContext {
+  return { objectNames: [], bareNames: [], storeKeys, scriptKind: 'background' }
+}
 export function buildEditorContext(
   book: Book,
   pageIndex: number,
   storeKeys: string[],
 ): EditorIntellisenseContext {
   const page = book.pages[pageIndex] ?? book.pages[0]!
-  const objectNames = flattenObjects(page.objects).map((o) => o.name)
+  const objectNames = pageScopeNames(book, pageIndex)
   const fns = extractFunctionNames(page.script)
+  const bgFns = extractFunctionNames(backgroundFor(book, page)?.script ?? '')
   return {
     objectNames,
-    bareNames: shortNamesFor(objectNames, fns),
+    bareNames: shortNamesFor(objectNames, [...fns, ...bgFns]),
     storeKeys,
+    scriptKind: 'page',
   }
 }

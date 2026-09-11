@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest'
 import {
   CONTROL_KINDS,
   DEFAULT_SIZES,
+  backgroundFor,
   createBook,
+  createBackground,
   createGroup,
   createObject,
+  createPage,
   flattenObjects,
   parseBook,
   rebaseRect,
+  resolvePageSize,
   safeParseBook,
   scaleRect,
   treeRows,
@@ -63,6 +67,80 @@ describe('format', () => {
       createObject('button', 'ok', { desktop: { x: 10, y: 10, w: 100, h: 40 } }),
     )
     expect(() => parseBook(book)).not.toThrow()
+  })
+
+  describe('backgrounds', () => {
+    it('createBook ships with one background and links the first page', () => {
+      const book = createBook('Fresh')
+      expect(book.backgrounds).toHaveLength(1)
+      expect(book.backgrounds[0]!.name).toBe('Background 1')
+      expect(book.pages[0]!.backgroundId).toBe(book.backgrounds[0]!.id)
+      expect(() => parseBook(book)).not.toThrow()
+    })
+
+    it('migrates legacy books: one background per distinct page colour', () => {
+      const legacy = {
+        id: 'b1',
+        title: 'old',
+        pages: [
+          { id: 'p1', name: 'A', background: '#ffffff', objects: [] },
+          { id: 'p2', name: 'B', background: '#ffffff', objects: [] },
+          { id: 'p3', name: 'C', background: '#0000ff', objects: [] },
+        ],
+      }
+      const book = parseBook(legacy)
+      expect(book.backgrounds.map((b) => b.color)).toEqual(['#ffffff', '#0000ff'])
+      expect(book.backgrounds[0]!.name).toBe('Background 1')
+      expect(book.backgrounds[1]!.name).toBe('Background 2')
+      expect(book.pages[0]!.backgroundId).toBe(book.backgrounds[0]!.id)
+      expect(book.pages[1]!.backgroundId).toBe(book.backgrounds[0]!.id)
+      expect(book.pages[2]!.backgroundId).toBe(book.backgrounds[1]!.id)
+      // the legacy field is stripped
+      expect('background' in book.pages[0]!).toBe(false)
+    })
+
+    it('normalises dangling backgroundIds to the first background', () => {
+      const raw = {
+        id: 'b1',
+        title: 'x',
+        backgrounds: [{ id: 'bg1', name: 'B', color: '#fff', objects: [] }],
+        pages: [
+          { id: 'p1', name: 'A', backgroundId: 'nope', objects: [] },
+          { id: 'p2', name: 'B', backgroundId: 'bg1', objects: [] },
+        ],
+      }
+      const book = parseBook(raw)
+      expect(book.pages[0]!.backgroundId).toBe('bg1')
+    })
+
+    it('backgroundFor resolves and falls back to the first background', () => {
+      const book = createBook('F')
+      const page = book.pages[0]!
+      expect(backgroundFor(book, page)).toBe(book.backgrounds[0])
+      page.backgroundId = 'ghost'
+      expect(backgroundFor(book, page)).toBe(book.backgrounds[0])
+    })
+
+    it('resolvePageSize: background override wins per breakpoint, else book canvas', () => {
+      const book = createBook('F')
+      const bg = backgroundFor(book, book.pages[0]!)
+      expect(resolvePageSize(book, bg, 'desktop')).toEqual({ width: 1280, height: 800 })
+      expect(resolvePageSize(book, bg, 'tablet')).toEqual({ width: 768, height: 1024 })
+      bg.size = { desktop: { width: 320, height: 240 } }
+      expect(resolvePageSize(book, bg, 'desktop')).toEqual({ width: 320, height: 240 })
+      // tablet has no override → book canvas
+      expect(resolvePageSize(book, bg, 'tablet')).toEqual({ width: 768, height: 1024 })
+      // undefined background → book canvas
+      expect(resolvePageSize(book, undefined, 'desktop')).toEqual({ width: 1280, height: 800 })
+    })
+
+    it('createPage links a backgroundId', () => {
+      const bg = createBackground('Popup', '#f0f0f0')
+      const page = createPage('Dialog', bg.id)
+      expect(page.backgroundId).toBe(bg.id)
+      expect(page.name).toBe('Dialog')
+      expect(page.objects).toEqual([])
+    })
   })
 
   describe('groups', () => {

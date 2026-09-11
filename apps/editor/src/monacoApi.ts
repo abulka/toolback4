@@ -9,6 +9,8 @@ export interface SnippetSpec {
   label: string
   detail: string
   body: string
+  /** which editor kinds offer it (default: everywhere) */
+  kinds?: Array<'page' | 'background' | 'object'>
 }
 
 export const SNIPPETS: SnippetSpec[] = [
@@ -16,11 +18,25 @@ export const SNIPPETS: SnippetSpec[] = [
     label: 'pageEnter',
     detail: 'runs when this page becomes active (Run or page.go)',
     body: 'function pageEnter() {\n\t$0\n}',
+    kinds: ['page', 'object'],
   },
   {
     label: 'pageLeave',
     detail: 'runs before leaving this page',
     body: 'function pageLeave() {\n\t$0\n}',
+    kinds: ['page', 'object'],
+  },
+  {
+    label: 'backgroundEnter',
+    detail: 'background scripts: fires once per run, on the first page using this background',
+    body: 'function backgroundEnter() {\n\t$0\n}',
+    kinds: ['background'],
+  },
+  {
+    label: 'popupOpen',
+    detail: 'open a page as a popup dialog (size comes from its background)',
+    body: "page.popupOpen('${1:Page name}')$0",
+    kinds: ['page', 'object'],
   },
   {
     label: 'store.set',
@@ -168,6 +184,10 @@ function buildProvider(monaco: typeof Monaco): Monaco.languages.CompletionItemPr
           item('name', 'current page name', 'name', K.Property, false),
           item('names', 'all page names', 'names', K.Property, false),
           item('go', "navigate: page.go('Page name')", "go('${1:Page name}')", K.Method, true),
+          item('popupOpen', "open a page as a popup dialog", "popupOpen('${1:Page name}')", K.Method, true),
+          item('popupClose', "close a popup by page name (topmost when omitted)", "popupClose(${1:'${2:Page name}'})", K.Method, true),
+          item('popupCloseAll', 'close every open popup', 'popupCloseAll()', K.Method, false),
+          item('popups', 'names of the open popups (bottom → top)', 'popups', K.Property, false),
         ]
       } else if (recv === 'event') {
         list = [
@@ -259,6 +279,7 @@ function buildProvider(monaco: typeof Monaco): Monaco.languages.CompletionItemPr
       })
     }
     for (const s of SNIPPETS) {
+      if (s.kinds && !(s.kinds as string[]).includes(ctx.scriptKind ?? 'page')) continue
       suggestions.push({
         label: s.label,
         kind: K.Snippet,

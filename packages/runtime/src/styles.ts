@@ -209,6 +209,95 @@ body {
   pointer-events: auto;
 }
 
+/* ---- popups (run mode) ---- */
+
+.tb-popup-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.tb-popup-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 17, 21, 0.45);
+  pointer-events: auto;
+}
+
+.tb-popup {
+  position: absolute;
+  pointer-events: auto;
+  background: #ffffff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.45),
+    0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.tb-popup-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 32px;
+  padding: 0 6px 0 12px;
+  background: #1f2430;
+  color: #cbd5e1;
+  font: 600 12px/1 system-ui, sans-serif;
+  user-select: none;
+  cursor: move;
+  touch-action: none;
+}
+
+.tb-popup-close {
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.tb-popup-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.tb-popup-content {
+  position: relative;
+}
+
+/* ---- author mode (M6c): a plugin page floating over the editable book ---- */
+
+.tb-author-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+/* the plugin box is live UI: undo the design-mode input suppression
+   (.tb-design .tb-page * would otherwise deaden its .tb-page content) */
+.tb-design .tb-author-layer .tb-page,
+.tb-design .tb-author-layer .tb-page * {
+  pointer-events: auto !important;
+}
+
+.tb-author.tb-popup {
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.5),
+    0 0 0 2px var(--tb-accent);
+}
+
+.tb-author .tb-popup-chrome {
+  background: #2a2140;
+  color: #c7d2fe;
+}
+
 /* ---- design-mode chrome ---- */
 
 .tb-canvas-root {
@@ -233,6 +322,27 @@ body {
 .tb-design .tb-page,
 .tb-design .tb-page * {
   pointer-events: none !important;
+}
+
+/* background objects on a page are locked in design view — ghost them */
+.tb-design .tb-page [data-tb-bg] {
+  opacity: 0.4;
+}
+
+/* background design view: badge in the corner naming the background */
+.tb-bg-badge {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 6;
+  font: 600 11px/1 system-ui, sans-serif;
+  letter-spacing: 0.4px;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(100, 116, 139, 0.35);
+  border-radius: 999px;
+  padding: 4px 10px;
+  pointer-events: none;
 }
 
 .tb-design-overlay {

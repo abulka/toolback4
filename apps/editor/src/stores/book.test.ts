@@ -296,3 +296,157 @@ describe('book store — groups and arrange', () => {
     ])
   })
 })
+
+describe('book store — backgrounds', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {} })
+    setActivePinia(createPinia())
+  })
+
+  it('addBackground creates, selects it for editing and is undoable', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    expect(store.book.backgrounds).toHaveLength(1)
+    store.addBackground()
+    expect(store.book.backgrounds).toHaveLength(2)
+    expect(store.editing).toEqual({ kind: 'background', id: store.book.backgrounds[1]!.id })
+    expect(store.selectionIds).toEqual([])
+    store.undo()
+    expect(store.book.backgrounds).toHaveLength(1)
+    expect(store.editing).toEqual({ kind: 'page' })
+  })
+
+  it('addObject in a background view lands in background.objects; page adds avoid bg names', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    // page already owns labelA / labelB
+    store.addBackground()
+    store.addObject('button', { x: 0, y: 0, w: 100, h: 40 })
+    const bg = store.book.backgrounds[1]!
+    expect(bg.objects).toHaveLength(1)
+    expect(bg.objects[0]!.name).toBe('button1')
+
+    // page-level adds avoid names owned by the page's background too
+    const bg1 = store.book.backgrounds[0]!
+    bg1.objects.push(createObject('button', 'button1', { desktop: { x: 0, y: 0, w: 90, h: 30 } }))
+    store.editPage(0)
+    store.addObject('button', { x: 0, y: 0, w: 100, h: 40 })
+    const names = store.activePage.objects.map((o) => o.name)
+    expect(names).not.toContain('button1')
+    expect(names).toContain('button2')
+  })
+
+  it('removeBackground refuses while pages reference it; deletePages removes both', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.addBackground()
+    const bgId = store.book.backgrounds[1]!.id
+    store.movePageToBackground(0, bgId)
+    // referenced → plain remove is a no-op
+    store.removeBackground(bgId)
+    expect(store.book.backgrounds).toHaveLength(2)
+    store.removeBackground(bgId, true)
+    expect(store.book.backgrounds).toHaveLength(1)
+    // the deleted background's pages go with it, but a book always keeps at
+    // least one page — parked on the surviving background
+    expect(store.book.pages).toHaveLength(1)
+    expect(store.book.pages[0]!.backgroundId).toBe(store.book.backgrounds[0]!.id)
+  })
+
+  it('setBackgroundSize sets per-breakpoint overrides and clears them', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const bgId = store.book.backgrounds[0]!.id
+    store.setBackgroundSize(bgId, 'desktop', { width: 320, height: 240 })
+    expect(store.book.backgrounds[0]!.size).toEqual({ desktop: { width: 320, height: 240 } })
+    // activeCanvasSize reflects the override at desktop, book size at tablet
+    expect(store.activeCanvasSize).toEqual({ width: 320, height: 240 })
+    store.setBreakpoint('tablet')
+    // twoObjectBook has no tablet canvas — setBreakpoint upgrades it to the default
+    expect(store.activeCanvasSize).toEqual({ width: 768, height: 1024 })
+    store.setBackgroundSize(bgId, 'desktop', null)
+    expect(store.book.backgrounds[0]!.size).toBeUndefined()
+  })
+
+  it('undo restores the editing target along with the book', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.addBackground() // history: editing was {kind:'page'} at record time
+    const bgId = store.book.backgrounds[1]!.id
+    store.editPage(0) // no history — editing switches are free
+    store.editBackground(bgId)
+    store.undo() // restores the pre-add book AND the page editing target
+    expect(store.book.backgrounds).toHaveLength(1)
+    expect(store.editing).toEqual({ kind: 'page' })
+    // the stale background id no longer resolves — editBackground no-ops
+    store.editBackground(bgId)
+    expect(store.editing).toEqual({ kind: 'page' })
+  })
+
+  it('movePageToBackground re-homes a page', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.addBackground()
+    const bgId = store.book.backgrounds[1]!.id
+    store.editPage(0)
+    store.movePageToBackground(0, bgId)
+    expect(store.activePage.backgroundId).toBe(bgId)
+    // undo restores the original background
+    store.undo()
+    expect(store.activePage.backgroundId).toBe(store.book.backgrounds[0]!.id)
+  })
+
+  it('duplicateBackground deep-copies objects with fresh ids and edits the copy', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const bg1 = store.book.backgrounds[0]!
+    bg1.objects.push(createObject('button', 'navBtn', { desktop: { x: 0, y: 0, w: 100, h: 40 } }))
+    store.duplicateBackground(bg1.id)
+    expect(store.book.backgrounds).toHaveLength(2)
+    const copy = store.book.backgrounds[1]!
+    expect(copy.objects).toHaveLength(1)
+    expect(copy.objects[0]!.id).not.toBe(bg1.objects[0]!.id)
+    expect(copy.name).toBe('Background 2')
+    expect(store.editing).toEqual({ kind: 'background', id: copy.id })
+  })
+
+  it('addPage joins the background being edited', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.addBackground()
+    store.addPage()
+    expect(store.activePage.backgroundId).toBe(store.book.backgrounds[1]!.id)
+  })
+
+  it('reorderPage repositions pages and follows the edited page', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.addPage() // Page 2 (bg1)
+    store.addPage() // Page 3 (bg1)
+    store.editPage(2) // editing Page 3
+    store.reorderPage(2, 0)
+    expect(store.book.pages.map((p) => p.name)).toEqual(['Page 3', 'P', 'Page 2'])
+    // the edited page followed its content
+    expect(store.activePage.name).toBe('Page 3')
+    expect(store.currentPageIndex).toBe(0)
+    store.undo()
+    expect(store.book.pages.map((p) => p.name)).toEqual(['P', 'Page 2', 'Page 3'])
+    expect(store.activePage.name).toBe('Page 3')
+  })
+
+  it('reorderPage re-homes a page across backgrounds in one step', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.addBackground()
+    store.addPage() // Page 2 on bg1
+    const bg2 = store.book.backgrounds[1]!.id
+    // move page 0 (P) after page 1, onto bg2
+    store.reorderPage(0, 2, bg2)
+    expect(store.book.pages.map((p) => p.name)).toEqual(['Page 2', 'P'])
+    expect(store.book.pages[1]!.backgroundId).toBe(bg2)
+    expect(store.activePage.name).toBe('P')
+    store.undo()
+    expect(store.book.pages.map((p) => p.name)).toEqual(['P', 'Page 2'])
+    expect(store.book.pages[0]!.backgroundId).toBe(store.book.backgrounds[0]!.id)
+  })
+})

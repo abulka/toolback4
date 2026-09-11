@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import type { Book } from '@toolback/format'
 import { buildApiLib, buildEditorContext } from './monacoApiLib'
+const BG = { id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', objects: [] }
 
 function book(pages: Array<{ script: string; objects: string[] }>): Book {
   return {
     id: 'b',
     title: 't',
     canvas: { desktop: { width: 100, height: 100 } },
+    backgrounds: [BG],
     pages: pages.map((p, i) => ({
       id: `p${i}`,
       name: `Page ${i + 1}`,
       script: p.script,
-      background: '#fff',
+      backgroundId: 'bg1',
       objects: p.objects.map((n, j) => ({
         id: `o${i}_${j}`,
         name: n,

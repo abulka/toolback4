@@ -54,16 +54,50 @@ const PageObjectSchema: z.ZodType<PageObject, z.ZodTypeDef, unknown> = z.lazy(()
   }),
 )
 
+const CanvasSizeSchema = z.object({ width: z.number(), height: z.number() })
+export type CanvasSize = z.infer<typeof CanvasSizeSchema>
+
+/**
+ * Background: the ToolBook-style shared page resource. Objects live under
+ * every member page; `size` overrides the page size per breakpoint (absent
+ * breakpoint = book default). Pages no longer carry a fill color — the
+ * background paints.
+ */
+export interface Background {
+  id: string
+  name: string
+  color: string
+  size?: Partial<Record<Breakpoint, CanvasSize>>
+  /** shared functions + backgroundEnter() hook, compiled like a page script */
+  script: string
+  objects: PageObject[]
+}
+
+const BackgroundSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  color: z.string().default('#ffffff'),
+  script: z.string().default(''),
+  size: z
+    .object({
+      desktop: CanvasSizeSchema.optional(),
+      tablet: CanvasSizeSchema.optional(),
+      mobile: CanvasSizeSchema.optional(),
+    })
+    .optional(),
+  objects: z.array(PageObjectSchema).default([]),
+})
+
 const PageSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   script: z.string().default(''),
-  background: z.string().default('#ffffff'),
+  backgroundId: z.string().default(''),
+  /** plugin page: offered in the editor's Author menu, runs with the author API */
+  author: z.boolean().optional(),
   objects: z.array(PageObjectSchema).default([]),
 })
 export type Page = z.infer<typeof PageSchema>
-
-const CanvasSizeSchema = z.object({ width: z.number(), height: z.number() })
 
 const BookSchema = z.object({
   id: z.string().min(1),
@@ -75,12 +109,55 @@ const BookSchema = z.object({
       mobile: CanvasSizeSchema.optional(),
     })
     .default({ desktop: { width: 1280, height: 800 } }),
+  backgrounds: z.array(BackgroundSchema).default([]),
   pages: z.array(PageSchema).min(1),
 })
 export type Book = z.infer<typeof BookSchema>
 
+/**
+ * Legacy upgrade: pre-background books carried the fill color on each page
+ * (`page.background`). Group pages by color into one background per distinct
+ * color (in page order), assign `backgroundId`s, and normalize dangling
+ * backgroundIds. Runs before schema validation so old files parse unchanged.
+ */
+function migrateBackgrounds(data: unknown): unknown {
+  if (!data || typeof data !== 'object') return data
+  const raw = data as Record<string, unknown>
+  if (!Array.isArray(raw['pages'])) return data
+  const pages = raw['pages'] as Array<Record<string, unknown>>
+  const backgrounds = Array.isArray(raw['backgrounds']) ? (raw['backgrounds'] as Background[]) : []
+  if (backgrounds.length === 0) {
+    // one background per distinct legacy page color, in first-seen order
+    const byColor = new Map<string, Background>()
+    for (const page of pages) {
+      const color = typeof page['background'] === 'string' ? (page['background'] as string) : '#ffffff'
+      let bg = byColor.get(color)
+      if (!bg) {
+        bg = {
+          id: newId('bg'),
+          name: `Background ${byColor.size + 1}`,
+          color,
+          script: '',
+          objects: [],
+        }
+        byColor.set(color, bg)
+      }
+      page['backgroundId'] = bg.id
+    }
+    raw['backgrounds'] = [...byColor.values()]
+  } else {
+    for (const page of pages) {
+      const known =
+        typeof page['backgroundId'] === 'string' &&
+        backgrounds.some((b) => b.id === page['backgroundId'])
+      if (!known) page['backgroundId'] = backgrounds[0]!.id
+    }
+  }
+  return data
+}
+
 export function parseBook(data: unknown): Book {
-  return BookSchema.parse(data)
+  return BookSchema.parse(migrateBackgrounds(data))
 }
 
 export const DEFAULT_SIZES: Record<ControlKind, { w: number; h: number }> = {
@@ -153,14 +230,47 @@ export function createObject(
   })
 }
 
-export function createPage(name: string): Page {
-  return PageSchema.parse({
-    id: newId('page'),
+export function createBackground(name: string, color = '#ffffff'): Background {
+  return BackgroundSchema.parse({
+    id: newId('bg'),
     name,
+    color,
   })
 }
 
+export function createPage(name: string, backgroundId = ''): Page {
+  return PageSchema.parse({
+    id: newId('page'),
+    name,
+    backgroundId,
+  })
+}
+
+/** The background a page renders on (dangling ids fall back to the first). */
+export function backgroundFor(book: Book, page: Page): Background {
+  return (
+    book.backgrounds.find((b) => b.id === page.backgroundId) ?? book.backgrounds[0]!
+  )
+}
+
+/**
+ * Page size for a page in a breakpoint: the background's size override for
+ * that breakpoint, else the book canvas, else the desktop book size.
+ */
+export function resolvePageSize(
+  book: Book,
+  background: Background | undefined,
+  breakpoint: Breakpoint,
+): CanvasSize {
+  return (
+    background?.size?.[breakpoint] ??
+    book.canvas[breakpoint] ??
+    book.canvas.desktop
+  )
+}
+
 export function createBook(title: string): Book {
+  const bg = createBackground('Background 1')
   return BookSchema.parse({
     id: newId('book'),
     title,
@@ -169,7 +279,8 @@ export function createBook(title: string): Book {
       tablet: { width: 768, height: 1024 },
       mobile: { width: 390, height: 844 },
     },
-    pages: [createPage('Page 1')],
+    backgrounds: [bg],
+    pages: [createPage('Page 1', bg.id)],
   })
 }
 

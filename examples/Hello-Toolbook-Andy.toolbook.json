@@ -7,115 +7,53 @@
       "height": 800
     }
   },
-  "pages": [
+  "backgrounds": [
     {
-      "id": "page_fb245c3b2",
-      "name": "Page 1",
-      "script": "",
-      "background": "#ffffff",
+      "id": "bg_973808d55",
+      "name": "Background 1",
+      "color": "#c9c9c9",
+      "script": "function backgroundEnter() {\n  console.log('bg1 activated')\n}\n",
+      "objects": []
+    },
+    {
+      "id": "bg_9665bd506",
+      "name": "Background 2",
+      "color": "#e0ffe7",
+      "script": "function backgroundEnter() {\n  console.log('bg2 activated')\n}",
+      "size": {
+        "desktop": {
+          "width": 464,
+          "height": 248
+        }
+      },
       "objects": [
         {
-          "id": "obj_1973aa773",
-          "name": "helloLabel",
+          "id": "obj_c78fe2a98",
+          "name": "label1",
           "control": "label",
           "rects": {
             "desktop": {
-              "x": 120,
-              "y": 32,
-              "w": 400,
-              "h": 56
+              "x": 160,
+              "y": 8,
+              "w": 240,
+              "h": 40
             }
           },
           "props": {
-            "text": "Hello, Toolbook nostalgia!",
-            "color": "#968bbb",
-            "fontSize": 22,
-            "fontFamily": "mono"
-          },
-          "on": {
-            "click": "\n\nbutt"
-          }
-        },
-        {
-          "id": "obj_474c719f4",
-          "name": "myButton",
-          "control": "button",
-          "rects": {
-            "desktop": {
-              "x": 96,
-              "y": 184,
-              "w": 176,
-              "h": 48
-            }
-          },
-          "props": {
-            "text": "go page 2"
-          },
-          "on": {
-            "click": "page.go('Page 2')\n//image1.visible = false\n\n"
-          }
-        },
-        {
-          "id": "obj_610bdbd36",
-          "name": "image1",
-          "control": "image",
-          "rects": {
-            "desktop": {
-              "x": 624,
-              "y": 32,
-              "w": 216,
-              "h": 112
-            }
-          },
-          "props": {
-            "src": "https://dummyimage.com/600x400/000/fff&text=hi+there"
-          },
-          "on": {}
-        },
-        {
-          "id": "obj_d1697f755",
-          "name": "button1",
-          "control": "button",
-          "rects": {
-            "desktop": {
-              "x": 96,
-              "y": 320,
-              "w": 176,
-              "h": 48
-            }
-          },
-          "props": {
-            "text": "Button",
-            "fontSize": 15,
-            "color": "#5f89d3"
-          },
-          "on": {}
-        },
-        {
-          "id": "obj_0d2854a46",
-          "name": "button2",
-          "control": "button",
-          "rects": {
-            "desktop": {
-              "x": 304,
-              "y": 320,
-              "w": 176,
-              "h": 48
-            }
-          },
-          "props": {
-            "text": "Button",
+            "text": "Background 2",
             "fontSize": 15
           },
           "on": {}
         }
       ]
-    },
+    }
+  ],
+  "pages": [
     {
       "id": "page_4d378c595",
       "name": "Page 2",
       "script": "function pageEnter() {\n  console.log('hi from page enter')\n  button2.text = 'back to the first page'\n}\n",
-      "background": "#ffffff",
+      "backgroundId": "bg_973808d55",
       "objects": [
         {
           "id": "obj_710c31c36",
@@ -231,7 +169,7 @@
           "props": {
             "text": "Button",
             "fontFamily": "mono",
-            "color": "#51ad1f"
+            "color": "teal"
           },
           "on": {
             "click": "button3.color = 'red'"
@@ -275,23 +213,297 @@
           "on": {}
         },
         {
+          "id": "obj_91a084a78",
+          "name": "label3",
+          "control": "label",
+          "rects": {
+            "desktop": {
+              "x": 308,
+              "y": 504,
+              "w": 144,
+              "h": 40
+            },
+            "tablet": {
+              "x": 0,
+              "y": 32,
+              "w": 144,
+              "h": 40
+            },
+            "mobile": {
+              "x": 0,
+              "y": 32,
+              "w": 144,
+              "h": 40
+            }
+          },
+          "props": {
+            "text": "Label",
+            "color": "orange"
+          },
+          "on": {}
+        },
+        {
           "id": "obj_8feef39f7",
           "name": "label2",
           "control": "label",
           "rects": {
             "desktop": {
-              "x": 304,
-              "y": 480,
-              "w": 240,
+              "x": 308,
+              "y": 472,
+              "w": 136,
+              "h": 40
+            },
+            "tablet": {
+              "x": 0,
+              "y": 0,
+              "w": 136,
+              "h": 40
+            },
+            "mobile": {
+              "x": 0,
+              "y": 0,
+              "w": 136,
               "h": 40
             }
           },
           "props": {
-            "text": "Label"
+            "text": "Label",
+            "color": "green"
           },
           "on": {}
         }
       ]
+    },
+    {
+      "id": "page_fb245c3b2",
+      "name": "Page 1",
+      "script": "",
+      "backgroundId": "bg_973808d55",
+      "objects": [
+        {
+          "id": "obj_1973aa773",
+          "name": "helloLabel",
+          "control": "label",
+          "rects": {
+            "desktop": {
+              "x": 120,
+              "y": 32,
+              "w": 400,
+              "h": 56
+            }
+          },
+          "props": {
+            "text": "Hello, Toolbook nostalgia!",
+            "color": "#968bbb",
+            "fontSize": 22,
+            "fontFamily": "mono"
+          },
+          "on": {
+            "click": "\n\nbutt"
+          }
+        },
+        {
+          "id": "obj_474c719f4",
+          "name": "myButton",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 96,
+              "y": 184,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "go page 2"
+          },
+          "on": {
+            "click": "page.go('Page 2')\n//image1.visible = false\n\n"
+          }
+        },
+        {
+          "id": "obj_610bdbd36",
+          "name": "image1",
+          "control": "image",
+          "rects": {
+            "desktop": {
+              "x": 624,
+              "y": 32,
+              "w": 216,
+              "h": 112
+            }
+          },
+          "props": {
+            "src": "https://dummyimage.com/600x400/000/fff&text=hi+there"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_d1697f755",
+          "name": "button1",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 96,
+              "y": 320,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "Open Popup",
+            "fontSize": 15,
+            "color": "#5f89d3"
+          },
+          "on": {
+            "click": "page.popupOpen('Page 5')\n//page.popupOpen('Page 5', { modal: false, chrome: 'none', x: 100, y: 60 })"
+          }
+        },
+        {
+          "id": "obj_0d2854a46",
+          "name": "button2",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 304,
+              "y": 320,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "Button",
+            "fontSize": 15
+          },
+          "on": {}
+        }
+      ]
+    },
+    {
+      "id": "page_39206a479",
+      "name": "Page 3",
+      "script": "",
+      "backgroundId": "bg_9665bd506",
+      "objects": [
+        {
+          "id": "obj_236524cf10",
+          "name": "button1",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 120,
+              "y": 64,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "Button",
+            "fontSize": 15
+          },
+          "on": {}
+        }
+      ]
+    },
+    {
+      "id": "page_a57a28cd13",
+      "name": "Page 5",
+      "script": "",
+      "backgroundId": "bg_9665bd506",
+      "objects": [
+        {
+          "id": "obj_84235e6b14",
+          "name": "image1",
+          "control": "image",
+          "rects": {
+            "desktop": {
+              "x": 32,
+              "y": 80,
+              "w": 400,
+              "h": 96
+            }
+          },
+          "props": {
+            "src": "https://abulka.github.io/toolbook/_derived/archive.htm_cmp_subterra010_bnr.gif"
+          },
+          "on": {}
+        }
+      ]
+    },
+    {
+      "id": "page_747b65f711",
+      "name": "Page 4",
+      "script": "",
+      "backgroundId": "bg_9665bd506",
+      "author": true,
+      "objects": [
+        {
+          "id": "obj_54a7f40e12",
+          "name": "switch1",
+          "control": "switch",
+          "rects": {
+            "desktop": {
+              "x": 40,
+              "y": 56,
+              "w": 160,
+              "h": 40
+            }
+          },
+          "props": {
+            "text": "Switch does nothing",
+            "checked": false,
+            "fontSize": 15
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_932e51c76",
+          "name": "button1",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 32,
+              "y": 136,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "Change selection colour",
+            "fontSize": 15
+          },
+          "on": {
+            "click": "const objs = await author.selected()\nif (!objs.length) {\n  await author.message('Select an object first, then press me')\n} else {\n  const colors = ['red', 'orange', 'gold', 'green', 'teal', 'navy', 'indigo', 'purple']\n  const c = colors[Math.floor(Math.random() * colors.length)]\n  for (const o of objs) await o.set({ color: c })\n  await author.message('Coloured ' + objs.length + ' object(s) ' + c)\n}"
+          }
+        },
+        {
+          "id": "obj_5b6a97a27",
+          "name": "button2",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 232,
+              "y": 136,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "Group selection and move it",
+            "fontSize": 15
+          },
+          "on": {
+            "click": "// Group + 20px right — the entire script:\nconst g = await author.command('group')   // g IS the new group\nawait g.move(20, 0)\n"
+          }
+        }
+      ]
+    },
+    {
+      "id": "page_e6bce45e6",
+      "name": "Page 6",
+      "script": "",
+      "backgroundId": "bg_9665bd506",
+      "objects": []
     }
   ]
 }

@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type * as Monaco from 'monaco-editor'
 import { getMonaco } from '../monaco'
 import { registerToolbackIntellisense, updateApiLib } from '../monacoApi'
-import { buildApiLib, buildEditorContext } from '../monacoApiLib'
+import { buildApiLib, buildBackgroundApiLib, buildBackgroundEditorContext, buildEditorContext } from '../monacoApiLib'
 import { collectStoreKeys } from '../storeKeys'
 import { useBookStore } from '../stores/book'
 
@@ -12,8 +12,10 @@ const props = withDefaults(
     modelValue: string
     height?: string
     editorClass?: string
+    /** which editor pane this is — selects the right API lib + completions */
+    kind?: 'page' | 'background' | 'object'
   }>(),
-  { height: '150px', editorClass: '' },
+  { height: '150px', editorClass: '', kind: 'page' },
 )
 
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
@@ -25,6 +27,16 @@ const store = useBookStore()
 
 // fingerprint of everything the generated API lib + completion context depend on
 const libFingerprint = computed(() => {
+  if (props.kind === 'background') {
+    const bg = store.activeBackground
+    return JSON.stringify({
+      kind: 'background',
+      bg: bg?.id ?? '',
+      names: bg?.objects.map((o) => o.name) ?? [],
+      script: bg?.script ?? '',
+      keys: collectStoreKeys(store.book),
+    })
+  }
   const page = store.activePage
   return JSON.stringify({
     pi: store.currentPageIndex,
@@ -36,6 +48,15 @@ const libFingerprint = computed(() => {
 
 async function refreshLib(): Promise<void> {
   const monaco = await getMonaco()
+  if (props.kind === 'background') {
+    const bg = store.activeBackground
+    updateApiLib(
+      monaco,
+      buildBackgroundApiLib(bg),
+      buildBackgroundEditorContext(collectStoreKeys(store.book)),
+    )
+    return
+  }
   updateApiLib(
     monaco,
     buildApiLib(store.book, store.currentPageIndex),

@@ -4,6 +4,8 @@ import { sampleBook } from '@toolback/format/src/sample'
 import { createDesignController, resizeRect, snap } from './design'
 import { listenForEditor } from './editorLink'
 
+const BG = { id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', objects: [] }
+
 describe('design geometry helpers', () => {
   it('snaps to the grid', () => {
     expect(snap(3)).toBe(0)
@@ -228,7 +230,8 @@ it('clicking a member selects the group; alt-click and double-click enter it', (
         id: 'bg',
         title: 'G',
         canvas: { desktop: { width: 800, height: 600 } },
-        pages: [{ id: 'p', name: 'P', script: '', background: '#fff', objects: [group] }],
+        backgrounds: [BG],
+        pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [group] }],
       }
       load(root, book)
 
@@ -285,7 +288,8 @@ it('resizing a group scales member rects around the fixed corner (batched commit
         id: 'bg',
         title: 'G',
         canvas: { desktop: { width: 800, height: 600 } },
-        pages: [{ id: 'p', name: 'P', script: '', background: '#fff', objects: [group] }],
+        backgrounds: [BG],
+        pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [group] }],
       }
       load(root, book)
       const groupId = group.id
@@ -323,7 +327,8 @@ it('resizing a group scales member rects around the fixed corner (batched commit
       id: 'bg',
       title: 'G',
       canvas: { desktop: { width: 800, height: 600 } },
-      pages: [{ id: 'p', name: 'P', script: '', background: '#fff', objects: [group] }],
+      backgrounds: [BG],
+      pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [group] }],
     }
     return { book, groupId: group.id, c1: c1.id, c2: c2.id }
   }
@@ -423,7 +428,8 @@ it('resizing a group scales member rects around the fixed corner (batched commit
         id: 'bg',
         title: 'G',
         canvas: { desktop: { width: 800, height: 600 } },
-        pages: [{ id: 'p', name: 'P', script: '', background: '#fff', objects: [group] }],
+        backgrounds: [BG],
+        pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [group] }],
       }
       load(root, book)
 
@@ -531,7 +537,8 @@ describe('nested group drill-in', () => {
       id: 'bn',
       title: 'N',
       canvas: { desktop: { width: 800, height: 600 } },
-      pages: [{ id: 'p', name: 'P', script: '', background: '#fff', objects: [outer] }],
+      backgrounds: [BG],
+      pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [outer] }],
     }
   }
   // btn sits at page (50, 70)
@@ -730,7 +737,8 @@ describe('nested group drill-in', () => {
         id: 'bg',
         title: 'G',
         canvas: { desktop: { width: 800, height: 600 } },
-        pages: [{ id: 'p', name: 'P', script: '', background: '#fff', objects: [group] }],
+        backgrounds: [BG],
+        pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [group] }],
       }
       load(root, book)
 
@@ -741,6 +749,53 @@ describe('nested group drill-in', () => {
 
       overlayOf(root).dispatchEvent(new MouseEvent('dblclick', { clientX: 60, clientY: 60, bubbles: true }))
       expect(selectionMsgs(sent).at(-1)!.ids).toEqual([child.id])
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('background objects on a page are locked: clicks report toolback:bgClick, not selection', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const sent: Array<{ type: string; ids?: string[] }> = []
+    const cleanup = listenForEditor(root, (m) => sent.push(m as never))
+    try {
+      const navBtn = createObject('button', 'navBtn', { desktop: { x: 40, y: 40, w: 120, h: 40 } })
+      const pageBtn = createObject('button', 'pageBtn', { desktop: { x: 200, y: 200, w: 120, h: 40 } })
+      const book: Book = {
+        id: 'bg',
+        title: 'G',
+        canvas: { desktop: { width: 800, height: 600 } },
+        backgrounds: [
+          {
+            id: 'bg1',
+            name: 'Background 1',
+            color: '#ffffff',
+            script: '',
+            objects: [navBtn],
+          },
+        ],
+        pages: [
+          { id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [pageBtn] },
+        ],
+      }
+      load(root, book, [pageBtn.id])
+
+      // click squarely on the background's navBtn: hint sent, never selected
+      pointer(root, 'pointerdown', 60, 60)
+      pointer(root, 'pointerup', 60, 60)
+      expect(sent.some((m) => m.type === 'toolback:bgClick')).toBe(true)
+      // navBtn appears in no selection message (the empty click deselects,
+      // which is the ordinary marquee behaviour)
+      for (const sel of selectionMsgs(sent)) expect(sel.ids).not.toContain(navBtn.id)
+
+      // a click on empty space also avoids selecting the locked object
+      const bgClicks = sent.filter((m) => m.type === 'toolback:bgClick').length
+      pointer(root, 'pointerdown', 700, 500)
+      pointer(root, 'pointerup', 700, 500)
+      expect(sent.filter((m) => m.type === 'toolback:bgClick')).toHaveLength(bgClicks)
     } finally {
       unpatchRects()
       cleanup()

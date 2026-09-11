@@ -1,5 +1,5 @@
-import type { Book, Breakpoint, PageObject, Rect } from '@toolback/format'
-import { flattenObjects, FONT_STACKS, resolveColor } from '@toolback/format'
+import type { Background, Book, Breakpoint, PageObject, Rect } from '@toolback/format'
+import { backgroundFor, flattenObjects, FONT_STACKS, resolveColor } from '@toolback/format'
 import { renderBookPage } from './index'
 
 export interface ToolbackStore {
@@ -58,15 +58,15 @@ function escapeSel(name: string): string {
   return name.replace(/[\\"]/g, '\\$&')
 }
 
-function controlElement(pageRoot: HTMLElement, name: string): HTMLElement | null {
+export function controlElement(pageRoot: HTMLElement, name: string): HTMLElement | null {
   return controlWrapper(pageRoot, name)?.firstElementChild as HTMLElement | null
 }
 
-function controlWrapper(pageRoot: HTMLElement, name: string): HTMLElement | null {
+export function controlWrapper(pageRoot: HTMLElement, name: string): HTMLElement | null {
   return pageRoot.querySelector<HTMLElement>(`[data-tb-name="${escapeSel(name)}"]`)
 }
 
-function makeControlApi(
+export function makeControlApi(
   obj: PageObject,
   el: HTMLElement,
   wrapper: HTMLElement,
@@ -74,8 +74,7 @@ function makeControlApi(
   listeners: Array<() => void>,
 ): ControlApi {
   const input = el instanceof HTMLInputElement ? el : null
-  // switches render as a <label> wrapping a checkbox
-  const checkbox = el.querySelector<HTMLInputElement>('input[type="checkbox"]')
+  const checkbox = el instanceof HTMLInputElement ? null : (el.querySelector?.('input[type="checkbox"]') as HTMLInputElement | null)
   // groups have no content of their own — writing textContent would wipe
   // the member DOM, so text/value are inert for them
   const isGroup = obj.control === 'group'
@@ -100,29 +99,19 @@ function makeControlApi(
     el,
     name: obj.name,
     get text() {
-      if (isGroup) return ''
-      if (input) return input.value
-      // switches keep their label text in a separate span
-      const span = el.querySelector('.tb-switch-text')
-      if (span) return span.textContent ?? ''
-      return el.textContent ?? ''
+      return isGroup ? '' : input ? input.value : (el.textContent ?? '')
     },
     set text(v: string) {
       if (isGroup) return
       if (input) input.value = String(v)
-      else {
-        const span = el.querySelector('.tb-switch-text')
-        if (span) span.textContent = String(v)
-        else el.textContent = String(v)
-      }
+      else el.textContent = String(v)
     },
     get value() {
-      if (checkbox) return checkbox.checked
-      return input ? input.value : ''
+      return input ? input.value : checkbox ? checkbox.checked : ''
     },
     set value(v: unknown) {
-      if (checkbox) checkbox.checked = v === true || v === 'true'
-      else if (input) input.value = String(v)
+      if (input) input.value = String(v)
+      else if (checkbox) checkbox.checked = Boolean(v)
     },
     get visible() {
       return el.style.display !== 'none'
@@ -131,14 +120,9 @@ function makeControlApi(
       el.style.display = v ? '' : 'none'
     },
     get enabled() {
-      if (checkbox) return !checkbox.disabled
       return !((el as HTMLButtonElement).disabled ?? false)
     },
     set enabled(v: boolean) {
-      if (checkbox) {
-        checkbox.disabled = !v
-        return
-      }
       if (el instanceof HTMLButtonElement || el instanceof HTMLInputElement) {
         el.disabled = !v
       }
@@ -214,8 +198,7 @@ export function shortNamesFor(objectNames: string[], exclude: Iterable<string>):
   return objectNames.filter((n) => IDENT_RE.test(n) && !NAME_RESERVED.has(n) && !ex.has(n))
 }
 
-function wireDynamicText(
-  pageRoot: HTMLElement,
+export function wireDynamicText(  pageRoot: HTMLElement,
   page: { objects: PageObject[] },
   store: ToolbackStore,
   listeners: Array<() => void>,
@@ -247,18 +230,48 @@ function wireDynamicText(
   listeners.push(store.subscribe(render))
 }
 
+// ---- popups (the ToolBook viewer mechanism) ----
+
+export interface PopupOptions {
+  /** block the page behind (default true); backdrop click closes */
+  modal?: boolean
+  /** 'auto' = styled title bar with the page name + ✕; 'none' = bare page */
+  chrome?: 'auto' | 'none'
+  /** position in canvas coordinates; default centred over the page */
+  x?: number
+  y?: number
+}
+
+export interface PopupHandle {
+  readonly name: string
+  close(): void
+}
+
+/**
+ * One execution context: the base page (scopes[0]) or an open popup.
+ * Controls/listeners/page functions are per scope; book/store/breakpoint
+ * are shared through the RunState.
+ */
+interface Scope {
+  idx: number
+  root: HTMLElement
+  controls: Record<string, ControlApi>
+  listeners: Array<() => void>
+  pageFns: Record<string, (e?: unknown) => unknown>
+  popup: { name: string; modal: boolean; chrome: 'auto' | 'none'; box: HTMLElement; backdrop: HTMLElement | null } | null
+  navLock: boolean
+}
+
 interface RunState {
   book: Book
   root: HTMLElement
   breakpoint: Breakpoint
   onError?: (message: string) => void
+  onPopups?: (open: string[]) => void
   store: ToolbackStore
-  pageApi: unknown
-  controls: Record<string, ControlApi>
-  listeners: Array<() => void>
-  pageFns: Record<string, (e?: unknown) => unknown>
-  idx: number
-  navLock: boolean
+  scopes: Scope[]
+  bgFns: Map<string, Record<string, (e?: unknown) => unknown>>
+  popupLayer: HTMLElement | null
 }
 
 function safeRun(st: RunState, what: string, fn: () => void): void {
@@ -269,37 +282,144 @@ function safeRun(st: RunState, what: string, fn: () => void): void {
   }
 }
 
-function runPage(st: RunState, idx: number): void {
-  if (st.navLock) return
-  st.navLock = true
+function scopeOfPageName(st: RunState, name: string): Scope | null {
+  return st.scopes.find((s) => (st.book.pages[s.idx] ?? st.book.pages[0]!).name === name) ?? null
+}
+
+function openPopupNames(st: RunState): string[] {
+  return st.scopes.slice(1).map((s) => (st.book.pages[s.idx] ?? st.book.pages[0]!).name)
+}
+
+function notifyPopups(st: RunState): void {
+  st.onPopups?.(openPopupNames(st))
+}
+
+function popupLayerOf(st: RunState): HTMLElement {
+  if (st.popupLayer?.isConnected) return st.popupLayer
+  const doc = st.root.ownerDocument
+  const layer = doc.createElement('div')
+  layer.className = 'tb-popup-layer'
+  ;(st.root.parentElement ?? st.root).appendChild(layer)
+  st.popupLayer = layer
+  return layer
+}
+
+function removePopupLayer(st: RunState): void {
+  st.popupLayer?.remove()
+  st.popupLayer = null
+}
+
+/** close one popup: pageLeave → listeners off → DOM + scope out */
+function closePopup(st: RunState, scope: Scope): void {
+  const i = st.scopes.indexOf(scope)
+  if (i === -1) return
+  st.scopes.splice(i, 1)
+  const leave = scope.pageFns['pageLeave']
+  if (typeof leave === 'function') {
+    safeRun(st, 'pageLeave', () => {
+      Promise.resolve(leave()).catch((err) => st.onError?.(`pageLeave: ${String(err)}`))
+    })
+  }
+  for (const un of scope.listeners) un()
+  scope.listeners = []
+  scope.popup?.backdrop?.remove()
+  scope.popup?.box.remove()
+  notifyPopups(st)
+}
+
+function closeTopModalPopup(st: RunState): boolean {
+  for (let i = st.scopes.length - 1; i >= 1; i--) {
+    const s = st.scopes[i]!
+    if (s.popup?.modal) {
+      closePopup(st, s)
+      return true
+    }
+  }
+  return false
+}
+
+/** Esc in run mode: closes the topmost modal popup, if any. */
+export function popupEscape(): boolean {
+  if (!active) return false
+  return closeTopModalPopup((active as unknown as { st: RunState }).st)
+}
+
+function ensureBackgroundFns(st: RunState, bg: Background | undefined, pageApi: unknown): Record<string, (e?: unknown) => unknown> {
+  if (!bg) return {}
+  let fns = st.bgFns.get(bg.id)
+  if (!fns) {
+    fns = {}
+    if (bg.script?.trim()) {
+      safeRun(st, 'background script', () => {
+        const names = extractFunctionNames(bg.script)
+        const returnObj = names
+          .map((n) => `${JSON.stringify(n)}: typeof ${n} === 'function' ? ${n} : undefined`)
+          .join(',')
+        const factory = new Function(
+          'api',
+          'self',
+          `"use strict";\nconst { page, controls, store } = api;\n${bg.script}\n;return { ${returnObj} };`,
+        )
+        fns = ((factory({ page: pageApi, controls: {}, store: st.store }, undefined) ?? {}) as Record<string, (e?: unknown) => unknown>)
+      })
+    }
+    st.bgFns.set(bg.id, fns)
+    const enter = fns['backgroundEnter']
+    if (typeof enter === 'function') {
+      safeRun(st, 'backgroundEnter', () => {
+        Promise.resolve(enter()).catch((err) => st.onError?.(`backgroundEnter: ${String(err)}`))
+      })
+    }
+  }
+  return fns
+}
+
+function runPage(st: RunState, scope: Scope, idx: number): void {
+  if (scope.navLock) return
+  scope.navLock = true
   try {
-    const leave = st.pageFns['pageLeave']
+    // navigating the base page closes any open popups (their pageLeave runs)
+    if (scope === st.scopes[0] && st.scopes.length > 1) {
+      for (const s of [...st.scopes.slice(1)]) closePopup(st, s)
+    }
+    const leave = scope.pageFns['pageLeave']
     if (typeof leave === 'function') {
       safeRun(st, 'pageLeave', () => {
         Promise.resolve(leave()).catch((err) => st.onError?.(`pageLeave: ${String(err)}`))
       })
     }
-    for (const un of st.listeners) un()
-    st.listeners = []
+    for (const un of scope.listeners) un()
+    scope.listeners = []
 
-    st.idx = idx
+    scope.idx = idx
     const page = st.book.pages[idx] ?? st.book.pages[0]!
-    renderBookPage(st.book, idx, st.root, st.breakpoint)
-    const pageRoot = st.root.querySelector<HTMLElement>('.tb-page')!
-    const flat = flattenObjects(page.objects)
+    const bg = backgroundFor(st.book, page)
+    renderBookPage(st.book, idx, scope.root, st.breakpoint)
+    const pageRoot = scope.root.querySelector<HTMLElement>('.tb-page')!
+    // background objects are first-class at run time: they get ControlApis,
+    // can carry event scripts, and are addressable as controls[name] (names
+    // are unique across the page and its background)
+    const flat = flattenObjects([...(bg?.objects ?? []), ...page.objects])
 
-    for (const k of Object.keys(st.controls)) delete st.controls[k]
+    for (const k of Object.keys(scope.controls)) delete scope.controls[k]
     for (const obj of flat) {
       const wrapper = controlWrapper(pageRoot, obj.name)
       const el = (wrapper?.firstElementChild as HTMLElement | null) ?? null
       if (el && wrapper) {
-        st.controls[obj.name] = makeControlApi(obj, el, wrapper, st.breakpoint, st.listeners)
+        scope.controls[obj.name] = makeControlApi(obj, el, wrapper, st.breakpoint, scope.listeners)
       }
     }
 
-    const api = { page: st.pageApi, controls: st.controls, store: st.store }
+    // per-scope page API: `page.go` in a popup navigates that popup
+    const pageApi = makePageApi(st, scope)
+    const api = { page: pageApi, controls: scope.controls, store: st.store }
 
-    st.pageFns = {}
+    // background script first: its functions back the page script and the
+    // backgroundEnter hook fires once per run, on the first member page
+    const bgFns = ensureBackgroundFns(st, bg, pageApi)
+    const bgFnNames = Object.keys(bgFns)
+
+    scope.pageFns = {}
     if (page.script.trim()) {
       safeRun(st, 'page script', () => {
         const names = extractFunctionNames(page.script)
@@ -308,19 +428,21 @@ function runPage(st: RunState, idx: number): void {
           .join(',')
         const bare = shortNamesFor(
           flat.map((o) => o.name),
-          names,
+          [...names, ...bgFnNames],
         )
         const shortNames = bare.length > 0 ? `const { ${bare.join(', ')} } = controls;` : ''
         const factory = new Function(
           'api',
           'self',
+          ...bgFnNames,
           `"use strict";\nconst { page, controls, store } = api;\n${shortNames}\n${page.script}\n;return { ${returnObj} };`,
         )
-        // `self` in a page script is the page API (self.name = the page name)
-        st.pageFns = (factory(api, st.pageApi) ?? {}) as Record<string, (e?: unknown) => unknown>
+        // `self` in a page script is the page API (self.name = the page name);
+        // background functions arrive as parameters so page scripts can call them
+        scope.pageFns = (factory(api, pageApi, ...bgFnNames.map((n) => bgFns[n])) ?? {}) as Record<string, (e?: unknown) => unknown>
       })
     }
-    const fnNames = Object.keys(st.pageFns)
+    const fnNames = Object.keys(scope.pageFns)
 
     /** the object that actually received the event — nearest data-tb-name element */
     const resolveTarget = (e: Event, fallback: ControlApi): ControlApi => {
@@ -328,7 +450,7 @@ function runPage(st: RunState, idx: number): void {
       while (el) {
         const name = el.dataset?.tbName
         if (name) {
-          const found = st.controls[name]
+          const found = scope.controls[name]
           if (found) return found
         }
         el = el.parentElement
@@ -351,25 +473,25 @@ function runPage(st: RunState, idx: number): void {
         if (o.children?.length) walkTree(o.children, o)
       }
     }
-    walkTree(page.objects, null)
+    walkTree([...(bg?.objects ?? []), ...page.objects], null)
 
     // compile every owner's event scripts once per page render
     const compiled = new Map<string, Map<string, (e: Event, self: ControlApi, forward: () => void) => void>>()
     for (const obj of flat) {
-      const ctl = st.controls[obj.name]
+      const ctl = scope.controls[obj.name]
       if (!ctl) continue
       const perEvent = new Map<string, (e: Event, self: ControlApi, forward: () => void) => void>()
       for (const [eventName, script] of Object.entries(obj.on)) {
         if (!script || !script.trim()) continue
         try {
-          const bare = shortNamesFor(flat.map((o) => o.name), fnNames)
+          const bare = shortNamesFor(flat.map((o) => o.name), [...fnNames, ...bgFnNames])
           const shortNames =
             bare.length > 0 ? `const { ${bare.join(', ')} } = controls;` : ''
           // `target` = the member that received the event; `self` = the
           // script owner (in a group script: the group itself); `forward()`
           // continues the message to the next enclosing handler. Page
           // functions with colliding names lose the reserved slots.
-          const paramNames = [...new Set([...fnNames, 'event', 'target', 'self', 'forward'])]
+          const paramNames = [...new Set([...bgFnNames, ...fnNames, 'event', 'target', 'self', 'forward'])]
           const factory = new Function(
             'api',
             ...paramNames,
@@ -382,7 +504,7 @@ function runPage(st: RunState, idx: number): void {
               else if (p === 'target') args.push(resolveTarget(e, ctl))
               else if (p === 'self') args.push(self)
               else if (p === 'forward') args.push(forward)
-              else args.push(st.pageFns[p])
+              else args.push(scope.pageFns[p] ?? bgFns[p])
             }
             safeRun(st, `${obj.name}.${eventName}`, () => {
               // `this` inside the script is the script owner (=== self)
@@ -413,7 +535,7 @@ function runPage(st: RunState, idx: number): void {
       // group wrappers have pointer-events: none — events originate on
       // members, and group handlers are reached through the chain walk
       if (obj.control === 'group') continue
-      const ctl = st.controls[obj.name]
+      const ctl = scope.controls[obj.name]
       if (!ctl) continue
       const chain = chainOf(obj)
       const types = new Set<string>()
@@ -425,26 +547,158 @@ function runPage(st: RunState, idx: number): void {
             while (i < chain.length && !compiled.get(chain[i]!.name)?.has(eventName)) i++
             if (i >= chain.length) return
             const owner = chain[i++]!
-            compiled.get(owner.name)!.get(eventName)!(e, st.controls[owner.name]!, forward)
+            compiled.get(owner.name)!.get(eventName)!(e, scope.controls[owner.name]!, forward)
           }
           forward()
         }
         ctl.el.addEventListener(eventName, dispatch)
-        st.listeners.push(() => ctl.el.removeEventListener(eventName, dispatch))
+        scope.listeners.push(() => ctl.el.removeEventListener(eventName, dispatch))
       }
     }
 
-    wireDynamicText(pageRoot, page, st.store, st.listeners)
+    wireDynamicText(pageRoot, { objects: [...(bg?.objects ?? []), ...page.objects] }, st.store, scope.listeners)
 
-    st.navLock = false
-    const enter = st.pageFns['pageEnter']
+    scope.navLock = false
+    const enter = scope.pageFns['pageEnter']
     if (typeof enter === 'function') {
       safeRun(st, 'pageEnter', () => {
         Promise.resolve(enter()).catch((err) => st.onError?.(`pageEnter: ${String(err)}`))
       })
     }
   } finally {
-    st.navLock = false
+    scope.navLock = false
+  }
+}
+
+function makePageApi(st: RunState, scope: Scope) {
+  return {
+    get name(): string {
+      return (st.book.pages[scope.idx] ?? st.book.pages[0]!).name
+    },
+    get names(): string[] {
+      return st.book.pages.map((p) => p.name)
+    },
+    get popups(): string[] {
+      return openPopupNames(st)
+    },
+    go(name: string): void {
+      const i = st.book.pages.findIndex((p) => p.name === name)
+      if (i === -1) {
+        st.onError?.(`page.go: no page named "${name}"`)
+        return
+      }
+      // a popup navigates itself; the base page navigates the book
+      runPage(st, scope.popup ? scope : st.scopes[0]!, i)
+    },
+    popupOpen(pageName: string, opts: PopupOptions = {}): PopupHandle | null {
+      const i = st.book.pages.findIndex((p) => p.name === pageName)
+      if (i === -1) {
+        st.onError?.(`page.popupOpen: no page named "${pageName}"`)
+        return null
+      }
+      if (scopeOfPageName(st, pageName)) {
+        st.onError?.(`page.popupOpen: "${pageName}" is already open`)
+        return null
+      }
+      const page = st.book.pages[i]!
+      const modal = opts.modal ?? true
+      const chrome = opts.chrome ?? 'auto'
+      const layer = popupLayerOf(st)
+      const doc = layer.ownerDocument
+
+      const box = doc.createElement('div')
+      box.className = 'tb-popup'
+      // the popup's own scope is created below — chrome/backdrop handlers
+      // close IT (not the script's owning scope, which is often the base)
+      const me: { scope: Scope | null } = { scope: null }
+      const closeSelf = (): void => {
+        if (me.scope) closePopup(st, me.scope)
+      }
+      let backdrop: HTMLElement | null = null
+      if (modal) {
+        backdrop = doc.createElement('div')
+        backdrop.className = 'tb-popup-backdrop'
+        backdrop.addEventListener('click', () => me.scope && closePopup(st, me.scope))
+        layer.appendChild(backdrop)
+      }
+      if (chrome === 'auto') {
+        const bar = doc.createElement('div')
+        bar.className = 'tb-popup-chrome'
+        const title = doc.createElement('span')
+        title.textContent = page.name
+        const close = doc.createElement('button')
+        close.className = 'tb-popup-close'
+        close.title = 'Close'
+        close.textContent = '✕'
+        close.addEventListener('click', () => me.scope && closePopup(st, me.scope))
+        bar.append(title, close)
+        // drag by the title bar to move the popup
+        bar.addEventListener('pointerdown', (e: PointerEvent) => {
+          if ((e.target as HTMLElement).closest('.tb-popup-close')) return
+          e.preventDefault()
+          const startX = e.clientX
+          const startY = e.clientY
+          const originX = box.offsetLeft
+          const originY = box.offsetTop
+          const move = (ev: PointerEvent): void => {
+            box.style.left = `${originX + (ev.clientX - startX)}px`
+            box.style.top = `${originY + (ev.clientY - startY)}px`
+          }
+          const up = (): void => {
+            window.removeEventListener('pointermove', move)
+            window.removeEventListener('pointerup', up)
+          }
+          window.addEventListener('pointermove', move)
+          window.addEventListener('pointerup', up)
+        })
+        box.appendChild(bar)
+      }
+      const content = doc.createElement('div')
+      content.className = 'tb-popup-content'
+      box.appendChild(content)
+
+      // size + position: the popup page's background decides the size (the
+      // M6a override), placement defaults to centred over the base page
+      const bg = backgroundFor(st.book, page)
+      const size = bg?.size?.[st.breakpoint] ?? st.book.canvas[st.breakpoint] ?? st.book.canvas.desktop!
+      const holder = st.root
+      const x = opts.x ?? Math.round((holder.offsetWidth - size.width) / 2)
+      const y = opts.y ?? Math.round((holder.offsetHeight - size.height) / 2)
+      box.style.left = `${Math.max(0, holder.offsetLeft + x)}px`
+      box.style.top = `${Math.max(0, holder.offsetTop + y)}px`
+      layer.appendChild(box)
+
+      const popupScope: Scope = {
+        idx: i,
+        root: content,
+        controls: {},
+        listeners: [],
+        pageFns: {},
+        popup: { name: page.name, modal, chrome, box, backdrop },
+        navLock: false,
+      }
+      me.scope = popupScope
+      st.scopes.push(popupScope)
+      runPage(st, popupScope, i)
+      notifyPopups(st)
+      return {
+        name: page.name,
+        close: () => closePopup(st, popupScope),
+      }
+    },
+    popupClose(name?: string): void {
+      if (name === undefined) {
+        const top = st.scopes[st.scopes.length - 1]
+        if (top && top.popup) closePopup(st, top)
+        return
+      }
+      const target = scopeOfPageName(st, name)
+      if (target?.popup) closePopup(st, target)
+      else st.onError?.(`page.popupClose: no popup named "${name}"`)
+    },
+    popupCloseAll(): void {
+      for (const s of [...st.scopes.slice(1)]) closePopup(st, s)
+    },
   }
 }
 
@@ -467,50 +721,52 @@ export function runBook(
   breakpoint: Breakpoint = 'desktop',
   onError?: (message: string) => void,
   startPageIndex = 0,
+  onPopups?: (open: string[]) => void,
 ): RunHandle {
   stopRun()
 
   const store = createStore()
+  const baseScope: Scope = {
+    idx: startPageIndex,
+    root,
+    controls: {},
+    listeners: [],
+    pageFns: {},
+    popup: null,
+    navLock: false,
+  }
   const st: RunState = {
     book,
     root,
     breakpoint,
     onError,
+    onPopups,
     store,
-    pageApi: null,
-    controls: {},
-    listeners: [],
-    pageFns: {},
-    idx: startPageIndex,
-    navLock: false,
+    scopes: [baseScope],
+    bgFns: new Map(),
+    popupLayer: null,
   }
 
-  st.pageApi = {
-    get name(): string {
-      return (book.pages[st.idx] ?? book.pages[0]!).name
-    },
-    names: book.pages.map((p) => p.name),
-    go(name: string): void {
-      const i = book.pages.findIndex((p) => p.name === name)
-      if (i === -1) {
-        onError?.(`page.go: no page named "${name}"`)
-        return
-      }
-      runPage(st, i)
-    },
-  }
-
-  runPage(st, startPageIndex)
+  runPage(st, baseScope, startPageIndex)
 
   active = {
     store,
     get controls() {
-      return st.controls
+      // base page + open popups; popups win on name collisions while open
+      const merged: Record<string, ControlApi> = {}
+      for (const s of st.scopes) Object.assign(merged, s.controls)
+      return merged
     },
     stop: () => {
-      for (const un of st.listeners) un()
-      st.listeners = []
+      for (const s of st.scopes) {
+        for (const un of s.listeners) un()
+        s.listeners = []
+      }
+      removePopupLayer(st)
+      st.scopes = st.scopes.slice(0, 1)
     },
   }
+  // expose the raw state for popupEscape()
+  ;(active as unknown as { st: RunState }).st = st
   return active
 }
