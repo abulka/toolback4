@@ -598,12 +598,16 @@ decides the **size of its pages**.
 The **Backgrounds panel** (left sidebar) shows one group per background with its
 pages nested underneath:
 
-- **click a background** to edit it — the canvas shows only the background's own
-  objects; drag, script and restyle them like page objects. The background of
-  the page you're editing stays outlined; the one being edited is highlighted
+- **👁** (or **double-click anywhere on the background row**) edits the background —
+  the canvas shows only the background's own objects; drag, script and restyle
+  them like page objects. The background of the page you're editing stays
+  outlined; the one being edited is highlighted.
+  A single click on the background does nothing — this is deliberate, so a stray
+  click can't drop you onto an empty background. A click on any page always
+  returns the canvas to that page.
 - **⚙** opens the background properties: name, colour, **page size**, and
   **Delete…** (backgrounds with pages take them along — confirmed first)
-- **double-click a background name** to rename it; ⧉ duplicates
+- **✎** renames it; ⧉ duplicates
 - **drag pages** to rearrange them, or drop them on another background to move
   them there
 - **+ Add background** / **+ Add page** — new pages join the background you're
@@ -706,7 +710,7 @@ The **Backgrounds** panel (left sidebar) groups pages under their backgrounds:
 
 - click a page to edit it; press **Run** to play the page you're editing
   (shortcut: `F3` or `⌥3` — works even when the canvas has focus)
-- **double-click a page name** to rename it
+- ✎ renames it
 - ⧉ duplicates a page — objects, properties and scripts included
 - ✕ deletes it (a book always keeps at least one page)
 - **+ Add page** appends a fresh page on the background in context

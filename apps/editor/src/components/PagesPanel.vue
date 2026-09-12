@@ -187,7 +187,8 @@ function bgDropClass(id: string): Record<string, boolean> {
         ...bgDropClass(g.bg.id),
       }"
       :data-bg-drop="g.bg.id"
-      @click="store.editBackground(g.bg.id)"
+      title="Double-click to edit background objects"
+      @dblclick="store.editBackground(g.bg.id)"
     >
       <template v-if="renamingBg === g.bg.id">
         <input
@@ -198,6 +199,7 @@ function bgDropClass(id: string): Record<string, boolean> {
           @keydown.esc="renamingBg = null"
           @blur="commitRename"
           @click.stop
+          @dblclick.stop
         />
       </template>
       <template v-else>
@@ -207,8 +209,10 @@ function bgDropClass(id: string): Record<string, boolean> {
             <span class="bg-name">{{ g.bg.name }}</span>
           </span>
           <span class="page-actions">
-            <button class="big" title="Background properties (name, colour, page size, delete)" @click.stop="store.backgroundDialogId = g.bg.id">⚙</button>
-            <button class="big" title="Duplicate background" @click.stop="store.duplicateBackground(g.bg.id)">⧉</button>
+            <button title="Edit this background's own objects (or double-click the row)" @click.stop="store.editBackground(g.bg.id)" @dblclick.stop>👁</button>
+            <button title="Rename background" @click.stop="startBgRename(g.bg)" @dblclick.stop>✎</button>
+            <button title="Background properties (name, colour, page size, delete)" @click.stop="store.backgroundDialogId = g.bg.id" @dblclick.stop>⚙</button>
+            <button title="Duplicate background" @click.stop="store.duplicateBackground(g.bg.id)" @dblclick.stop>⧉</button>
           </span>
         </span>
         <span class="bg-size">page size · {{ sizeLabel(g.bg) || 'book default' }}</span>
@@ -225,7 +229,9 @@ function bgDropClass(id: string): Record<string, boolean> {
             dropClass(entry),
           ]"
           :data-page-drop="entry.i"
+          title="Select to edit this page · ✎ rename · ⧉ duplicate · ✕ delete"
           @click.stop="store.selectPage(entry.i)"
+          @dblclick.stop
           @pointerdown="onPagePointerDown($event, entry.i)"
         >
           <template v-if="renamingPage === entry.i">
@@ -237,11 +243,13 @@ function bgDropClass(id: string): Record<string, boolean> {
               @keydown.esc="renamingPage = null"
               @blur="commitRename"
               @click.stop
+              @dblclick.stop
             />
           </template>
           <template v-else>
-            <span class="page-name" @dblclick="startPageRename(entry.i)">{{ entry.p.name }}</span>
+            <span class="page-name">{{ entry.p.name }}</span>
             <span class="page-actions">
+              <button title="Rename page" @click.stop="startPageRename(entry.i)" @dblclick.stop>✎</button>
               <button title="Duplicate page" @click.stop="store.duplicatePage(entry.i)">⧉</button>
               <button
                 v-if="store.book.pages.length > 1"
@@ -286,10 +294,9 @@ function bgDropClass(id: string): Record<string, boolean> {
   border-color: var(--ed-accent);
 }
 
-/* the background being edited is stronger: outline + tint */
+/* the background being edited is stronger: outline + inset ring (no tint) */
 .bg.active {
   border-color: var(--ed-accent);
-  background: rgba(99, 102, 241, 0.1);
   box-shadow: inset 0 0 0 1px var(--ed-accent);
 }
 
@@ -345,16 +352,6 @@ function bgDropClass(id: string): Record<string, boolean> {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.page-actions button.big {
-  font-size: 16px;
-  line-height: 1;
-  padding: 5px 16px;
-  border-radius: 6px;
-  border: 1px solid var(--ed-border);
-  background: var(--ed-panel);
-  min-width: 44px;
 }
 
 .pages {
