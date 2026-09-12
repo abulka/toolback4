@@ -1,6 +1,7 @@
 import type { Background, Book, Breakpoint, PageObject, Rect } from '@toolback/format'
 import { backgroundFor, flattenObjects, FONT_STACKS, resolveColor } from '@toolback/format'
 import { renderBookPage } from './index'
+import { rewriteLibImports, toolbackImport } from './libs'
 
 export interface ToolbackStore {
   get(key: string): unknown
@@ -186,7 +187,7 @@ export function makeControlApi(
 
 const DYN_RE = /\{\{\s*([\w$]+(?:\.[\w$]+)*)\s*\}\}/g
 
-const NAME_RESERVED = new Set(['page', 'controls', 'store', 'event', 'target', 'self', 'this'])
+const NAME_RESERVED = new Set(['page', 'controls', 'store', 'event', 'target', 'self', 'this', '__tbImport'])
 const IDENT_RE = /^[A-Za-z_$][\w$]*$/
 
 /**
@@ -358,9 +359,10 @@ function ensureBackgroundFns(st: RunState, bg: Background | undefined, pageApi: 
         const factory = new Function(
           'api',
           'self',
-          `"use strict";\nconst { page, controls, store } = api;\n${bg.script}\n;return { ${returnObj} };`,
+          '__tbImport',
+          `"use strict";\nconst { page, controls, store } = api;\n${rewriteLibImports(bg.script)}\n;return { ${returnObj} };`,
         )
-        fns = ((factory({ page: pageApi, controls: {}, store: st.store }, undefined) ?? {}) as Record<string, (e?: unknown) => unknown>)
+        fns = ((factory({ page: pageApi, controls: {}, store: st.store }, undefined, toolbackImport) ?? {}) as Record<string, (e?: unknown) => unknown>)
       })
     }
     st.bgFns.set(bg.id, fns)
@@ -435,11 +437,12 @@ function runPage(st: RunState, scope: Scope, idx: number): void {
           'api',
           'self',
           ...bgFnNames,
-          `"use strict";\nconst { page, controls, store } = api;\n${shortNames}\n${page.script}\n;return { ${returnObj} };`,
+          '__tbImport',
+          `"use strict";\nconst { page, controls, store } = api;\n${shortNames}\n${rewriteLibImports(page.script)}\n;return { ${returnObj} };`,
         )
         // `self` in a page script is the page API (self.name = the page name);
         // background functions arrive as parameters so page scripts can call them
-        scope.pageFns = (factory(api, pageApi, ...bgFnNames.map((n) => bgFns[n])) ?? {}) as Record<string, (e?: unknown) => unknown>
+        scope.pageFns = (factory(api, pageApi, ...bgFnNames.map((n) => bgFns[n]), toolbackImport) ?? {}) as Record<string, (e?: unknown) => unknown>
       })
     }
     const fnNames = Object.keys(scope.pageFns)
@@ -491,11 +494,11 @@ function runPage(st: RunState, scope: Scope, idx: number): void {
           // script owner (in a group script: the group itself); `forward()`
           // continues the message to the next enclosing handler. Page
           // functions with colliding names lose the reserved slots.
-          const paramNames = [...new Set([...bgFnNames, ...fnNames, 'event', 'target', 'self', 'forward'])]
+          const paramNames = [...new Set([...bgFnNames, ...fnNames, 'event', 'target', 'self', 'forward', '__tbImport'])]
           const factory = new Function(
             'api',
             ...paramNames,
-            `"use strict";\nconst { page, controls, store } = api;\nreturn (async () => {\n${shortNames}\n${script}\n})();`,
+            `"use strict";\nconst { page, controls, store } = api;\nreturn (async () => {\n${shortNames}\n${rewriteLibImports(script)}\n})();`,
           )
           perEvent.set(eventName, (e, self, forward) => {
             const args: unknown[] = [api]
@@ -504,6 +507,7 @@ function runPage(st: RunState, scope: Scope, idx: number): void {
               else if (p === 'target') args.push(resolveTarget(e, ctl))
               else if (p === 'self') args.push(self)
               else if (p === 'forward') args.push(forward)
+              else if (p === '__tbImport') args.push(toolbackImport)
               else args.push(scope.pageFns[p] ?? bgFns[p])
             }
             safeRun(st, `${obj.name}.${eventName}`, () => {

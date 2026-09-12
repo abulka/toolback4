@@ -1,6 +1,7 @@
 import type { Book, Breakpoint, Rect } from '@toolback/format'
 import { flattenObjects } from '@toolback/format'
 import { renderBookPage } from './index'
+import { rewriteLibImports, toolbackImport } from './libs'
 import {
   controlWrapper,
   extractFunctionNames,
@@ -360,14 +361,15 @@ export function startAuthorMode(
         .join(',')
       const bare = flattenObjects(page.objects)
         .map((o) => o.name)
-        .filter((n) => /^[A-Za-z_$][\w$]*$/.test(n) && !['page', 'controls', 'store', 'author', 'event', 'target', 'self', 'this'].includes(n) && !names.includes(n))
+        .filter((n) => /^[A-Za-z_$][\w$]*$/.test(n) && !['page', 'controls', 'store', 'author', 'event', 'target', 'self', 'this', '__tbImport'].includes(n) && !names.includes(n))
       const shortNames = bare.length ? `const { ${bare.join(', ')} } = controls;` : ''
       const factory = new Function(
         'api',
         'self',
-        `"use strict";\nconst { page, controls, store, author } = api;\n${shortNames}\n${page.script}\n;return { ${returnObj} };`,
+        '__tbImport',
+        `"use strict";\nconst { page, controls, store, author } = api;\n${shortNames}\n${rewriteLibImports(page.script)}\n;return { ${returnObj} };`,
       )
-      Object.assign(pageFns, (factory(api, pageApi) ?? {}) as Record<string, (e?: unknown) => unknown>)
+      Object.assign(pageFns, (factory(api, pageApi, toolbackImport) ?? {}) as Record<string, (e?: unknown) => unknown>)
     })
   }
 
@@ -380,21 +382,22 @@ export function startAuthorMode(
       if (!script?.trim()) continue
       try {
         const fnNames = Object.keys(pageFns)
-        const paramNames = [...new Set([...fnNames, 'event', 'target', 'self'])]
+        const paramNames = [...new Set([...fnNames, 'event', 'target', 'self', '__tbImport'])]
         const bare = flattenObjects(page.objects)
           .map((o) => o.name)
-          .filter((n) => /^[A-Za-z_$][\w$]*$/.test(n) && !['page', 'controls', 'store', 'author', 'event', 'target', 'self', 'this'].includes(n) && !paramNames.includes(n))
+          .filter((n) => /^[A-Za-z_$][\w$]*$/.test(n) && !['page', 'controls', 'store', 'author', 'event', 'target', 'self', 'this', '__tbImport'].includes(n) && !paramNames.includes(n))
         const shortNames = bare.length ? `const { ${bare.join(', ')} } = controls;` : ''
         const factory = new Function(
           'api',
           ...paramNames,
-          `"use strict";\nconst { page, controls, store, author } = api;\nreturn (async () => {\n${shortNames}\n${script}\n})();`,
+          `"use strict";\nconst { page, controls, store, author } = api;\nreturn (async () => {\n${shortNames}\n${rewriteLibImports(script)}\n})();`,
         )
         const handler = (e: Event): void => {
           const args: unknown[] = [api]
           for (const p of paramNames) {
             if (p === 'event') args.push(e)
             else if (p === 'target' || p === 'self') args.push(ctl)
+            else if (p === '__tbImport') args.push(toolbackImport)
             else args.push(pageFns[p])
           }
           safeRun(onError, `${obj.name}.${eventName}`, () => {

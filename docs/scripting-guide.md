@@ -350,6 +350,119 @@ async function pageEnter() {
 
 Label text: `Hello {{handle}}` — `await` works in object scripts too.
 
+## npm libraries
+
+Scripts can import npm packages with a plain dynamic import — no configuration
+in the book:
+
+```js
+async function onPlay() {
+  const { Midi } = await import('@tonejs/midi')
+  const midi = await Midi.fromUrl('https://example.com/song.mid')
+  store.set('name', midi.header.name)
+}
+```
+
+Packages resolve through **esm.sh** by default (both in the editor preview and
+in exports), so any browser-friendly package works immediately — the exported
+book fetches it from the CDN at runtime. To make a package **offline** in
+exports, install it on toolback's library shelf:
+
+```sh
+pnpm --filter @toolback/libs add @tonejs/midi
+```
+
+and restart `pnpm dev` — shelf packages are pre-bundled to browser-ready ES
+modules and embedded into exports as inline `data:` URLs, keeping the published
+book a single self-contained file that works offline.
+
+Import results are normalized for convenience:
+
+- Bundled CommonJS packages come back with their exports available for named
+  destructuring: `const { Midi } = await import('@tonejs/midi')`.
+- Real ESM namespaces pass through: `const { nanoid } = await import('nanoid')`.
+- A package with only a default export comes back as that default:
+  `const Chart = await import('chart.js')` gives you the chart constructor.
+
+Things to know:
+
+- **`await import(...)` works in object event scripts (they are async) and
+  inside `async function`s defined in page/background scripts** — but not as a
+  top-level statement in a page or background script body (those bodies are
+  plain functions). Put the import inside a function.
+- Subpath imports (`import('lodash/fp')`) resolve to the package's own subpath
+  via esm.sh; shelf packages always serve their main entry. Version pinning
+  works too: `import('chart.js@4.4.1')`.
+- Publishing warns (status bar) for each import that is not on the shelf, since
+  those need network at runtime.
+- Packages that need Node.js (filesystem, child_process, native modules) cannot
+  work in a browser — shelf builds fail loudly for them.
+
+### Reading a package's README
+
+Package documentation assumes bundlers or old-school script tags. Translate
+like this (or use the **npm** helper button next to the script editor, which
+does it for you):
+
+| README says | toolback script |
+|---|---|
+| `import { Midi } from '@tonejs/midi'` | `const { Midi } = await import('@tonejs/midi')` |
+| `import Chart from 'chart.js'` | `const Chart = await import('chart.js')` |
+| `import * as THREE from 'three'` | `const THREE = await import('three')` |
+| `const _ = require('lodash')` | `const _ = await import('lodash')` |
+| `<script src="https://unpkg.com/…"></script>` | `const Thing = await import('…')` — use the package name, not the URL |
+
+Where imports actually resolve:
+
+- **esm.sh** is the default CDN: it serves browser-ready ES modules, converts
+  CommonJS, and resolves a package's own dependencies. This is what
+  `await import('name')` hits in previews and exports.
+- **jsDelivr** (`cdn.jsdelivr.net/npm/<pkg>@<ver>/+esm`) is an equivalent
+  alternative — but toolback standardises on esm.sh, so keep the bare package
+  name in scripts.
+- **unpkg** (and other raw-file CDNs) serve the files as published — usually
+  UMD/global builds that are **not** ES modules. Never import unpkg URLs
+  directly; import the package name and let the resolver pick a module build.
+
+### Using one library across the whole book
+
+Imports are cached per specifier — `await import('@tonejs/midi')` in ten places
+still loads the package once. Two comfortable patterns:
+
+1. **Import where you use it** (simplest):
+
+```js
+async function onPlay() {
+  const { Midi } = await import('@tonejs/midi')
+  // ...
+}
+```
+
+2. **Import once, share globally** — stash the library on `window` in the
+   background's `backgroundEnter()` hook (runs once per run), then every script
+   on every page can use it as a plain global:
+
+```js
+// background script
+async function backgroundEnter() {
+  const { Midi } = await import('@tonejs/midi')
+  window.Midi = Midi
+}
+```
+
+```js
+// any object script, any page
+async function onParse() {
+  const midi = new Midi() // window global — set up by backgroundEnter
+  // ...
+}
+```
+
+Page scripts that need the library at `pageEnter()` time can import there too —
+or just await the import in their own scope. A dedicated **book script** layer
+(one shared script above background, running once per book) is planned and will
+become the natural home for global imports.
+
 ## Groups
 
 Select several objects (shift-click, or drag a box on empty canvas) and press

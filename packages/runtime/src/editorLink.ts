@@ -3,6 +3,7 @@ import { getObjectRects, renderBackgroundView, renderBookPage } from './index'
 import { createDesignController, type DesignOutMessage } from './design'
 import { popupEscape, runBook, stopRun } from './player'
 import { startAuthorMode, stopAuthor, syncAuthorScripts } from './author'
+import { loadShelfManifest, setLibMap } from './libs'
 import type { ObjectRects } from './index'
 
 /**
@@ -148,6 +149,12 @@ export function listenForEditor(
   root: HTMLElement = document.body,
   send: CanvasMessageSender = (m) => window.parent.postMessage(m, '*'),
 ): () => void {
+  // preview parity for user-script library imports: shelf URLs, esm.sh fallback
+  // happens lazily inside __tbImport for anything not on the shelf
+  void loadShelfManifest()
+    .then(setLibMap)
+    .catch(() => setLibMap({}))
+
   const design = createDesignController((msg: DesignOutMessage) => send(msg))
 
   let wrapper: HTMLElement | null = null

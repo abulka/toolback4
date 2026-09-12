@@ -21,6 +21,17 @@ export { isAuthorObjectRef } from './author'
 export type { AuthorReplyMessage } from './editorLink'
 export type { EditorToCanvasMessage, CanvasToEditorMessage, CanvasMessageSender, ToolbackView } from './editorLink'
 export { listenForEditor, shouldToggleRun, zOrderActionOf, isDeleteSelectionKey, isUndoKey, isDuplicateKey, isGroupKey } from './editorLink'
+export {
+  scanLibImports,
+  basePackageName,
+  isBareSpecifier,
+  rewriteLibImports,
+  libUrlFor,
+  toolbackImport,
+  normalizeModule,
+  setLibMap,
+  loadShelfManifest,
+} from './libs'
 
 let stylesInjected = false
 

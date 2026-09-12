@@ -52,9 +52,26 @@
     {
       "id": "page_4d378c595",
       "name": "Page 2",
-      "script": "function pageEnter() {\n  console.log('hi from page enter')\n  button2.text = 'back to the first page'\n}\n",
+      "script": "function pageEnter() {\n  console.log('hi from page enter')\n  button2.text = 'back to the first page'\n}\n\nfunction pageEnter() {\n  console.log('page enter2 called')\n  store.set('where', page.name)\n  if (store.get('midiInfo') === undefined) store.set('midiInfo', 'nothing parsed yet — press the button')\n}\n\n// package docs say: import { Midi } from '@tonejs/midi' — in toolback the same\n// line goes inside a function, awaited. Imports resolve via esm.sh (or the shelf).\nasync function parseDemo() {\n  const { Midi } = await import('@tonejs/midi')\n  const midi = new Midi()\n  const track = midi.addTrack()\n  track.name = 'toolback demo'\n  track.addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 })\n  track.addNote({ midi: 64, time: 0.5, duration: 0.5, velocity: 0.8 })\n  const reparsed = new Midi(midi.toArray())\n  store.set('midiInfo', `tracks: ${reparsed.tracks.length}, notes: ${reparsed.tracks[0].notes.length}, second note: ${reparsed.tracks[0].notes[1].name}`)\n}\n\nasync function playDemo() {\n  const { Midi } = await import('@tonejs/midi');\n  const Tone = await import('tone');\n\n  const midi = new Midi();\n  const track = midi.addTrack();\n  track.name = 'toolback demo';\n  track.addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 });\n  track.addNote({ midi: 64, time: 0.5, duration: 0.5, velocity: 0.8 });\n\n  // --- PLAYBACK LOGIC ---\n  \n  // 1. Start the audio context (required by browsers before playing sound)\n  await Tone.start();\n\n  // 2. Create a basic synthesizer and connect it to the master output\n  const synth = new Tone.PolySynth(Tone.Synth).toDestination();\n\n  // 3. Schedule each note to play at its specified time\n  track.notes.forEach(note => {\n    synth.triggerAttackRelease(\n      note.name, \n      note.duration, \n      note.time + Tone.now(), // Offset relative to the current timeline\n      note.velocity\n    );\n  });\n}\n\nasync function parseAndDownloadDemo() {\n  const { Midi } = await import('@tonejs/midi')\n  const midi = new Midi()\n  const track = midi.addTrack()\n  track.name = 'toolback demo'\n  track.addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 })\n  track.addNote({ midi: 64, time: 0.5, duration: 0.5, velocity: 0.8 })\n  \n  // --- DOWNLOAD LOGIC ---\n  const midiArray = midi.toArray();\n  \n  // Create a blob from the binary array\n  const blob = new Blob([midiArray], { type: 'audio/midi' });\n  \n  // Generate a URL for the blob\n  const url = URL.createObjectURL(blob);\n  \n  // Create a temporary hidden anchor element to trigger the download\n  const a = document.createElement('a');\n  a.href = url;\n  a.download = 'toolback_demo.mid';\n  document.body.appendChild(a);\n  a.click();\n  \n  // Clean up\n  document.body.removeChild(a);\n  URL.revokeObjectURL(url);\n}\n",
       "backgroundId": "bg_973808d55",
       "objects": [
+        {
+          "id": "obj_a18a0b8611",
+          "name": "container1",
+          "control": "container",
+          "rects": {
+            "desktop": {
+              "x": 48,
+              "y": 456,
+              "w": 248,
+              "h": 280
+            }
+          },
+          "props": {
+            "color": "#b7ca9b"
+          },
+          "on": {}
+        },
         {
           "id": "obj_710c31c36",
           "name": "button1",
@@ -145,13 +162,13 @@
             }
           },
           "props": {
-            "text": "Button",
+            "text": "Button 3",
             "fontFamily": "mono",
             "color": "#1fad96",
             "fontSize": 28
           },
           "on": {
-            "click": "button3.color = 'red'"
+            "click": "alert('hi')"
           }
         },
         {
@@ -167,7 +184,7 @@
             }
           },
           "props": {
-            "text": "Button",
+            "text": "turn above button red",
             "fontFamily": "mono",
             "color": "teal"
           },
@@ -202,15 +219,55 @@
           "rects": {
             "desktop": {
               "x": 88,
-              "y": 480,
+              "y": 512,
               "w": 176,
               "h": 48
             }
           },
           "props": {
-            "text": "Button"
+            "text": "parseDemo()"
           },
-          "on": {}
+          "on": {
+            "click": "parseDemo()"
+          }
+        },
+        {
+          "id": "obj_97fc4e4710",
+          "name": "button6",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 88,
+              "y": 576,
+              "w": 176,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "playDemo()"
+          },
+          "on": {
+            "click": "playDemo()"
+          }
+        },
+        {
+          "id": "obj_889881c413",
+          "name": "button7",
+          "control": "button",
+          "rects": {
+            "desktop": {
+              "x": 64,
+              "y": 648,
+              "w": 216,
+              "h": 48
+            }
+          },
+          "props": {
+            "text": "parseAndDownloadDemo()"
+          },
+          "on": {
+            "click": "parseAndDownloadDemo()"
+          }
         },
         {
           "id": "obj_91a084a78",
@@ -269,6 +326,26 @@
           "props": {
             "text": "Label",
             "color": "green"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_89a234d812",
+          "name": "label4",
+          "control": "label",
+          "rects": {
+            "desktop": {
+              "x": 120,
+              "y": 464,
+              "w": 144,
+              "h": 40
+            }
+          },
+          "props": {
+            "text": "MIDI demos",
+            "fontSize": 15,
+            "color": "#1a8e43",
+            "fontFamily": "mono"
           },
           "on": {}
         }

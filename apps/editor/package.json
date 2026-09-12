@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/build-player.mjs && vite",
-    "build": "node scripts/build-player.mjs && vue-tsc --noEmit && vite build",
+    "dev": "node scripts/build-player.mjs && node scripts/build-libs.mjs && vite",
+    "build": "node scripts/build-player.mjs && node scripts/build-libs.mjs && vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit"
   },

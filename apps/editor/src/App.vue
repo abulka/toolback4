@@ -7,10 +7,11 @@ import { wireCanvas } from './canvasClient'
 import { startPaletteDrag } from './paletteDrag'
 import { useBookStore } from './stores/book'
 import { openBookFile, saveBookFile, saveTextFile } from './files'
-import { buildStandaloneHtml, standaloneFileName } from './publish'
+import { basePackageName, buildStandaloneHtml, libUrlMapFor, scanLibImports, standaloneFileName } from './publish'
 import PropertiesPanel from './components/PropertiesPanel.vue'
 import ScriptEditor from './components/ScriptEditor.vue'
 import HelpButton from './components/HelpButton.vue'
+import ImportHelper from './components/ImportHelper.vue'
 import PagesPanel from './components/PagesPanel.vue'
 import StoreBrowser from './components/StoreBrowser.vue'
 import BackgroundDialog from './components/BackgroundDialog.vue'
@@ -293,12 +294,47 @@ async function onRecent(e: Event): Promise<void> {
 
 const BREAKPOINTS = ['desktop', 'tablet', 'mobile'] as const
 
+/** browser-safe base64 of UTF-8 text, chunked for large payloads */
+function toDataUrl(text: string): string {
+  const bytes = new TextEncoder().encode(text)
+  let bin = ''
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return `data:text/javascript;base64,${btoa(bin)}`
+}
+
 async function onPublish(): Promise<void> {
   try {
     const player = await fetch('/toolback-player.js').then((r) => r.text())
-    const html = buildStandaloneHtml(store.book, player)
+    const specifiers = scanLibImports(store.book)
+    const available = new Map<string, string>()
+    if (specifiers.length > 0) {
+      const shelfRes = await fetch('/libs/importmap.json')
+      const shelf = shelfRes.ok
+        ? ((await shelfRes.json()) as { imports: Record<string, string> })
+        : { imports: {} }
+      for (const spec of specifiers) {
+        const name = basePackageName(spec)
+        const url = shelf.imports[name]
+        if (!url || available.has(name)) continue
+        available.set(
+          name,
+          toDataUrl(
+            await fetch(url).then((r) => {
+              if (!r.ok) throw new Error(`${url} missing — run "pnpm dev" to rebuild the library shelf`)
+              return r.text()
+            }),
+          ),
+        )
+      }
+    }
+    const { libs, warnings } = libUrlMapFor(specifiers, available)
+    const html = buildStandaloneHtml(store.book, player, libs)
     const result = await saveTextFile(standaloneFileName(store.book), html, 'text/html')
-    store.fileNote = result === 'saved' ? 'published to file' : 'published (downloaded)'
+    const base = result === 'saved' ? 'published to file' : 'published (downloaded)'
+    store.fileNote = warnings.length ? `${base}; ${warnings.join(' ')}` : base
   } catch (err) {
     if (!(err instanceof DOMException && err.name === 'AbortError')) {
       store.error = `Publish failed: ${String(err)}`
@@ -547,6 +583,7 @@ function startPaletteSplitDrag(e: PointerEvent): void {
           <div class="row">
             <h2 class="tab-head">Page script</h2>
             <HelpButton anchor="page-script" />
+            <ImportHelper />
           </div>
           <p class="hint mono-hint">
             Shared functions + <code>pageEnter()</code>. Object scripts can call these directly.
@@ -590,6 +627,7 @@ function startPaletteSplitDrag(e: PointerEvent): void {
           <div class="row">
             <h2 class="tab-head">Background script</h2>
             <HelpButton anchor="background-scripts" />
+            <ImportHelper />
           </div>
           <p class="hint mono-hint">
             Shared functions + <code>backgroundEnter()</code>. Pages on this background can call these.

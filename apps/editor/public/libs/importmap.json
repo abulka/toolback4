@@ -1,0 +1,5 @@
+{
+  "imports": {
+    "@tonejs/midi": "/libs/@tonejs/midi.js"
+  }
+}

@@ -315,6 +315,20 @@ match what will resolve at runtime:
 - Publish: `player-entry.ts` self-plays an embedded, `<`-escaped book;
   esbuild bundles it to `public/toolback-player.js`; `buildStandaloneHtml`
   wraps runtime + book into one HTML file.
+- Libraries: user scripts write plain `import('name')`; every compile site
+  (`player.ts` background/page/object-event factories, `author.ts`) rewrites
+  bare specifiers to the injected `__tbImport` param (see `runtime/src/libs.ts`,
+  `rewriteLibImports`). The resolver consults `window.__TOOLBACK_LIBS__`
+  (`{specifier: url}`) — exports embed shelf libraries as base64 `data:` URLs,
+  previews set the map from `public/libs/importmap.json` (the shelf manifest
+  built by `scripts/build-libs.mjs`) — and falls back to `https://esm.sh/<spec>`
+  for anything else, then normalizes CJS interop (`{default: exports}` unwrap).
+  `scanLibImports` (same regex as the rewrite) finds bare specifiers at publish
+  time; `libUrlMapFor` maps shelf hits to data: URLs and emits
+  `<script>window.__TOOLBACK_LIBS__=…</script>` between the book JSON and the
+  player. No import map, no modulepreload — imports run through the same
+  `new Function` bodies as every other script. Base64 payloads cannot contain
+  `<`, so the `</script>` breakout escaping never applies to library code.
 
 ## 10. Invariants to preserve when extending
 
@@ -330,3 +344,11 @@ match what will resolve at runtime:
 6. The examples test (`examples/examples.test.ts`) runs every page of every
    example book and fails on any script error — new runtime features should be
    exercised by an example.
+7. Library imports: `rewriteLibImports` and `scanLibImports` must stay in sync
+   (same bare-specifier regex); `__tbImport` is a reserved name
+   (`NAME_RESERVED` + the author-mode lists) and must stay in every compile
+   site's param list; `window.__TOOLBACK_LIBS__` must be set before user
+   scripts compile — exports embed it as a script tag before the player, the
+   canvas sets it at boot from `public/libs/importmap.json`; shelf output must
+   always be ESM — `build-libs.mjs` emits `/libs/<name>.js` and both publish
+   and preview consume that layout.

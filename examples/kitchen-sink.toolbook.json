@@ -98,6 +98,17 @@
         }
 ,
         {
+          "id": "obj_ks_mnGo7",
+          "name": "mnGo7",
+          "control": "button",
+          "rects": {"desktop":{"x":96,"y":608,"w":380,"h":52}},
+          "props": {"text":"npm libraries"},
+          "on": {
+            "click": "page.go('Npm')"
+          }
+        }
+,
+        {
           "id": "obj_ks_mnCard",
           "name": "mnCard",
           "control": "card",
@@ -128,7 +139,7 @@
           "id": "obj_ks_mnTip",
           "name": "mnTip",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 624, "w": 460, "h": 80 } },
+          "rects": { "desktop": { "x": 48, "y": 672, "w": 460, "h": 80 } },
           "props": { "text": "Tip: the ↶ ↷ buttons (or ⌘Z) undo any design edit — even grouping or deleting. Try it as you explore.", "fontSize": 14 },
           "on": {}
         }
@@ -884,6 +895,72 @@
           "control": "button",
           "rects": { "desktop": { "x": 1080, "y": 32, "w": 152, "h": 48 } },
           "props": { "text": "← Menu" },
+          "on": {
+            "click": "page.go('Home')"
+          }
+        }
+
+      ]
+    },
+    {
+      "id": "page_ks_npm",
+      "name": "Npm",
+      "script": "function pageEnter() {\n  store.set('where', page.name)\n  if (store.get('midiInfo') === undefined) store.set('midiInfo', 'nothing parsed yet — press the button')\n}\n\n// package docs say: import { Midi } from '@tonejs/midi' — in toolback the same\n// line goes inside a function, awaited. Imports resolve via esm.sh (or the shelf).\nasync function parseDemo() {\n  const { Midi } = await import('@tonejs/midi')\n  const midi = new Midi()\n  const track = midi.addTrack()\n  track.name = 'toolback demo'\n  track.addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 })\n  track.addNote({ midi: 64, time: 0.5, duration: 0.5, velocity: 0.8 })\n  const reparsed = new Midi(midi.toArray())\n  store.set('midiInfo', `tracks: ${reparsed.tracks.length}, notes: ${reparsed.tracks[0].notes.length}, second note: ${reparsed.tracks[0].notes[1].name}`)\n}",
+      "background": "#f6f7fb",
+      "objects": [
+        {
+          "id": "obj_ks_npTitle",
+          "name": "npTitle",
+          "control": "label",
+          "rects": {"desktop":{"x":48,"y":32,"w":980,"h":48}},
+          "props": {"text":"npm libraries — any package, one import line","fontSize":22},
+          "on": {}
+        }
+,
+        {
+          "id": "obj_ks_npHint",
+          "name": "npHint",
+          "control": "label",
+          "rects": {"desktop":{"x":48,"y":96,"w":1180,"h":96}},
+          "props": {"text":"Any npm package works in scripts. Package docs say import { Midi } from '@tonejs/midi' — in toolback the same line goes inside a function, awaited: imports resolve via esm.sh in previews and exports, and packages installed on the toolback library shelf are embedded offline instead. Press the button — its script builds a two-note MIDI, serializes it, and re-parses it, no external files needed.","fontSize":14},
+          "on": {}
+        }
+,
+        {
+          "id": "obj_ks_npBuild",
+          "name": "npBuild",
+          "control": "button",
+          "rects": {"desktop":{"x":96,"y":216,"w":380,"h":52}},
+          "props": {"text":"Build & parse a MIDI"},
+          "on": {
+            "click": "parseDemo()"
+          }
+        }
+,
+        {
+          "id": "obj_ks_npResult",
+          "name": "npResult",
+          "control": "label",
+          "rects": {"desktop":{"x":96,"y":288,"w":1000,"h":48}},
+          "props": {"text":"Result: {{midiInfo}}","fontSize":16},
+          "on": {}
+        }
+,
+        {
+          "id": "obj_ks_npTip",
+          "name": "npTip",
+          "control": "label",
+          "rects": {"desktop":{"x":48,"y":688,"w":1180,"h":80}},
+          "props": {"text":"Tips: object event scripts are async, so await import(...) works directly in them; in page/background scripts put the import inside a function like parseDemo above. Repeat imports are cheap — modules are cached and shared. The editor's npm helper (toolbar) converts README install snippets into toolback import lines.","fontSize":13},
+          "on": {}
+        }
+,
+        {
+          "id": "obj_ks_mnBack7",
+          "name": "mnBack7",
+          "control": "button",
+          "rects": {"desktop":{"x":1080,"y":32,"w":152,"h":48}},
+          "props": {"text":"← Menu"},
           "on": {
             "click": "page.go('Home')"
           }
