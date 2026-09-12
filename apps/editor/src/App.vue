@@ -651,6 +651,7 @@ function startPaletteSplitDrag(e: PointerEvent): void {
           </p>
           <ScriptEditor
             editor-class="page-script"
+            title="Page script"
             :model-value="store.activePage.script"
             height="190px"
             @update:model-value="store.setPageScript"
@@ -696,6 +697,7 @@ function startPaletteSplitDrag(e: PointerEvent): void {
           <ScriptEditor
             editor-class="background-script"
             kind="background"
+            title="Background script"
             :model-value="store.activeBackground?.script ?? ''"
             height="190px"
             @update:model-value="store.setBackgroundScript"

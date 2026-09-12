@@ -1,11 +1,11 @@
 import { parseBook, type Book } from '@toolback/format'
 
-interface Writable {
+export interface Writable {
   write(data: unknown): Promise<void>
   close(): Promise<void>
 }
 
-interface PickerHandle {
+export interface PickerHandle {
   getFile(): Promise<File>
   createWritable(): Promise<Writable>
 }

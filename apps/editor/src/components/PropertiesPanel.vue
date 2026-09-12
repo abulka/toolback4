@@ -259,7 +259,11 @@ async function copyJson(): Promise<void> {
       </select>
     </div>
     <ScriptEditor
+      :key="sel ? `${sel.id}:${currentEvent}` : 'none'"
       editor-class="obj-script"
+      kind="object"
+      :title="sel ? `Script · ${sel.name} · ${currentEvent}` : 'Object script'"
+      :link-key="sel ? `obj:${sel.id}:${currentEvent}` : ''"
       :model-value="eventScript"
       height="150px"
       @update:model-value="onScript"

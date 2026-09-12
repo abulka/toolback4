@@ -72,6 +72,15 @@ export interface Autosave {
   at: number
 }
 
+/** generic kv helpers — used by other modules for small structured-clone state */
+export function kvGet<T>(key: string): Promise<T | undefined> {
+  return idbGet<T>(key)
+}
+
+export function kvSet(key: string, value: unknown): Promise<void> {
+  return idbSet(key, value)
+}
+
 export async function loadAutosave(): Promise<Autosave | undefined> {
   return idbGet<Autosave>('autosave')
 }

@@ -171,11 +171,37 @@ export interface EditorIntellisenseContext {
   bareNames: string[]
   /** store keys found across the book, for {{ }} and store.get help */
   storeKeys: string[]
+  /** user function names callable from this script: the page's own shared
+   *  functions + its background's (both are injected into the runtime scope) */
+  functionNames: string[]
   /** which script kind the completions are for (drives lifecycle snippets) */
   scriptKind?: 'page' | 'background' | 'object'
 }
 
 const NAME_RE = /^[A-Za-z_$][\w$]*$/
+
+/** reserved names that can never be offered as callable user functions */
+const FUNCTION_RESERVED = new Set([
+  'page',
+  'controls',
+  'store',
+  'event',
+  'target',
+  'self',
+  'this',
+  'forward',
+  '__tbImport',
+  'undefined',
+  'window',
+  'document',
+  'console',
+  'fetch',
+])
+
+/** valid identifiers that don't collide with the runtime API */
+function callableFunctionNames(names: Iterable<string>): string[] {
+  return [...new Set(names)].filter((n) => NAME_RE.test(n) && !FUNCTION_RESERVED.has(n))
+}
 
 /**
  * API lib for a background script: the base API (store/page/controls) plus
@@ -193,9 +219,16 @@ export function buildBackgroundApiLib(bg: { script?: string } | null): string {
 }
 
 export function buildBackgroundEditorContext(
+  bg: { script?: string } | null,
   storeKeys: string[],
 ): EditorIntellisenseContext {
-  return { objectNames: [], bareNames: [], storeKeys, scriptKind: 'background' }
+  return {
+    objectNames: [],
+    bareNames: [],
+    storeKeys,
+    functionNames: callableFunctionNames(extractFunctionNames(bg?.script ?? '')),
+    scriptKind: 'background',
+  }
 }
 export function buildEditorContext(
   book: Book,
@@ -210,6 +243,9 @@ export function buildEditorContext(
     objectNames,
     bareNames: shortNamesFor(objectNames, [...fns, ...bgFns]),
     storeKeys,
+    // a page script can call its own helpers AND its background's shared
+    // functions — both are offered as callable-name completions
+    functionNames: callableFunctionNames([...fns, ...bgFns]),
     scriptKind: 'page',
   }
 }

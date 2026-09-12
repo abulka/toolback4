@@ -324,6 +324,46 @@ match what will resolve at runtime:
 - Worker completions are disabled; one curated provider supplies everything
   (Monaco silently discards suggestions whose range covers non-word
   characters — ranges are caret-anchored with `additionalTextEdits`).
+- Diagnostics run with explicit compiler options on `javascriptDefaults`:
+  `module: ESNext` + `moduleResolution: node` make `await import('pkg')` legal
+  (no TS1323) and bare specifiers resolve like a bundler. The unresolved-module
+  diagnostics TS2307/TS2792 and the in-memory-URL noise TS80001 are ignored —
+  library imports (shelf / esm.sh) legitimately have no installed types.
+- The completion **context** is per editor instance, keyed by the editor's
+  model URI (`updateApiLib` registers `EditorIntellisenseContext` per URI, and
+  the provider looks it up from the model being completed). Page, background
+  and object script editors therefore never share stale state, even though
+  they may be mounted at the same time.
+- User-defined functions from the page and its background scripts are offered
+  as top-level completions (`ctx.functionNames`): the same `extractFunctionNames`
+  that harvests them at runtime. A page's own helpers and its background's
+  shared functions are both callable from any object script, so they all appear.
+- Popout: a script editor's ⤢ button renders the same content in a
+  draggable/resizable window (`EditorWindow.vue`). The popout **shares the
+  parent editor's Monaco `model`** (`sharedModel` prop) rather than creating a
+  second one — critical for diagnostics: two models with the same function
+  definitions would otherwise produce phantom TS2393 "Duplicate function
+  implementation" squiggles. The shared model keeps one diagnosis for both
+  views, and the embedded editor neither registers a lib nor disposes the
+  model (the owner does). Window z-order uses a module-level counter (a
+  `<script setup>` top-level `let` would be per-instance and never stack).
+- VS Code link: `scriptLink.ts` writes the script (plus a short comment
+  header marking the marker boundary) to a `.ts` file via the File System
+  Access API ("⇄ file" button). It deliberately does **not** dump the generated
+  toolback API into the file — the export is the author's script, not a
+  library reference; toolback-style autocomplete is a built-in-editor feature.
+  Linking to an **empty** file never clobbers the editor's content (the editor
+  is the source of truth), and the current script is written out immediately so
+  the file is never left blank. A poll re-reads the file; content differing
+  from the last toolback write is pulled back into the book. Echo-loop safety
+  comes from tracking what the file *actually* contains (`lastWritten` only
+  advances after a write lands, never before), and empty files never trigger a
+  pull. **The poll never races our own edits:** a `dirty` flag is set from the
+  first keystroke until the write completes, and an 800 ms grace window follows
+  every write (the OS can serve stale bytes), so the poll cannot mistake our
+  in-flight/stale write for an external save and yank the editor back. Writes
+  are serialized on a promise chain and always flush the *latest* draft, so
+  rapid typing collapses into one write of the final text.
 
 ## 9. Persistence & publish
 
@@ -353,7 +393,9 @@ match what will resolve at runtime:
 2. Every content mutation goes through the store and ends in `sync()`.
 3. New script variables must be added to: the runtime param list + dispatch
    args, `NAME_RESERVED` (both bare-name sources), and the curated completions
-   (not the TS lib if the name collides with a DOM global).
+   (not the TS lib if the name collides with a DOM global). Pages/backgrounds
+   should also be excluded from `FUNCTION_RESERVED` in `monacoApiLib.ts` if
+   they become callable user functions.
 4. Group handlers must be reached through the **owner-chain dispatch**, never
    by attaching listeners to group wrappers (double-fire risk).
 5. `{{…}}` template grammar and `collectStoreKeys` must stay in sync about

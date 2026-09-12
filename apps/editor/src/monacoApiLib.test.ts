@@ -87,4 +87,23 @@ describe('buildApiLib', () => {
     expect(ctx.bareNames).toEqual(['ok'])
     expect(ctx.storeKeys).toEqual(['score', 'max'])
   })
+
+  it('offers user-defined page functions as callable completions', () => {
+    const b = book([
+      {
+        script: 'function pageEnter() {}\nfunction go() {}\nfunction myHelper(a, b) { return a + b }',
+        objects: ['go', 'ok'],
+      },
+    ])
+    const ctx = buildEditorContext(b, 0, [])
+    // the page's own shared functions are callable from object scripts
+    expect(ctx.functionNames).toContain('pageEnter')
+    expect(ctx.functionNames).toContain('go')
+    expect(ctx.functionNames).toContain('myHelper')
+    // API-reserved identifiers are never offered as user functions
+    expect(ctx.functionNames).not.toContain('store')
+    // bare object names that collide with a page function keep their function
+    // meaning, so the colliding name is NOT a bare object completion
+    expect(ctx.bareNames).not.toContain('go')
+  })
 })

@@ -7,6 +7,12 @@ you can use inside a script, plus recipes you can copy straight into your book.
 dispatch chain, the editor↔canvas protocol — see
 [runtime-internals.md](./runtime-internals.md).)
 
+> **Plain JavaScript means no type annotations.** `const numbers: number[] = []` is
+> TypeScript and won't run — toolback executes scripts as JavaScript, so write
+> `const numbers = []`. The editor flags any TS annotation with a red squiggle
+> ("Type annotations can only be used in TypeScript files") before you hit Run.
+> The on-disk link file is also `.js`, so VS Code treats it the same way.
+
 ## Where scripts live
 
 There are two places a script can live:
@@ -552,7 +558,8 @@ The script editors help as you type:
 
 - **Ctrl+Space** opens a short, curated list — *only* toolback things: your
   objects (first), the API (`store`, `page`, `controls`, `event`, `target`,
-  `self`), and ready-made templates. No thousands of irrelevant browser
+  `self`), your page and background **functions** (callable by name from any
+  object script), and ready-made templates. No thousands of irrelevant browser
   globals. Filter by typing; **Tab** (or Enter/click) inserts.
 - **Typing `.` after an object** lists that object's properties — `button2.`
   offers `text`, `value`, `visible`, `enabled`, `x`, `y`, `width`, `height`,
@@ -568,6 +575,35 @@ The script editors help as you type:
 - **Red squiggles** underline syntax errors (like a stray `}`) before you even
   press Run. A squiggle is a hint — you can still run the page, and any error
   will also appear in the status bar when it actually happens.
+
+### Bigger editing: spacious script windows
+
+Every script editor has two small buttons above it:
+
+- **⤢** opens the same script in a **resizable, draggable window** — drag by
+  the title bar, resize from the bottom-right corner. Edits stay in sync with
+  the in-panel editor live. Size and position are remembered per editor.
+- **⇄ file** links the script to a real `.js` file on disk, for editing in
+  **VS Code** (or any editor). Saves flow two ways:
+
+  - click **⇄ file**, pick where to save the `.js` file; the file is written
+    immediately with **just your script** (plus a short comment marking the
+    sync boundary) — no generated API dump, never left blank
+  - type in toolback → the file updates; save in VS Code → toolback updates
+    (polls the file every second or so)
+  - linking to an empty file never wipes the script already in the editor —
+    the editor's content is the source of truth until the file says otherwise
+  - the linked file shows as a **⇄ name** chip with a **✕** next to it — click
+    **✕** to unlink (the file itself stays on disk: the browser won't let a
+    web app delete a file you picked, so remove it manually if you want it
+    gone). Links survive reloads (per script, stored in the browser) until
+    you unlink.
+  - **If the file disappears from disk** (deleted or moved while linked),
+    toolback notices on the next poll, unlinks itself, and shows a note
+    ("`name` disappeared from disk — unlinked…") — no scary console errors.
+
+  The comment header is stripped whenever toolback reads the file back, so
+  only your script matters on the toolback side.
 
 ## Debugging
 

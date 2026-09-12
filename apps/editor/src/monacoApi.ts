@@ -3,7 +3,16 @@ import type { EditorIntellisenseContext } from './monacoApiLib'
 
 let registered = false
 let libDisposable: Monaco.IDisposable | null = null
-let ctx: EditorIntellisenseContext = { objectNames: [], bareNames: [], storeKeys: [] }
+/** per-editor completion contexts, keyed by the editor's model URI. The
+ *  completion provider looks up the context of the model it is providing for,
+ *  so the page / background / object script editors never clobber each other. */
+const contexts = new Map<string, EditorIntellisenseContext>()
+const EMPTY_CTX: EditorIntellisenseContext = {
+  objectNames: [],
+  bareNames: [],
+  storeKeys: [],
+  functionNames: [],
+}
 
 export interface SnippetSpec {
   label: string
@@ -136,6 +145,8 @@ function buildProvider(monaco: typeof Monaco): Monaco.languages.CompletionItemPr
     model: Monaco.editor.ITextModel,
     position: Monaco.Position,
   ): Monaco.languages.CompletionList {
+    // per-editor context (the page/background/object each register their own)
+    const ctx = contexts.get(model.uri.toString()) ?? EMPTY_CTX
     const before = model.getValueInRange({
       startLineNumber: position.lineNumber,
       startColumn: 1,
@@ -260,6 +271,19 @@ function buildProvider(monaco: typeof Monaco): Monaco.languages.CompletionItemPr
         range,
       })
     }
+    // shared functions from the page/background scripts — callable by name
+    for (const n of ctx.functionNames) {
+      if (ctx.bareNames.includes(n)) continue
+      suggestions.push({
+        label: n,
+        kind: K.Function,
+        detail: `shared function from your script — call it directly`,
+        insertText: n,
+        insertTextRules: undefined,
+        sortText: `1${n}`,
+        range,
+      })
+    }
     for (const [api, detail] of [
       ['store', 'shared key/value store (get/set)'],
       ['page', 'page API (name, names, go)'],
@@ -337,28 +361,50 @@ export function registerToolbackIntellisense(monaco: typeof Monaco): void {
     signatureHelp: false,
     codeActions: false,
   })
+  // Compiler options matter for what the red squiggles say:
+  // - `module: ESNext` makes `await import('pkg')` legal (no TS1323 "Dynamic
+  //   imports are only supported when '--module' …")
+  // - node-style resolution lets bare specifiers resolve like a bundler would
+  monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+    module: monaco.languages.typescript.ModuleKind.ESNext,
+    moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+    allowJs: true,
+    allowSyntheticDefaultImports: true,
+    esModuleInterop: true,
+  })
   ts.javascriptDefaults.setDiagnosticsOptions({
     noSemanticValidation: false,
     noSyntaxValidation: false,
-    diagnosticCodesToIgnore: [80001, 7044, 7043],
+    // 80001: "Cannot find module '/@fs/…'" noise from our in-memory URIs
+    // 2307 / 2792: unresolved bare-specifier imports (library shelf / esm.sh
+    //   resolve these at runtime — a red squiggle here is just noise)
+    diagnosticCodesToIgnore: [80001, 2307, 2792, 7044, 7043],
   })
 
   monaco.languages.registerCompletionItemProvider('javascript', buildProvider(monaco))
 }
 
 /**
- * Replace the generated toolback API lib + completion context
- * (stable URI → clean swap). Call whenever the book changes.
+ * Replace the generated toolback API lib + completion context for one script
+ * editor. `uri` is the editor's model URI — each editor (page script, object
+ * script, background script, popouts) registers its own context, and the
+ * completion provider serves each model its own list.
  */
 export function updateApiLib(
   monaco: typeof Monaco,
+  uri: string,
   lib: string,
   context: EditorIntellisenseContext,
 ): void {
-  ctx = context
+  contexts.set(uri, context)
   libDisposable?.dispose()
   libDisposable = monaco.languages.typescript.javascriptDefaults.addExtraLib(
     lib,
     'inmemory://toolback/api.d.ts',
   )
+}
+
+/** drop a script editor's context when it unmounts (keeps the map lean) */
+export function releaseApiLib(uri: string): void {
+  contexts.delete(uri)
 }
