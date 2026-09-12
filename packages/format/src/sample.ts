@@ -11,6 +11,7 @@ export function sampleBook(): Book {
       mobile: { width: 390, height: 844 },
     },
     backgrounds: [bg],
+    store: [],
     pages: [
       {
         id: newId('page'),

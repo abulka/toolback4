@@ -1,5 +1,11 @@
 import type { Book, Breakpoint, ControlKind, Rect } from '@toolback/format'
-import { getObjectRects, renderBackgroundView, renderBookPage } from './index'
+import {
+  createStore,
+  getObjectRects,
+  renderBackgroundView,
+  renderBookPage,
+  renderDynamicText,
+} from './index'
 import { createDesignController, type DesignOutMessage } from './design'
 import { popupEscape, runBook, stopRun } from './player'
 import { startAuthorMode, stopAuthor, syncAuthorScripts } from './author'
@@ -37,7 +43,7 @@ export type CanvasToEditorMessage =
   | { type: 'toolback:scriptError'; message: string }
   | { type: 'toolback:error'; message: string }
   | { type: 'toolback:runToggle' }
-  | { type: 'toolback:store'; entries: Array<[string, string]> }
+  | { type: 'toolback:store'; entries: Array<[string, unknown]> }
   | { type: 'toolback:popups'; open: string[] }
   | { type: 'toolback:bgClick' }
   | { type: 'toolback:authorCall'; id: number; op: string; args: unknown }
@@ -123,6 +129,30 @@ function storeValueLabel(v: unknown): string {
   } catch {
     return String(v)
   }
+}
+
+/**
+ * Store values cross postMessage as structured clones — functions (and other
+ * non-cloneables) can't travel that way, so they arrive as a label sentinel.
+ * Usable values (strings/numbers/booleans/null/plain data) are sent raw so
+ * the editor can offer an exact "copy to design".
+ */
+export function serializeStoreValue(v: unknown): unknown {
+  if (typeof v === 'function') return { ['__tbLabel']: storeValueLabel(v) }
+  try {
+    structuredClone(v)
+    return v
+  } catch {
+    return { ['__tbLabel']: storeValueLabel(v) }
+  }
+}
+
+export function isStoreLabelSentinel(v: unknown): v is { __tbLabel: string } {
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    typeof (v as { __tbLabel?: unknown }).__tbLabel === 'string'
+  )
 }
 
 /**
@@ -268,6 +298,16 @@ export function listenForEditor(
           renderBookPage(data.book, view.index, holder!, data.breakpoint ?? 'desktop')
         }
         const pageRoot = holder!.querySelector<HTMLElement>('.tb-page')
+        // design-time preview: {{key}} labels resolve against the book's
+        // stored values, so the canvas shows what a run will seed (unset keys
+        // render empty, exactly like at run time)
+        if (pageRoot) {
+          const page =
+            view.kind === 'background'
+              ? { objects: data.book.backgrounds.find((b) => b.id === view.id)?.objects ?? [] }
+              : (data.book.pages[view.index] ?? data.book.pages[0]!)
+          renderDynamicText(pageRoot, page, createStore(data.book.store ?? []))
+        }
         send({ type: 'toolback:rects', rects: pageRoot ? getObjectRects(pageRoot) : {} })
         design.setEnabled(true)
         design.onRendered(data.selection ?? [])
@@ -291,7 +331,7 @@ export function listenForEditor(
         const sendStore = (): void => {
           send({
             type: 'toolback:store',
-            entries: handle.store.snapshot().map(([k, v]) => [k, storeValueLabel(v)]),
+            entries: handle.store.snapshot().map(([k, v]) => [k, serializeStoreValue(v)]),
           })
         }
         sendStore()

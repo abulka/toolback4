@@ -12,6 +12,7 @@ export {
   createStore,
   extractFunctionNames,
   shortNamesFor,
+  renderDynamicText,
   popupEscape,
 } from './player'
 export type { ToolbackStore, ControlApi, RunHandle, PopupHandle, PopupOptions } from './player'
@@ -20,7 +21,7 @@ export type { AuthorHandle, AuthorCaller, AuthorOp, AuthorObject, AuthorObjectRe
 export { isAuthorObjectRef } from './author'
 export type { AuthorReplyMessage } from './editorLink'
 export type { EditorToCanvasMessage, CanvasToEditorMessage, CanvasMessageSender, ToolbackView } from './editorLink'
-export { listenForEditor, shouldToggleRun, zOrderActionOf, isDeleteSelectionKey, isUndoKey, isDuplicateKey, isGroupKey } from './editorLink'
+export { listenForEditor, shouldToggleRun, zOrderActionOf, isDeleteSelectionKey, isUndoKey, isDuplicateKey, isGroupKey, serializeStoreValue, isStoreLabelSentinel } from './editorLink'
 export {
   scanLibImports,
   basePackageName,

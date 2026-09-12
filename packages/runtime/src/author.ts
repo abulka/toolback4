@@ -4,6 +4,7 @@ import { renderBookPage } from './index'
 import { rewriteLibImports, toolbackImport } from './libs'
 import {
   controlWrapper,
+  createStore,
   extractFunctionNames,
   makeControlApi,
   wireDynamicText,
@@ -230,22 +231,9 @@ export function startAuthorMode(
     window.addEventListener('pointerup', up)
   })
 
-  const store = ((): ToolbackStore => {
-    const data = new Map<string, unknown>()
-    const subs = new Set<() => void>()
-    return {
-      get: (key) => data.get(key),
-      set: (key, value) => {
-        data.set(key, value)
-        for (const fn of subs) fn()
-      },
-      snapshot: () => Array.from(data.entries()),
-      subscribe: (fn) => {
-        subs.add(fn)
-        return () => subs.delete(fn)
-      },
-    }
-  })()
+  // the plugin's session store starts from the book's design-time values,
+  // just like run mode (hot-reload resets to the same seed)
+  const store = createStore(book.store ?? [])
 
   // geometry: the plugin page renders like any page (its background decides
   // the size — a 320×240 background makes a compact plugin window)

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createGroup, createObject, type Book, type PageObject } from '@toolback/format'
+import { renderBookPage, renderDynamicText } from './index'
 import { createStore, extractFunctionNames, runBook, stopRun } from './player'
 
 const BG = { id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', objects: [] }
@@ -15,6 +16,84 @@ describe('store', () => {
       ['a', true],
       ['b', 'two'],
     ])
+  })
+
+  it('seeds from initial entries (last occurrence wins, like a Map)', () => {
+    const store = createStore([
+      ['score', 5],
+      ['name', 'andy'],
+      ['score', 9],
+    ])
+    expect(store.get('score')).toBe(9)
+    expect(store.get('name')).toBe('andy')
+    expect(store.snapshot()).toEqual([
+      ['score', 9],
+      ['name', 'andy'],
+    ])
+  })
+})
+
+describe('design-time store', () => {
+  it('runBook seeds the run store from book.store and labels render the seeded values', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const book = makeBook({
+      objects: [{ name: 'out', control: 'label', text: 'Score: {{score}} / {{missing}}' }],
+    })
+    book.store = [
+      ['score', 3],
+      ['title', 'Quiz'],
+    ]
+    const handle = runBook(book, root, 'desktop')
+    expect(handle.store.get('score')).toBe(3)
+    expect(handle.store.get('title')).toBe('Quiz')
+    // seeded keys render; unset keys still render empty
+    expect(root.querySelector('.tb-label')?.textContent).toBe('Score: 3 / ')
+    handle.stop()
+    root.remove()
+  })
+
+  it('run mutations are ephemeral: book.store is untouched and the next run re-seeds', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const book = makeBook({
+      objects: [{ name: 'btn', control: 'button', on: { click: `store.set('score', 99)` } }],
+    })
+    book.store = [['score', 1]]
+    const first = runBook(book, root, 'desktop')
+    root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
+    expect(first.store.get('score')).toBe(99)
+    // the book's design-time store is untouched by running
+    expect(book.store).toEqual([['score', 1]])
+    const second = runBook(book, root, 'desktop')
+    expect(second.store.get('score')).toBe(1)
+    second.stop()
+    root.remove()
+  })
+
+  it("renderDynamicText resolves {{key}} and {{self.name}} without subscribing (design preview)", () => {
+    const pageRoot = document.createElement('div')
+    document.body.appendChild(pageRoot)
+    const book = makeBook({
+      objects: [
+        { name: 'out', control: 'label', text: 'Score: {{score}} name={{self.name}}' },
+        { name: 'plain', control: 'label', text: 'no templates here' },
+      ],
+    })
+    const page = book.pages[0]!
+    renderBookPage(book, 0, pageRoot, 'desktop')
+    renderDynamicText(
+      pageRoot.querySelector('.tb-page')!,
+      page,
+      createStore([
+        ['score', 7],
+      ]),
+    )
+    const labels = [...pageRoot.querySelectorAll('.tb-label')].map((el) => el.textContent)
+    expect(labels[0]).toBe('Score: 7 name=out')
+    // the store read is one-shot — a later set does not re-render
+    expect(labels[1]).toBe('no templates here')
+    pageRoot.remove()
   })
 })
 

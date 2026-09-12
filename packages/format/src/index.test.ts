@@ -39,6 +39,31 @@ describe('format', () => {
     expect(parsed).toEqual(book)
   })
 
+  it('design-time store: defaults empty, parses ordered [key, value] pairs, allows JSON values', () => {
+    const book = parseBook({ id: 'b1', title: 'x', pages: [{ id: 'p1', name: 'P', objects: [] }] })
+    expect(book.store).toEqual([])
+
+    const withStore = parseBook({
+      id: 'b1',
+      title: 'x',
+      store: [
+        ['score', 3],
+        ['name', 'andy'],
+        ['win', true],
+        ['opts', { a: 1 }],
+      ],
+      pages: [{ id: 'p1', name: 'P', objects: [] }],
+    })
+    expect(withStore.store).toEqual([
+      ['score', 3],
+      ['name', 'andy'],
+      ['win', true],
+      ['opts', { a: 1 }],
+    ])
+    // round-trips through JSON (what crosses the iframe)
+    expect(parseBook(JSON.parse(JSON.stringify(withStore))).store).toEqual(withStore.store)
+  })
+
   it('rejects an empty pages array', () => {
     const result = safeParseBook({ id: 'b1', title: 'x', pages: [] })
     expect(result.success).toBe(false)

@@ -57,4 +57,27 @@ describe('collectStoreKeys', () => {
     }
     expect(collectStoreKeys(book)).toEqual([])
   })
+
+  it('includes keys with a design-time value even before any script or template', () => {
+    const book: Book = {
+      id: 'b',
+      title: 't',
+      canvas: { desktop: { width: 10, height: 10 } },
+      backgrounds: [BG],
+      store: [
+        ['total', 0],
+        ['score', 3],
+      ],
+      pages: [
+        {
+          id: 'p1',
+          name: 'One',
+          script: "store.set('score', 1)",
+          backgroundId: 'bg1',
+          objects: [],
+        },
+      ],
+    }
+    expect(collectStoreKeys(book)).toEqual(['score', 'total'])
+  })
 })

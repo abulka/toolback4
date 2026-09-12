@@ -99,6 +99,31 @@ A tiny key/value store shared by everything on the page.
 
 Values can be any JavaScript value. Labels render them as text.
 
+**Design-time store.** The Store tab in design mode doubles as an editor for a
+book-level store: add/remove keys and set values before you ever press Run.
+Every run (and every published export) **seeds** the runtime store from those
+values, so scripts can read starting state without a `pageEnter` `store.set`.
+`{{key}}` labels resolve against these values **right in design view** — for
+example a `Score: {{score}}` label shows `Score: 0` as you type `0` into the
+Store tab.
+
+The rules:
+
+- **Design values are data, not code** — strings, numbers, `true`/`false`,
+  `null`, and JSON arrays/objects. Typing `3`, `[1,2]`, or `{"a":1}` parses;
+  anything else is stored as a string (quote `"true"` to keep it a string).
+- **Every Run starts fresh** from the design store. Mutating a value while
+  running never writes back to the book, so re-running behaves identically each
+  time.
+- To deliberately freeze a computed value for the *next* run, use the **⇓
+  button** in the Store tab while running — it copies that value into the
+  design store. (Undo isn't available while running, matching every run-mode
+  edit.)
+- Keys you type into the design store show up in the `{{` picker and script
+  completions, even before any script references them.
+- Author-mode plugins share the same seed rule: opening the plugin box starts
+  its session store from the design values.
+
 ### controls
 
 `controls.<name>` gives you every object on the page, by name.
@@ -548,9 +573,12 @@ The script editors help as you type:
 
 - Script errors appear in the editor **status bar**, tagged with where they came
   from (`button1.click: Error: …`, `page script: SyntaxError: …`).
-- The **Store tab** in the right-hand panel is a live view of the store while a
-  run is active — every `store.set()` shows up there as it happens. It clears
-  when you stop.
+- The **Store tab** in the right-hand panel is where the store lives. In
+  **design mode** it edits the book's design-time store (the values every run
+  starts from — see [store](#store)). While a **run** is active it's a live
+  view: every `store.set()` shows up as it happens (starting from the seeded
+  design values), each row's **⇓** copies that value into the design store, and
+  it clears when you stop.
 - `console.log(...)` writes to the browser devtools console — open devtools and
   pick the canvas frame's context.
 - Referencing an object that doesn't exist gives `undefined` — e.g. setting a
@@ -558,8 +586,8 @@ The script editors help as you type:
   spelling against the Objects list.
 - If you press Run and a page's `pageEnter` seems to run more than expected,
   press Stop and Run again to start a fresh session.
-- The store resets every time you press **Run**. Edits made while running re-run
-  the page, so it's a live-coding loop.
+- The store resets to its design-time values every time you press **Run**.
+  Edits made while running re-run the page, so it's a live-coding loop.
 
 ## Backgrounds
 

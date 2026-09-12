@@ -99,6 +99,17 @@ const PageSchema = z.object({
 })
 export type Page = z.infer<typeof PageSchema>
 
+/**
+ * The design-time store: the book's starting values for the run store, as
+ * ordered [key, value] pairs (order matches the runtime `snapshot()` —
+ * insertion-ordered). Values are JSON data — the book always crosses the
+ * iframe as a JSON clone, so functions/non-JSON values can't be persisted
+ * here. Every run (and published export) seeds its store from these.
+ */
+const StoreEntrySchema = z.tuple([z.string().min(1), z.unknown()])
+const StoreSchema = z.array(StoreEntrySchema).default([])
+export type StoreEntry = z.infer<typeof StoreEntrySchema>
+
 const BookSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -111,8 +122,12 @@ const BookSchema = z.object({
     .default({ desktop: { width: 1280, height: 800 } }),
   backgrounds: z.array(BackgroundSchema).default([]),
   pages: z.array(PageSchema).min(1),
+  store: StoreSchema,
 })
-export type Book = z.infer<typeof BookSchema>
+export type Book = Omit<z.infer<typeof BookSchema>, 'store'> & {
+  /** design-time store values; seeded into every run (see StoreEntrySchema) */
+  store?: StoreEntry[]
+}
 
 /**
  * Legacy upgrade: pre-background books carried the fill color on each page

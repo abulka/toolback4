@@ -58,7 +58,7 @@ export const useBookStore = defineStore('book', () => {
   const dragOverCanvas = ref(false)
   const isRunning = ref(false)
   const scriptError = ref('')
-  const storeEntries = ref<Array<[string, string]>>([])
+  const storeEntries = ref<Array<[string, unknown]>>([])
   const popupsOpen = ref<string[]>([])
   const currentPageIndex = ref(0)
   /** what the canvas is editing: a page, or a background's own objects */
@@ -689,6 +689,18 @@ export const useBookStore = defineStore('book', () => {
     sync()
   }
 
+  /**
+   * Replace the design-time store (ordered [key, value] pairs). Values are
+   * JSON data — the book crosses the iframe as a JSON clone, so nothing else
+   * can be persisted here. Undoable/redoable like any book edit and recordable
+   * active only when not running (like every other design-time edit).
+   */
+  function setDesignStore(entries: Array<[string, unknown]>): void {
+    if (!isRunning.value) record('Edit store', 'designstore')
+    book.value.store = entries
+    sync()
+  }
+
   function setPageScript(code: string): void {
     record('Edit page script', `script:page:${activePage.value.id}`)
     activePage.value.script = code
@@ -1038,6 +1050,7 @@ export const useBookStore = defineStore('book', () => {
     resetPaletteWidth,
     setEventScript,
     setPageScript,
+    setDesignStore,
     selectPage,
     editPage,
     editBackground,

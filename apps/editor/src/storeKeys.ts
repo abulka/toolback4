@@ -5,9 +5,11 @@ const TEMPLATE_RE = /\{\{\s*([\w$]+)\s*\}\}/g
 
 /**
  * All store keys referenced anywhere in the book: keys written via
- * `store.set('key', …)` in page/object scripts, plus keys already used
- * in `{{key}}` label templates. Store is shared across pages during a
- * run, so keys from every page are relevant. Group members included.
+ * `store.set('key', …)` in page/object scripts, keys already used in
+ * `{{key}}` label templates, plus keys with a design-time value in the
+ * book's store (which may predate any script or template reference). Store
+ * is shared across pages during a run, so keys from every page are relevant.
+ * Group members included.
  */
 export function collectStoreKeys(book: Book): string[] {
   const keys = new Set<string>()
@@ -24,5 +26,6 @@ export function collectStoreKeys(book: Book): string[] {
       }
     }
   }
+  for (const [key] of book.store ?? []) keys.add(key)
   return [...keys].sort()
 }

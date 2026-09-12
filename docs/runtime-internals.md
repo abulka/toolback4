@@ -31,7 +31,7 @@ JSON document (`Book`). The editor owns it; the canvas is a renderer.
 ## 2. Data model (`packages/format`)
 
 ```ts
-Book    { id, title, canvas: { desktop: {w,h}, tablet?, mobile? }, pages: Page[] }
+Book    { id, title, canvas: { desktop: {w,h}, tablet?, mobile? }, store?: [key,value][], pages: Page[] }
 Page    { id, name, script, background, objects: PageObject[] }
 PageObject {
   id, name,                       // name = unique per page; the `controls[name]` handle
@@ -82,10 +82,19 @@ put) and re-enters `runPage`. The store survives navigation; scripts do not.
 
 ### 3.2 The store
 
-`createStore()`: a `Map` plus a subscriber set. `set` writes and **notifies
-every subscriber synchronously** — that is what re-renders `{{key}}` labels
-and drives the editor's store browser. No per-key granularity; snapshots are
-insertion-ordered entries.
+`createStore(initial?)`: a `Map` (optionally pre-seeded) plus a subscriber set.
+`set` writes and **notifies every subscriber synchronously** — that is what
+re-renders `{{key}}` labels and drives the editor's store browser. No per-key
+granularity; snapshots are insertion-ordered entries.
+
+**The design-time store.** `Book.store` is an ordered array of `[key, value]`
+pairs (zod default `[]`; JSON data only — the book crosses the iframe as a JSON
+clone). `runBook` seeds its store with `book.store`, so **every run starts from
+the book's stored values** (`runBook` reads the book it already receives — no
+caller changes; published exports inherit the same seed via `player-entry.ts`).
+Run mutations never write back into the book; the editor's Store tab offers an
+explicit per-row "copy to design" for deliberately freezing a computed value.
+Author-mode (`author.ts`) sessions seed from `book.store` the same way.
 
 ### 3.3 Script compilation — one factory per script
 
@@ -198,8 +207,11 @@ Semantics (ToolBook-faithful):
   dotted member (`{{self.nme}}`) renders empty, like an unset key.
 - Substitution runs once at render and again on **every** `store.set` (the
   store subscription is torn down with the listeners).
-- Design-mode canvas shows `{{…}}` literally — templates are a run-mode
-  feature.
+- **Design mode** calls the same one-shot renderer (`renderDynamicText`,
+  exported) against a throwaway store seeded from `book.store` on every design
+  `load` — so the canvas shows the design-time values, not the literal
+  template, and unset keys still render empty exactly as at run time. Templates
+  re-resolve on every design sync (each sync re-renders the page).
 
 ## 4. The design controller (`packages/runtime/src/design.ts`)
 
@@ -263,7 +275,7 @@ iframe.
 | `toolback:commit` | kind move/resize, objects | a drag/resize finished (undoable edit) |
 | `toolback:scriptError` / `toolback:error` | message | status bar |
 | `toolback:runToggle` | — | F3/⌥3 pressed inside the canvas |
-| `toolback:store` | entries | run-mode store browser stream |
+| `toolback:store` | entries | run-mode store browser stream — cloneable values raw, functions as `{__tbLabel}` sentinels |
 | `toolback:popups` | open names | run-mode popup stack changed |
 | `toolback:authorCall` | id, op, args | plugin script called `author.<op>` (async bridge) |
 | `toolback:authorState` | active, pageName | plugin started/stopped (✕ in the box) |
@@ -290,6 +302,11 @@ IndexedDB autosave. Components never touch `book` directly.
   *pre-redo* state so undo-after-redo steps back instead of bouncing.
 - **Run mode** (`isRunning`): the same iframe re-rendered by `runBook`; edits
   made during a run mutate the book but are not recorded in history.
+- **Design-time store** (`setDesignStore`): replaces `book.store` (ordered
+  `[key, value]` pairs) through the normal `record → sync` path, so Store-tab
+  edits are undoable/redoable like any book edit (coalesced under
+  `designstore`); still applied while running (record no-ops, matching every
+  run-mode edit), which is how the ⇓ "copy to design" action works.
 
 ## 8. IntelliSense generation (`apps/editor/src/monacoApiLib.ts`)
 
@@ -340,7 +357,8 @@ match what will resolve at runtime:
 4. Group handlers must be reached through the **owner-chain dispatch**, never
    by attaching listeners to group wrappers (double-fire risk).
 5. `{{…}}` template grammar and `collectStoreKeys` must stay in sync about
-   what is a store key vs a self-binding.
+   what is a store key vs a self-binding; `collectStoreKeys` also harvests
+   keys from `book.store` so design-time keys surface in the `{{` picker.
 6. The examples test (`examples/examples.test.ts`) runs every page of every
    example book and fails on any script error — new runtime features should be
    exercised by an example.

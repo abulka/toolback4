@@ -165,4 +165,28 @@ describe('author mode (M6c)', () => {
       root.remove()
     }
   })
+
+  it('the plugin session store starts from the book design-time store', async () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const book = pluginBook()
+    book.store = [['seed', 'fromDesign']]
+    // the plugin label binds the seeded key
+    book.pages[1]!.objects[1]!.props = { text: 'seed={{seed}}' }
+    const cleanup = listenForEditor(root, () => {})
+    try {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: { type: 'toolback:authorStart', book, pageIndex: 1, breakpoint: 'desktop' },
+        }),
+      )
+      await tick()
+      const labels = [...root.querySelectorAll('.tb-author .tb-label')].map((el) => el.textContent)
+      expect(labels.join(' | ')).toContain('seed=fromDesign')
+    } finally {
+      cleanup()
+      stopAuthor()
+      root.remove()
+    }
+  })
 })

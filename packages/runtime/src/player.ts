@@ -10,8 +10,8 @@ export interface ToolbackStore {
   subscribe(fn: () => void): () => void
 }
 
-export function createStore(): ToolbackStore {
-  const data = new Map<string, unknown>()
+export function createStore(initial?: Iterable<readonly [string, unknown]>): ToolbackStore {
+  const data = new Map<string, unknown>(initial)
   const subs = new Set<() => void>()
   return {
     get: (key) => data.get(key),
@@ -199,20 +199,17 @@ export function shortNamesFor(objectNames: string[], exclude: Iterable<string>):
   return objectNames.filter((n) => IDENT_RE.test(n) && !NAME_RESERVED.has(n) && !ex.has(n))
 }
 
-export function wireDynamicText(  pageRoot: HTMLElement,
+/**
+ * One-shot `{{…}}` label resolution for a rendered page, reading through a
+ * store-like `get`. Used by the live run-time wiring (via `wireDynamicText`)
+ * and by the design-time preview, where the canvas shows the book's stored
+ * values instead of the literal template.
+ */
+export function renderDynamicText(
+  pageRoot: HTMLElement,
   page: { objects: PageObject[] },
-  store: ToolbackStore,
-  listeners: Array<() => void>,
+  store: Pick<ToolbackStore, 'get'>,
 ): void {
-  const entries: Array<{ el: HTMLElement; template: string; obj: PageObject }> = []
-  for (const obj of flattenObjects(page.objects)) {
-    const t = obj.props['text']
-    if (typeof t !== 'string' || !t.includes('{{')) continue
-    const el = controlElement(pageRoot, obj.name)
-    if (!el) continue
-    entries.push({ el, template: t, obj })
-  }
-  if (entries.length === 0) return
   const resolveDyn = (path: string, obj: PageObject): string => {
     const dot = path.indexOf('.')
     if (dot === -1) return String(store.get(path) ?? '')
@@ -222,13 +219,27 @@ export function wireDynamicText(  pageRoot: HTMLElement,
     if ((head === 'self' || head === 'this') && member === 'name') return obj.name
     return '' // unsupported member — renders empty, like an unset store key
   }
-  const render = () => {
-    for (const e of entries) {
-      e.el.textContent = e.template.replace(DYN_RE, (_, path: string) => resolveDyn(path, e.obj))
-    }
+  for (const obj of flattenObjects(page.objects)) {
+    const t = obj.props['text']
+    if (typeof t !== 'string' || !t.includes('{{')) continue
+    const el = controlElement(pageRoot, obj.name)
+    if (!el) continue
+    el.textContent = t.replace(DYN_RE, (_, path: string) => resolveDyn(path, obj))
   }
-  render()
-  listeners.push(store.subscribe(render))
+}
+
+export function wireDynamicText(
+  pageRoot: HTMLElement,
+  page: { objects: PageObject[] },
+  store: ToolbackStore,
+  listeners: Array<() => void>,
+): void {
+  const hasTemplates = flattenObjects(page.objects).some(
+    (o) => typeof o.props['text'] === 'string' && (o.props['text'] as string).includes('{{'),
+  )
+  if (!hasTemplates) return
+  renderDynamicText(pageRoot, page, store)
+  listeners.push(store.subscribe(() => renderDynamicText(pageRoot, page, store)))
 }
 
 // ---- popups (the ToolBook viewer mechanism) ----
@@ -729,7 +740,9 @@ export function runBook(
 ): RunHandle {
   stopRun()
 
-  const store = createStore()
+  // every run starts from the book's design-time store — run mutations are
+  // ephemeral and never write back into the book
+  const store = createStore(book.store ?? [])
   const baseScope: Scope = {
     idx: startPageIndex,
     root,

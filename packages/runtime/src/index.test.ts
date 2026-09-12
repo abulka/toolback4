@@ -151,8 +151,8 @@ describe('runtime', () => {
     }
 
     it('streams store entries while running and clears them on design load', () => {
-      const sent: Array<{ type: string; entries?: Array<[string, string]> }> = []
-      const send = (msg: { type: string; entries?: Array<[string, string]> }) => sent.push(msg)
+      const sent: Array<{ type: string; entries?: Array<[string, unknown]> }> = []
+      const send = (msg: { type: string; entries?: Array<[string, unknown]> }) => sent.push(msg)
       const root = document.createElement('div')
       document.body.appendChild(root)
 
@@ -161,13 +161,13 @@ describe('runtime', () => {
         window.dispatchEvent(
           new MessageEvent('message', { data: { type: 'toolback:load', book: tinyBook(), design: false } }),
         )
-        expect(sent.filter((m) => m.type === 'toolback:store').at(-1)?.entries).toContainEqual(['seed', '1'])
+        expect(sent.filter((m) => m.type === 'toolback:store').at(-1)?.entries).toContainEqual(['seed', 1])
 
         root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
         expect(sent.filter((m) => m.type === 'toolback:store').at(-1)?.entries).toEqual(
           expect.arrayContaining([
-            ['seed', '1'],
-            ['n', '5'],
+            ['seed', 1],
+            ['n', 5],
           ]),
         )
 
@@ -181,9 +181,38 @@ describe('runtime', () => {
       }
     })
 
-    it('store values render as readable labels', () => {
-      const sent: Array<{ type: string; entries?: Array<[string, string]> }> = []
-      const send = (msg: { type: string; entries?: Array<[string, string]> }) => sent.push(msg)
+    it('design loads resolve {{key}} labels against the book store (design-time preview)', () => {
+      const sent: Array<{ type: string; entries?: Array<[string, unknown]> }> = []
+      const send = (msg: { type: string; entries?: Array<[string, unknown]> }) => sent.push(msg)
+      const root = document.createElement('div')
+      document.body.appendChild(root)
+      const obj = createObject('label', 'lbl', { desktop: { x: 0, y: 0, w: 100, h: 40 } })
+      obj.props = { text: 'Score: {{score}} / {{missing}}' }
+      const book: Book = {
+        id: 'b',
+        title: 'T',
+        canvas: { desktop: { width: 400, height: 300 } },
+        backgrounds: [BG],
+        store: [['score', 3]],
+        pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [obj] }],
+      }
+
+      const cleanup = listenForEditor(root, send)
+      try {
+        window.dispatchEvent(
+          new MessageEvent('message', { data: { type: 'toolback:load', book, design: true } }),
+        )
+        const labels = [...root.querySelectorAll('.tb-label')].map((el) => el.textContent)
+        expect(labels[0]).toBe('Score: 3 / ')
+      } finally {
+        cleanup()
+        root.remove()
+      }
+    })
+
+    it('store values stream to the editor: usable values raw, functions as labels', () => {
+      const sent: Array<{ type: string; entries?: Array<[string, unknown]> }> = []
+      const send = (msg: { type: string; entries?: Array<[string, unknown]> }) => sent.push(msg)
       const root = document.createElement('div')
       document.body.appendChild(root)
       const obj = createObject('label', 'lbl', { desktop: { x: 0, y: 0, w: 100, h: 40 } })
@@ -216,11 +245,13 @@ describe('runtime', () => {
           new MessageEvent('message', { data: { type: 'toolback:load', book, design: false } }),
         )
         const entries = sent.filter((m) => m.type === 'toolback:store').at(-1)?.entries ?? []
-        expect(entries).toContainEqual(['num', '42'])
+        // cloneable values arrive verbatim (the editor can copy them to design)
+        expect(entries).toContainEqual(['num', 42])
         expect(entries).toContainEqual(['text', 'hi'])
-        expect(entries).toContainEqual(['list', '[1,2]'])
-        expect(entries).toContainEqual(['missing', 'undefined'])
-        expect(entries).toContainEqual(['fn', 'ƒ greet'])
+        expect(entries).toContainEqual(['list', [1, 2]])
+        expect(entries).toContainEqual(['missing', undefined])
+        // functions can't cross postMessage — they arrive as a label sentinel
+        expect(entries).toContainEqual(['fn', { ['__tbLabel']: 'ƒ greet' }])
       } finally {
         cleanup()
         root.remove()
