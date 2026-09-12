@@ -6,7 +6,7 @@ import { isDeleteSelectionKey, isDuplicateKey, isGroupKey, isUndoKey, shouldTogg
 import { wireCanvas } from './canvasClient'
 import { startPaletteDrag } from './paletteDrag'
 import { useBookStore } from './stores/book'
-import { openBookFile, saveBookFile, saveTextFile } from './files'
+import { openBookFile, saveBookFile, saveTextFile, bookFileName } from './files'
 import { basePackageName, buildStandaloneHtml, libUrlMapFor, scanLibImports, standaloneFileName } from './publish'
 import PropertiesPanel from './components/PropertiesPanel.vue'
 import ScriptEditor from './components/ScriptEditor.vue'
@@ -15,6 +15,7 @@ import ImportHelper from './components/ImportHelper.vue'
 import PagesPanel from './components/PagesPanel.vue'
 import StoreBrowser from './components/StoreBrowser.vue'
 import BackgroundDialog from './components/BackgroundDialog.vue'
+import OpenDialog from './components/OpenDialog.vue'
 
 const store = useBookStore()
 const iframe = ref<HTMLIFrameElement | null>(null)
@@ -82,8 +83,39 @@ function toggleRight(): void {
 
 const settingsOpen = ref(false)
 const settingsPop = ref<HTMLElement | null>(null)
+const fileMenuOpen = ref(false)
+const fileMenu = ref<HTMLElement | null>(null)
+const openDialogOpen = ref(false)
 const authorMenuOpen = ref(false)
 const authorMenu = ref<HTMLElement | null>(null)
+
+interface FileAction {
+  label: string
+  hint?: string
+  /** draw a separator above this item */
+  sep?: boolean
+  action: () => Promise<void>
+}
+const fileActions: FileAction[] = [
+  { label: 'New', action: onNew },
+  { label: 'Open…', action: onOpen },
+  { label: 'Save', hint: '⌘S', action: onSave },
+  { label: 'Import…', sep: true, action: onImport },
+  { label: 'Export project…', action: onExport },
+  { label: 'Publish', sep: true, action: onPublish },
+]
+
+function invokeFile(a: FileAction): void {
+  fileMenuOpen.value = false
+  void a.action()
+}
+
+function onDocClickFile(e: MouseEvent): void {
+  if (!fileMenuOpen.value) return
+  if (fileMenu.value && !fileMenu.value.contains(e.target as Node)) {
+    fileMenuOpen.value = false
+  }
+}
 
 const pluginPages = computed(() => store.book.pages.filter((p) => p.author))
 
@@ -148,6 +180,21 @@ function onUndoKey(e: KeyboardEvent): void {
   else store.redo()
 }
 
+// save: ⌘S / Ctrl+S. Capture phase, skipped in editable targets so Monaco
+// and inputs keep their own save/insert behavior.
+function onSaveKey(e: KeyboardEvent): void {
+  const mod = e.metaKey || e.ctrlKey
+  if (!mod || e.key.toLowerCase() !== 's') return
+  const el = e.target as HTMLElement | null
+  const editable =
+    !!el &&
+    (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el.isContentEditable)
+  if (editable) return
+  e.preventDefault()
+  e.stopPropagation()
+  void store.save()
+}
+
 // z-order + delete: skip while typing (⌘[ is outdent in Monaco); only when
 // there is a selection
 function onArrangeKey(e: KeyboardEvent): void {
@@ -179,6 +226,7 @@ function onDocKey(e: KeyboardEvent): void {
   // that path is handled canvas-side)
   if (e.key === 'Escape') {
     settingsOpen.value = false
+    fileMenuOpen.value = false
     if (store.isRunning && iframe.value) {
       iframe.value.contentWindow?.postMessage({ type: 'toolback:esc' }, '*')
     }
@@ -213,12 +261,14 @@ function onGroupKey(e: KeyboardEvent): void {
 onMounted(async () => {
   window.addEventListener('keydown', onRunKey, true)
   window.addEventListener('keydown', onUndoKey, true)
+  window.addEventListener('keydown', onSaveKey, true)
   document.addEventListener('keydown', onArrangeKey)
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', onDocKey)
   document.addEventListener('keydown', onDuplicateKey)
   document.addEventListener('keydown', onGroupKey)
   document.addEventListener('click', onDocClickAuthor)
+  document.addEventListener('click', onDocClickFile)
   document.addEventListener('click', onDocClick)
   if (iframe.value) wireCanvas(iframe.value)
   await store.restoreAutosave()
@@ -228,12 +278,14 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('keydown', onRunKey, true)
   window.removeEventListener('keydown', onUndoKey, true)
+  window.removeEventListener('keydown', onSaveKey, true)
   document.removeEventListener('keydown', onDocKey)
   document.removeEventListener('keydown', onArrangeKey)
   document.removeEventListener('keydown', onDuplicateKey)
   document.removeEventListener('keydown', onGroupKey)
   document.removeEventListener('click', onDocClick)
   document.removeEventListener('click', onDocClickAuthor)
+  document.removeEventListener('click', onDocClickFile)
 })
 
 const objectRows = computed(() => treeRows(store.targetObjects))
@@ -263,7 +315,29 @@ async function onNew(): Promise<void> {
   await store.rememberCurrent()
 }
 
+async function onOpen(): Promise<void> {
+  openDialogOpen.value = true
+}
+
+async function onImport(): Promise<void> {
+  openDialogOpen.value = false
+  try {
+    const book = await openBookFile()
+    if (book && store.hydrate(book)) await store.rememberCurrent()
+  } catch (err) {
+    if (!(err instanceof DOMException && err.name === 'AbortError')) {
+      store.error = `Import failed: ${String(err)}`
+    }
+  }
+}
+
+/** explicit save to IndexedDB (named project snapshot + autosave slot) */
 async function onSave(): Promise<void> {
+  await store.save()
+}
+
+/** export the project as a .toolbook.json file */
+async function onExport(): Promise<void> {
   try {
     const result = await saveBookFile(store.book)
     await store.rememberCurrent()
@@ -273,23 +347,6 @@ async function onSave(): Promise<void> {
       store.error = String(err)
     }
   }
-}
-
-async function onOpen(): Promise<void> {
-  try {
-    const book = await openBookFile()
-    if (book && store.hydrate(book)) await store.rememberCurrent()
-  } catch (err) {
-    if (!(err instanceof DOMException && err.name === 'AbortError')) {
-      store.error = `Open failed: ${String(err)}`
-    }
-  }
-}
-
-async function onRecent(e: Event): Promise<void> {
-  const id = (e.target as HTMLSelectElement).value
-  ;(e.target as HTMLSelectElement).value = ''
-  if (id) await store.openRecent(id)
 }
 
 const BREAKPOINTS = ['desktop', 'tablet', 'mobile'] as const
@@ -407,14 +464,22 @@ function startPaletteSplitDrag(e: PointerEvent): void {
           <span class="badge">v4 · M4 publish</span>
         </div>
         <div class="filebar">
-          <button @click="onNew">New</button>
-          <button @click="onOpen">Open…</button>
-          <button @click="onSave">Save</button>
-          <button class="publish" @click="onPublish">Publish</button>
-          <select v-if="store.recents.length" class="recents" @change="onRecent">
-            <option value="">Recent…</option>
-            <option v-for="r in store.recents" :key="r.id" :value="r.id">{{ r.title }}</option>
-          </select>
+          <div class="file-wrap">
+            <button
+              class="file-trigger"
+              :class="{ on: fileMenuOpen }"
+              @click.stop="fileMenuOpen = !fileMenuOpen"
+            >File ▾</button>
+            <div v-if="fileMenuOpen" ref="fileMenu" class="file-menu" @click.stop>
+              <template v-for="a in fileActions" :key="a.label">
+                <div v-if="a.sep" class="file-sep"></div>
+                <button class="file-item" @click="invokeFile(a)">
+                  <span>{{ a.label }}</span>
+                  <span v-if="a.hint" class="kbd">{{ a.hint }}</span>
+                </button>
+              </template>
+            </div>
+          </div>
         </div>
         <div class="historybar" title="Undo (⌘Z) · Redo (⌘⇧Z) · Duplicate (⌥D)">
           <button :disabled="!store.canUndo" @click="store.undo()">↶</button>
@@ -429,7 +494,7 @@ function startPaletteSplitDrag(e: PointerEvent): void {
             :disabled="store.isRunning"
             @click="store.setBreakpoint(bp)"
           >
-            {{ bp[0]!.toUpperCase() + bp.slice(1, 3) }}
+            {{ bp[0]!.toUpperCase() + bp.slice(1) }}
           </button>
         </div>
       </div>
@@ -549,10 +614,6 @@ function startPaletteSplitDrag(e: PointerEvent): void {
       <div v-show="propsTab === 'page'">
         <template v-if="store.editing.kind === 'page'">
           <div class="field">
-            <label>Title</label>
-            <input :value="store.book.title" disabled />
-          </div>
-          <div class="field">
             <label>Page name</label>
             <input :value="store.activePage.name" disabled />
           </div>
@@ -651,6 +712,15 @@ function startPaletteSplitDrag(e: PointerEvent): void {
       </div>
 
       <div v-show="propsTab === 'objects'">
+        <div class="field">
+          <label>Project name</label>
+          <input
+            :value="store.book.title"
+            placeholder="Untitled"
+            @change="store.renameBook(($event.target as HTMLInputElement).value)"
+          />
+          <p class="hint file-hint">Exports as <code>{{ bookFileName(store.book) }}</code></p>
+        </div>
         <ul class="objects">
           <li
             v-for="row in objectRows"
@@ -672,6 +742,7 @@ function startPaletteSplitDrag(e: PointerEvent): void {
     </aside>
 
     <BackgroundDialog v-if="store.backgroundDialogId" />
+    <OpenDialog v-if="openDialogOpen" @close="openDialogOpen = false" @import="onImport" />
 
     <footer class="status">
       <template v-if="store.error">
@@ -683,6 +754,7 @@ function startPaletteSplitDrag(e: PointerEvent): void {
         <span>{{ targetLabel }} · {{ store.objectCount }} objects · "{{ store.book.title }}"</span>
         <span v-if="store.popupsOpen.length" class="popups">popup: {{ store.popupsOpen.join(', ') }}</span>
         <span v-if="store.authorActive" class="author-chip">⚡ plugin: {{ store.authorActive }}</span>
+        <span v-if="store.savedAt" class="dim">saved {{ new Date(store.savedAt).toLocaleTimeString() }}</span>
         <span v-if="store.autosaveAt" class="dim">autosaved {{ new Date(store.autosaveAt).toLocaleTimeString() }}</span>
         <span v-if="store.fileNote" class="dim">{{ store.fileNote }}</span>
         <span v-if="store.scriptError" class="err">script: {{ store.scriptError }}</span>
@@ -795,9 +867,87 @@ body.tb-palette-dragging * {
   cursor: pointer;
 }
 
+.filebar button.on,
 .filebar button:hover {
   border-color: var(--ed-accent);
   color: #fff;
+}
+
+.filebar .file-trigger {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--ed-text);
+}
+
+.filebar .file-trigger:hover:not(.on) {
+  color: var(--ed-accent);
+}
+
+.filebar .file-trigger.on {
+  background: rgba(99, 102, 241, 0.14);
+  color: #fff;
+}
+
+.file-wrap {
+  position: relative;
+}
+
+.file-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 80;
+  min-width: 170px;
+  background: var(--ed-panel);
+  border: 1px solid var(--ed-border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+}
+
+.filebar .file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  font: 500 12.5px/1.2 system-ui, sans-serif;
+  color: var(--ed-text);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.filebar .file-item:hover {
+  background: rgba(99, 102, 241, 0.16);
+  color: #fff;
+  border-color: transparent;
+}
+
+.file-sep {
+  height: 1px;
+  background: var(--ed-border);
+  margin: 3px 6px;
+}
+
+.filebar .file-item .kbd {
+  font-size: 10.5px;
+  color: var(--ed-text-dim);
+}
+
+.file-hint {
+  margin: 2px 2px 0;
+}
+
+.file-hint code {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  color: var(--ed-accent);
 }
 
 .historybar {
@@ -831,26 +981,6 @@ body.tb-palette-dragging * {
 
 .historybar button.dup {
   margin-left: 4px;
-}
-
-.recents {
-  max-width: 140px;
-  background: var(--ed-bg);
-  border: 1px solid var(--ed-border);
-  border-radius: 6px;
-  color: var(--ed-text-dim);
-  padding: 6px 6px;
-  font: 500 12px/1 system-ui, sans-serif;
-}
-
-.publish {
-  border-color: var(--ed-accent) !important;
-  color: #c7d2fe !important;
-}
-
-.publish:hover {
-  background: var(--ed-accent) !important;
-  color: #fff !important;
 }
 
 .bp-switch {

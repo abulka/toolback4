@@ -16,7 +16,7 @@ export function standaloneFileName(book: Book): string {
     book.title
       .trim()
       .replace(/[^\w-]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'book'
+      .replace(/^-+|-+$/g, '') || 'untitled'
   return `${base}.html`
 }
 

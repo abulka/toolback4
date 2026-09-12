@@ -31,6 +31,7 @@ import {
   getRecents,
   loadAutosave,
   putRecentBook,
+  removeBook,
   saveAutosave,
   type RecentEntry,
 } from '../persist'
@@ -68,6 +69,8 @@ export const useBookStore = defineStore('book', () => {
   const authorActive = ref<null | string>(null)
   const recents = ref<RecentEntry[]>([])
   const autosaveAt = ref<number | null>(null)
+  /** when the current book was last explicitly saved (IndexedDB named snapshot) */
+  const savedAt = ref<number | null>(null)
   const fileNote = ref('')
   const propsWidth = ref<number>(
     Number(localStorage.getItem('toolback.propsWidth')) || 330,
@@ -573,12 +576,13 @@ export const useBookStore = defineStore('book', () => {
 
   function newBook(): void {
     clearHistory()
-    book.value = createBook('Untitled book')
+    book.value = createBook('Untitled')
     currentPageIndex.value = 0
     selectionIds.value = []
     editing.value = { kind: 'page' }
     isRunning.value = false
     popupsOpen.value = []
+    savedAt.value = null
     sync()
   }
 
@@ -595,6 +599,7 @@ export const useBookStore = defineStore('book', () => {
     editing.value = { kind: 'page' }
     isRunning.value = false
     popupsOpen.value = []
+    savedAt.value = null
     sync()
     return true
   }
@@ -612,6 +617,7 @@ export const useBookStore = defineStore('book', () => {
     selectionIds.value = []
     editing.value = { kind: 'page' }
     autosaveAt.value = saved.at
+    savedAt.value = null
     sync()
     return true
   }
@@ -623,6 +629,53 @@ export const useBookStore = defineStore('book', () => {
   async function rememberCurrent(): Promise<void> {
     const snapshot = JSON.parse(JSON.stringify(book.value)) as Book
     recents.value = await putRecentBook(snapshot)
+  }
+
+  /** explicit save: durable named snapshot + the boot-restore autosave slot */
+  async function save(): Promise<void> {
+    const snapshot = JSON.parse(JSON.stringify(book.value)) as Book
+    recents.value = await putRecentBook(snapshot)
+    await saveAutosave(snapshot)
+    autosaveAt.value = Date.now()
+    savedAt.value = Date.now()
+    fileNote.value = ''
+  }
+
+  /** rename the project — drives the recents entry and the export filename */
+  async function renameBook(title: string): Promise<void> {
+    const trimmed = title.trim()
+    if (!trimmed || trimmed === book.value.title) return
+    record('Rename project')
+    book.value.title = trimmed
+    sync()
+    await rememberCurrent()
+  }
+
+  /** rename a saved project from the Open dialog — updates the stored
+   *  snapshot and its recents entry (the open book, if this is it, too) */
+  async function renameRecent(id: string, title: string): Promise<void> {
+    const trimmed = title.trim()
+    if (!trimmed) return
+    let target: Book
+    if (id === book.value.id) {
+      if (trimmed === book.value.title) return
+      record('Rename project')
+      book.value.title = trimmed
+      target = JSON.parse(JSON.stringify(book.value)) as Book
+      sync()
+    } else {
+      const saved = await getRecentBook(id)
+      if (!saved || saved.title === trimmed) return
+      target = saved
+      target.title = trimmed
+    }
+    recents.value = await putRecentBook(target)
+  }
+
+  /** delete a saved project snapshot (and its recents entry) */
+  async function deleteRecent(id: string): Promise<void> {
+    await removeBook(id)
+    recents.value = await getRecents()
   }
 
   async function openRecent(id: string): Promise<void> {
@@ -1020,6 +1073,7 @@ export const useBookStore = defineStore('book', () => {
     authorActive,
     recents,
     autosaveAt,
+    savedAt,
     fileNote,
     propsWidth,
     paletteWidth,
@@ -1072,6 +1126,10 @@ export const useBookStore = defineStore('book', () => {
     restoreAutosave,
     refreshRecents,
     rememberCurrent,
+    save,
+    renameBook,
+    renameRecent,
+    deleteRecent,
     openRecent,
     addObject,
     applyRect,

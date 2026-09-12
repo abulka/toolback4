@@ -2,6 +2,36 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { createGroup, createObject, flattenObjects, parseBook, type Book } from '@toolback/format'
 import { useBookStore } from './book'
+import type { RecentEntry } from '../persist'
+
+// persist talks to IndexedDB, which this node test env lacks — back it with
+// an in-memory map obeying the same key conventions.
+vi.mock('../persist', () => {
+  const map = new Map<string, unknown>()
+  return {
+    saveAutosave: vi.fn(async (book: Book) => {
+      map.set('autosave', { book, at: Date.now() })
+    }),
+    loadAutosave: vi.fn(async () => map.get('autosave') as { book: Book; at: number } | undefined),
+    getRecents: vi.fn(async () => (map.get('recents') as RecentEntry[] | undefined) ?? []),
+    putRecentBook: vi.fn(async (book: Book) => {
+      map.set(`book:${book.id}`, book)
+      const recents = (map.get('recents') as RecentEntry[] | undefined) ?? []
+      const next = [
+        { id: book.id, title: book.title, at: Date.now() },
+        ...recents.filter((r) => r.id !== book.id),
+      ].slice(0, 8)
+      map.set('recents', next)
+      return next
+    }),
+    removeBook: vi.fn(async (id: string) => {
+      map.delete(`book:${id}`)
+      const recents = (map.get('recents') as RecentEntry[] | undefined) ?? []
+      map.set('recents', recents.filter((r) => r.id !== id))
+    }),
+    getRecentBook: vi.fn(async (id: string) => map.get(`book:${id}`) as Book | undefined),
+  }
+})
 
 function twoObjectBook(): Book {
   return parseBook({
@@ -448,5 +478,83 @@ describe('book store — backgrounds', () => {
     store.undo()
     expect(store.book.pages.map((p) => p.name)).toEqual(['P', 'Page 2'])
     expect(store.book.pages[0]!.backgroundId).toBe(store.book.backgrounds[0]!.id)
+  })
+})
+
+describe('book store — save / rename / delete (IndexedDB)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {} })
+    setActivePinia(createPinia())
+  })
+
+  it('save writes a named snapshot, refreshes recents and stamps savedAt', async () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.renameBook('Hello')
+    await new Promise((r) => setTimeout(r, 0))
+    expect(store.recents).toHaveLength(1)
+    expect(store.recents[0]!.title).toBe('Hello')
+
+    const before = store.savedAt
+    await store.save()
+    expect(store.savedAt).toBeGreaterThan(0)
+    expect(store.recents[0]!.title).toBe('Hello')
+    // autosave slot is refreshed by save too
+    expect(store.autosaveAt).not.toBeNull()
+    expect(store.savedAt).not.toBeNull()
+    expect(before).toBeNull()
+  })
+
+  it('renameBook keeps the export filename in step (dashes kept, fallback untitled)', async () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.renameBook('Hello-Toolbook-Andy')
+    await new Promise((r) => setTimeout(r, 0))
+    expect(store.book.title).toBe('Hello-Toolbook-Andy')
+    const { bookFileName } = await import('../files')
+    expect(bookFileName(store.book)).toBe('Hello-Toolbook-Andy.toolbook.json')
+    store.newBook()
+    expect(store.book.title).toBe('Untitled')
+    expect(bookFileName(store.book)).toBe('Untitled.toolbook.json')
+  })
+
+  it('deleteRecent removes the snapshot and the recents entry', async () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    await store.save()
+    // second project
+    store.newBook()
+    store.renameBook('Other')
+    await new Promise((r) => setTimeout(r, 0))
+    await store.save()
+    expect(store.recents).toHaveLength(2)
+
+    await store.deleteRecent(store.recents[1]!.id)
+    expect(store.recents).toHaveLength(1)
+    expect(store.recents[0]!.title).toBe('Other')
+  })
+
+  it('renameRecent renames a stored project without opening it', async () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook()) // 'T'
+    await store.save()
+    store.newBook()
+    store.renameBook('Other')
+    await new Promise((r) => setTimeout(r, 0))
+    await store.save()
+    const stored = store.recents.find((r) => r.title === 'T')!
+    await store.renameRecent(stored.id, 'Renamed')
+    expect(store.recents.find((r) => r.id === stored.id)!.title).toBe('Renamed')
+    // the open book is untouched
+    expect(store.book.title).toBe('Other')
+  })
+
+  it('renameRecent on the open book renames it live and updates the entry', async () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    await store.save()
+    await store.renameRecent(store.book.id, 'Live rename')
+    expect(store.book.title).toBe('Live rename')
+    expect(store.recents[0]!.title).toBe('Live rename')
   })
 })

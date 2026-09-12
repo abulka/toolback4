@@ -28,7 +28,7 @@ const FILE_TYPE = {
 }
 
 export function bookFileName(book: Book): string {
-  const base = book.title.trim().replace(/[^\w-]+/g, '-') || 'book'
+  const base = book.title.trim().replace(/[^\w-]+/g, '-') || 'untitled'
   return `${base}.toolbook.json`
 }
 

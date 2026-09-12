@@ -43,6 +43,18 @@ function idbGet<T>(key: string): Promise<T | undefined> {
   )
 }
 
+function idbDelete(key: string): Promise<void> {
+  return openDb().then(
+    (db) =>
+      new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite')
+        tx.objectStore(STORE).delete(key)
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject(tx.error)
+      }),
+  )
+}
+
 function idbSet(key: string, value: unknown): Promise<void> {
   return openDb().then(
     (db) =>
@@ -91,4 +103,12 @@ export async function putRecentBook(book: Book): Promise<RecentEntry[]> {
 
 export async function getRecentBook(id: string): Promise<Book | undefined> {
   return idbGet<Book>(`book:${id}`)
+}
+
+/** permanently delete a named project snapshot and drop it from recents */
+export async function removeBook(id: string): Promise<void> {
+  await idbDelete(`book:${id}`)
+  const recents = await getRecents()
+  const next = recents.filter((r) => r.id !== id)
+  if (next.length !== recents.length) await idbSet('recents', next)
 }
