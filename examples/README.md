@@ -43,6 +43,7 @@ a `•` in the event dropdown):
 | **Motion** | Scripted geometry (`x`/`y`/`width`/`height`), an `await` drop-in animation in `pageEnter`, `pageLeave` recording the visit, a shared page function (`resetBox`). |
 | **Events** | `click` / `dblclick` / `mouseenter` / `mouseleave` on one button, `input` / `change` on a field — all writing to the store. |
 | **Editor** | Design-mode features with a practice group: undo/redo, duplicate (⧉ / ⌥D), group/ungroup (⌥G / ⌥U), Copy JSON, drill-in navigation. |
+| **Npm** | Dynamic `await import(...)` of npm packages: build & re-parse a two-note MIDI with `@tonejs/midi` (data path), play it through Tone.js (audio path), and download it as a `.mid` Blob (file path). |
 
 A runtime deep-dive of everything the demos touch lives in
 [../docs/runtime-internals.md](../docs/runtime-internals.md).

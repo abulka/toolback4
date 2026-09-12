@@ -905,7 +905,7 @@
     {
       "id": "page_ks_npm",
       "name": "Npm",
-      "script": "function pageEnter() {\n  store.set('where', page.name)\n  if (store.get('midiInfo') === undefined) store.set('midiInfo', 'nothing parsed yet — press the button')\n}\n\n// package docs say: import { Midi } from '@tonejs/midi' — in toolback the same\n// line goes inside a function, awaited. Imports resolve via esm.sh (or the shelf).\nasync function parseDemo() {\n  const { Midi } = await import('@tonejs/midi')\n  const midi = new Midi()\n  const track = midi.addTrack()\n  track.name = 'toolback demo'\n  track.addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 })\n  track.addNote({ midi: 64, time: 0.5, duration: 0.5, velocity: 0.8 })\n  const reparsed = new Midi(midi.toArray())\n  store.set('midiInfo', `tracks: ${reparsed.tracks.length}, notes: ${reparsed.tracks[0].notes.length}, second note: ${reparsed.tracks[0].notes[1].name}`)\n}",
+      "script": "function pageEnter() {\n  store.set('where', page.name)\n  if (store.get('midiInfo') === undefined) store.set('midiInfo', 'nothing built yet — press a button')\n  if (store.get('playInfo') === undefined) store.set('playInfo', '')\n}\n\n// One shared source of truth: the same two-note MIDI (C4, then E4) fuels every\n// demo below. addNote takes a midi note number, time/duration in seconds, and\n// velocity 0..1. Imports resolve via esm.sh (or the shelf — offline books).\nasync function buildMidi() {\n  const { Midi } = await import('@tonejs/midi')\n  const midi = new Midi()\n  const track = midi.addTrack()\n  track.name = 'toolback demo'\n  track.addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 })\n  track.addNote({ midi: 64, time: 0.5, duration: 0.5, velocity: 0.8 })\n  return midi\n}\n\n// Data path: @tonejs/midi is a data library — build, serialize with\n// midi.toArray(), re-parse. No files, no sound, no servers.\nasync function parseDemo() {\n  const midi = await buildMidi()\n  const { Midi } = await import('@tonejs/midi')\n  const reparsed = new Midi(midi.toArray())\n  const track = reparsed.tracks[0]\n  store.set('midiInfo', `tracks: ${reparsed.tracks.length}, notes: ${track.notes.length} — ${track.notes.map((n) => n.name).join(' + ')}`)\n}\n\n// Audio path: the notes are data, so Tone.js makes them audible. Browsers\n// require a user gesture before audio starts — a button click is one.\nasync function playDemo() {\n  store.set('playInfo', 'starting audio…')\n  const Tone = await import('tone')\n  const track = (await buildMidi()).tracks[0]\n\n  await Tone.start() // unlock the AudioContext\n  const synth = new Tone.PolySynth(Tone.Synth).toDestination()\n  const when = Tone.now() + 0.1 // tiny delay so both notes land cleanly\n  for (const note of track.notes) {\n    synth.triggerAttackRelease(note.name, note.duration, note.time + when, note.velocity)\n  }\n  store.set('playInfo', `playing ${track.notes.map((n) => n.name).join(' + ')}`)\n\n  // Dispose the synth after the last note has rung out.\n  const last = track.notes[track.notes.length - 1]\n  setTimeout(() => {\n    synth.dispose()\n    store.set('playInfo', 'done')\n  }, (last.time + last.duration + 0.5) * 1000)\n}\n\n// File path: midi.toArray() is the raw bytes — wrap them in a Blob and click a\n// temporary <a download> link. The same pattern exports any binary payload.\nasync function downloadDemo() {\n  const midi = await buildMidi()\n  const bytes = midi.toArray()\n  const blob = new Blob([bytes], { type: 'audio/midi' })\n  const url = URL.createObjectURL(blob)\n  const a = document.createElement('a')\n  a.href = url\n  a.download = 'toolback_demo.mid'\n  document.body.appendChild(a)\n  a.click()\n  a.remove()\n  URL.revokeObjectURL(url)\n  store.set('midiInfo', `downloaded toolback_demo.mid — ${bytes.length} bytes`)\n  store.set('playInfo', 'saved toolback_demo.mid')\n}",
       "background": "#f6f7fb",
       "objects": [
         {
@@ -922,7 +922,7 @@
           "name": "npHint",
           "control": "label",
           "rects": {"desktop":{"x":48,"y":96,"w":1180,"h":96}},
-          "props": {"text":"Any npm package works in scripts. Package docs say import { Midi } from '@tonejs/midi' — in toolback the same line goes inside a function, awaited: imports resolve via esm.sh in previews and exports, and packages installed on the toolback library shelf are embedded offline instead. Press the button — its script builds a two-note MIDI, serializes it, and re-parses it, no external files needed.","fontSize":14},
+          "props": {"text":"Any npm package works in scripts. The three buttons below all start from the same script-built two-note song (C4 → E4): Build re-parses it (data path), Play makes it audible through Tone.js (audio path — browsers demand a gesture first, and a click is one), and Download saves it as a real .mid file (file path). Package docs say import { Midi } from '@tonejs/midi' — in toolback the same line goes inside a function, awaited.","fontSize":14},
           "on": {}
         }
 ,
@@ -930,7 +930,7 @@
           "id": "obj_ks_npBuild",
           "name": "npBuild",
           "control": "button",
-          "rects": {"desktop":{"x":96,"y":216,"w":380,"h":52}},
+          "rects": {"desktop":{"x":96,"y":216,"w":300,"h":52}},
           "props": {"text":"Build & parse a MIDI"},
           "on": {
             "click": "parseDemo()"
@@ -938,11 +938,42 @@
         }
 ,
         {
+          "id": "obj_ks_npPlay",
+          "name": "npPlay",
+          "control": "button",
+          "rects": {"desktop":{"x":412,"y":216,"w":240,"h":52}},
+          "props": {"text":"Play","color":"teal"},
+          "on": {
+            "click": "playDemo()"
+          }
+        }
+,
+        {
+          "id": "obj_ks_npDownload",
+          "name": "npDownload",
+          "control": "button",
+          "rects": {"desktop":{"x":668,"y":216,"w":240,"h":52}},
+          "props": {"text":"Download .mid","color":"navy"},
+          "on": {
+            "click": "downloadDemo()"
+          }
+        }
+,
+        {
           "id": "obj_ks_npResult",
           "name": "npResult",
           "control": "label",
-          "rects": {"desktop":{"x":96,"y":288,"w":1000,"h":48}},
+          "rects": {"desktop":{"x":96,"y":288,"w":1180,"h":40}},
           "props": {"text":"Result: {{midiInfo}}","fontSize":16},
+          "on": {}
+        }
+,
+        {
+          "id": "obj_ks_npSound",
+          "name": "npSound",
+          "control": "label",
+          "rects": {"desktop":{"x":96,"y":336,"w":1180,"h":36}},
+          "props": {"text":"Sound: {{playInfo}}","fontSize":16},
           "on": {}
         }
 ,
@@ -951,7 +982,7 @@
           "name": "npTip",
           "control": "label",
           "rects": {"desktop":{"x":48,"y":688,"w":1180,"h":80}},
-          "props": {"text":"Tips: object event scripts are async, so await import(...) works directly in them; in page/background scripts put the import inside a function like parseDemo above. Repeat imports are cheap — modules are cached and shared. The editor's npm helper (toolbar) converts README install snippets into toolback import lines.","fontSize":13},
+          "props": {"text":"Where the scripts live: three async page functions. parseDemo (data) uses @tonejs/midi only; playDemo (audio) does await import('tone'), Tone.start() to unlock the AudioContext, then a PolySynth schedules track.notes at note.time + Tone.now(); downloadDemo (file) wraps midi.toArray() in a Blob and clicks a temporary <a download>. buildMidi() builds the song once and all three share it. Repeat imports are cheap — modules are cached. 'tone' isn't on the shelf yet, so previews fetch it from esm.sh; add it with pnpm --filter @toolback/libs add tone to embed it offline.","fontSize":13},
           "on": {}
         }
 ,
