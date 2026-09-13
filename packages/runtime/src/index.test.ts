@@ -82,7 +82,7 @@ describe('runtime', () => {
       expect(shouldToggleRun(key('F3', 'F3', { repeat: true }))).toBe(false)
     })
 
-    it('ignores ⌥3 while typing in editable targets, still allows F3 there', () => {
+    it('toggles on ⌥3 even in editable targets, like F3', () => {
       const input = document.createElement('input')
       document.body.appendChild(input)
       const onInput = new KeyboardEvent('keydown', {
@@ -92,7 +92,7 @@ describe('runtime', () => {
         bubbles: true,
       })
       Object.defineProperty(onInput, 'target', { value: input })
-      expect(shouldToggleRun(onInput)).toBe(false)
+      expect(shouldToggleRun(onInput)).toBe(true)
 
       const f3InInput = new KeyboardEvent('keydown', { key: 'F3', code: 'F3', bubbles: true })
       Object.defineProperty(f3InInput, 'target', { value: input })
@@ -101,7 +101,7 @@ describe('runtime', () => {
       input.remove()
     })
 
-    it('the canvas forwards run-toggle keys to the editor, editable ⌥3 stays typed', () => {
+    it('the canvas forwards run-toggle keys to the editor, including editable ⌥3', () => {
       const sent: Array<{ type: string }> = []
       const send = (msg: { type: string }) => sent.push(msg)
       const root = document.createElement('div')
@@ -114,13 +114,13 @@ describe('runtime', () => {
         input.dispatchEvent(
           new KeyboardEvent('keydown', { key: '£', code: 'Digit3', altKey: true, bubbles: true }),
         )
-        expect(sent.filter((m) => m.type === 'toolback:runToggle')).toHaveLength(0)
-
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F3', code: 'F3' }))
         expect(sent.filter((m) => m.type === 'toolback:runToggle')).toHaveLength(1)
 
-        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F3', code: 'F3', bubbles: true }))
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F3', code: 'F3' }))
         expect(sent.filter((m) => m.type === 'toolback:runToggle')).toHaveLength(2)
+
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'F3', code: 'F3', bubbles: true }))
+        expect(sent.filter((m) => m.type === 'toolback:runToggle')).toHaveLength(3)
       } finally {
         cleanup()
         root.remove()
