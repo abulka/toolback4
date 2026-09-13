@@ -157,22 +157,16 @@ export function isStoreLabelSentinel(v: unknown): v is { __tbLabel: string } {
 
 /**
  * Run-mode toggle keys: F3 (ToolBook heritage) and ⌥3 / Alt+3 (no fn-key needed).
- * ⌥3 is skipped while typing in editable targets — on Mac it is a text character.
+ * ⌥3 toggles everywhere, even in editable targets — the capture-phase handler
+ * preventDefaults before Monaco/OS text insertion, so no £ is typed.
  */
 export function shouldToggleRun(e: KeyboardEvent): boolean {
   if (e.repeat) return false
   const isF3 = e.key === 'F3' || e.code === 'F3'
   if (isF3) return true
-  const isAlt3 =
+  return (
     e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === 'Digit3'
-  if (!isAlt3) return false
-  const el = e.target as HTMLElement | null
-  const editable =
-    !!el &&
-    (el instanceof HTMLInputElement ||
-      el instanceof HTMLTextAreaElement ||
-      el.isContentEditable)
-  return !editable
+  )
 }
 
 export function listenForEditor(

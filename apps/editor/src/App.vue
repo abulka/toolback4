@@ -154,7 +154,8 @@ function onDocClick(e: MouseEvent): void {
 // --- run shortcut (F3 / ⌥3), z-order (⌘[/⌘]) and delete — global keys
 
 // F3 or ⌥3 (Alt+3) toggles Run. Capture phase + stopPropagation so it wins
-// over Monaco's F3 find-next; ⌥3 is skipped in editable targets by shouldToggleRun.
+// over Monaco's F3 find-next; ⌥3 also toggles from editable targets (the
+// preventDefault here stops the £ that ⌥3 would otherwise type on Mac).
 // Keydowns inside the canvas iframe are handled canvas-side (editorLink) instead.
 function onRunKey(e: KeyboardEvent): void {
   if (!shouldToggleRun(e)) return
@@ -748,7 +749,10 @@ function startPaletteSplitDrag(e: PointerEvent): void {
 
     <footer class="status">
       <template v-if="store.error">
-        <span class="err">canvas error: {{ store.error }}</span>
+        <span class="err-line">
+          <span class="err">canvas error: {{ store.error }}</span>
+          <button class="dismiss" title="Dismiss error" aria-label="Dismiss error" @click="store.error = ''">✕</button>
+        </span>
       </template>
       <template v-else-if="store.canvasReady">
         <span class="ok">● canvas ready</span>
@@ -759,7 +763,10 @@ function startPaletteSplitDrag(e: PointerEvent): void {
         <span v-if="store.savedAt" class="dim">saved {{ new Date(store.savedAt).toLocaleTimeString() }}</span>
         <span v-if="store.autosaveAt" class="dim">autosaved {{ new Date(store.autosaveAt).toLocaleTimeString() }}</span>
         <span v-if="store.fileNote" class="dim">{{ store.fileNote }}</span>
-        <span v-if="store.scriptError" class="err">script: {{ store.scriptError }}</span>
+        <span v-if="store.scriptError" class="err-line">
+          <span class="err">script: {{ store.scriptError }}</span>
+          <button class="dismiss" title="Dismiss error" aria-label="Dismiss script error" @click="store.scriptError = ''">✕</button>
+        </span>
         <span v-else-if="store.canvasNote" class="note">{{ store.canvasNote }}</span>
       </template>
       <template v-else>
@@ -1529,5 +1536,28 @@ h2:first-child {
 
 .err {
   color: var(--ed-err);
+}
+
+.err-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dismiss {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ed-text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.dismiss:hover {
+  color: #fff;
+  background: var(--ed-border);
 }
 </style>
