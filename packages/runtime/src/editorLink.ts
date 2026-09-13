@@ -55,6 +55,9 @@ export type CanvasToEditorMessage =
   | { type: 'toolback:duplicate' }
   | { type: 'toolback:group' }
   | { type: 'toolback:ungroup' }
+  | { type: 'toolback:copy' }
+  | { type: 'toolback:cut' }
+  | { type: 'toolback:paste' }
 
 /** reply leg of the author bridge (editor → canvas) */
 export type AuthorReplyMessage = {
@@ -117,6 +120,33 @@ export function isGroupKey(e: KeyboardEvent): 'group' | 'ungroup' | null {
   if (isAltShortcutKey(e, 'KeyG')) return 'group'
   if (isAltShortcutKey(e, 'KeyU')) return 'ungroup'
   return null
+}
+
+/**
+ * Clipboard shortcut (⌘C / ⌘V / ⌘X, or Ctrl): copy/paste/cut for the object
+ * selection — but only outside editable targets, where the browser's own
+ * text clipboard (script editors, inputs) must win.
+ */
+function isClipboardShortcut(e: KeyboardEvent, letter: string): boolean {
+  if ((!e.metaKey && !e.ctrlKey) || e.altKey) return false
+  if (e.key.toLowerCase() !== letter) return false
+  const el = e.target as HTMLElement | null
+  if (el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el.isContentEditable)) {
+    return false
+  }
+  return true
+}
+
+export function isCopyKey(e: KeyboardEvent): boolean {
+  return isClipboardShortcut(e, 'c')
+}
+
+export function isCutKey(e: KeyboardEvent): boolean {
+  return isClipboardShortcut(e, 'x')
+}
+
+export function isPasteKey(e: KeyboardEvent): boolean {
+  return isClipboardShortcut(e, 'v')
 }
 
 /** Display label for a store value in the editor's store browser */
@@ -373,6 +403,24 @@ const onKey = (e: KeyboardEvent): void => {
       e.preventDefault()
       e.stopPropagation()
       send({ type: gk === 'group' ? 'toolback:group' : 'toolback:ungroup' })
+      return
+    }
+    if (isCopyKey(e)) {
+      e.preventDefault()
+      e.stopPropagation()
+      send({ type: 'toolback:copy' })
+      return
+    }
+    if (isCutKey(e)) {
+      e.preventDefault()
+      e.stopPropagation()
+      send({ type: 'toolback:cut' })
+      return
+    }
+    if (isPasteKey(e)) {
+      e.preventDefault()
+      e.stopPropagation()
+      send({ type: 'toolback:paste' })
       return
     }
     const action = zOrderActionOf(e)

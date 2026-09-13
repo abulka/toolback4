@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { ControlKind, PageObject } from '@toolback/format'
 import { treeRows } from '@toolback/format'
-import { isDeleteSelectionKey, isDuplicateKey, isGroupKey, isUndoKey, shouldToggleRun, zOrderActionOf } from '@toolback/runtime'
+import { isDeleteSelectionKey, isDuplicateKey, isGroupKey, isUndoKey, isCopyKey, isCutKey, isPasteKey, shouldToggleRun, zOrderActionOf } from '@toolback/runtime'
 import { wireCanvas } from './canvasClient'
 import { startPaletteDrag } from './paletteDrag'
 import { useBookStore } from './stores/book'
@@ -259,10 +259,42 @@ function onGroupKey(e: KeyboardEvent): void {
   else store.ungroupSelected()
 }
 
+// copy/cut/paste: ⌘C / ⌘X / ⌘V (Ctrl on Windows/Linux). The editable-target
+// skip keeps the browser's own text clipboard — Monaco script editors, prop
+// inputs, contenteditable fields — untouched, so object copy/paste never
+// interferes with copying script text. Capture phase so we win over the
+// document-level handlers. Design-only.
+function onClipboardKey(e: KeyboardEvent): void {
+  let action: 'copy' | 'cut' | 'paste' | null = null
+  if (isCopyKey(e)) action = 'copy'
+  else if (isCutKey(e)) action = 'cut'
+  else if (isPasteKey(e)) action = 'paste'
+  if (!action) return
+  const el = e.target as HTMLElement | null
+  const editable =
+    !!el &&
+    (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el.isContentEditable)
+  if (editable) return
+  if (store.isRunning) return
+  if (action === 'paste') {
+    if (!store.canPaste) return
+  } else if (store.selectionIds.length === 0) {
+    return
+  }
+  e.preventDefault()
+  e.stopPropagation()
+  let n = 0
+  if (action === 'copy') n = store.copySelected()
+  else if (action === 'cut') n = store.cutSelected()
+  else n = store.pasteClipboard()
+  if (n) store.flashCanvasNote(`${action === 'paste' ? 'Pasted' : action === 'copy' ? 'Copied' : 'Cut'} ${n} object${n === 1 ? '' : 's'}`)
+}
+
 onMounted(async () => {
   window.addEventListener('keydown', onRunKey, true)
   window.addEventListener('keydown', onUndoKey, true)
   window.addEventListener('keydown', onSaveKey, true)
+  window.addEventListener('keydown', onClipboardKey, true)
   document.addEventListener('keydown', onArrangeKey)
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', onDocKey)
@@ -280,6 +312,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onRunKey, true)
   window.removeEventListener('keydown', onUndoKey, true)
   window.removeEventListener('keydown', onSaveKey, true)
+  window.removeEventListener('keydown', onClipboardKey, true)
   document.removeEventListener('keydown', onDocKey)
   document.removeEventListener('keydown', onArrangeKey)
   document.removeEventListener('keydown', onDuplicateKey)

@@ -21,7 +21,7 @@ export type { AuthorHandle, AuthorCaller, AuthorOp, AuthorObject, AuthorObjectRe
 export { isAuthorObjectRef } from './author'
 export type { AuthorReplyMessage } from './editorLink'
 export type { EditorToCanvasMessage, CanvasToEditorMessage, CanvasMessageSender, ToolbackView } from './editorLink'
-export { listenForEditor, shouldToggleRun, zOrderActionOf, isDeleteSelectionKey, isUndoKey, isDuplicateKey, isGroupKey, serializeStoreValue, isStoreLabelSentinel } from './editorLink'
+export { listenForEditor, shouldToggleRun, zOrderActionOf, isDeleteSelectionKey, isUndoKey, isDuplicateKey, isGroupKey, isCopyKey, isCutKey, isPasteKey, serializeStoreValue, isStoreLabelSentinel } from './editorLink'
 export {
   scanLibImports,
   basePackageName,

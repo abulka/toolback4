@@ -327,6 +327,148 @@ describe('book store — groups and arrange', () => {
   })
 })
 
+describe('book store — copy / cut / paste', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {} })
+    setActivePinia(createPinia())
+  })
+
+  it('copySelected deep-copies the selection into the clipboard and is mutation-safe', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a', 'b'])
+    expect(store.canPaste).toBe(false)
+    expect(store.copySelected()).toBe(2)
+    expect(store.canPaste).toBe(true)
+    expect(store.clipboard).toHaveLength(2)
+    // the clipboard is a plain mirror — mutating the source leaves it alone
+    store.book.pages[0]!.objects[0]!.name = 'changed'
+    expect(store.clipboard![0]!.name).toBe('labelA')
+    // copy alone is not undoable
+    store.undo()
+    expect(store.book.pages[0]!.objects).toHaveLength(2)
+  })
+
+  it('cutSelected removes the selection in one undoable step and leaves the clipboard', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a', 'b'])
+    expect(store.cutSelected()).toBe(2)
+    expect(store.book.pages[0]!.objects).toHaveLength(0)
+    expect(store.selectionIds).toEqual([])
+    expect(store.clipboard).toHaveLength(2)
+    store.undo()
+    expect(store.book.pages[0]!.objects.map((o) => o.name)).toEqual(['labelA', 'labelB'])
+  })
+
+  it('pasteClipboard re-ids, re-names, offsets down-right, selects, and is undoable', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a', 'b'])
+    store.copySelected()
+    expect(store.pasteClipboard()).toBe(2)
+    const page = store.book.pages[0]!.objects
+    expect(page).toHaveLength(4)
+    const [p1, p2] = [page[2]!, page[3]!]
+    expect(p1.name).toBe('label1')
+    expect(p2.name).toBe('label2')
+    expect(p1.id).not.toBe('a')
+    expect(p2.id).not.toBe('b')
+    expect(store.selectionIds.map((id) => page.find((o) => o.id === id))).toHaveLength(2)
+    // nudged +24 down-right of the copied positions
+    expect(p1.rects.desktop).toEqual({ x: 24, y: 24, w: 100, h: 50 })
+    expect(p2.rects.desktop).toEqual({ x: 144, y: 64, w: 80, h: 60 })
+    store.undo()
+    expect(store.book.pages[0]!.objects).toHaveLength(2)
+  })
+
+  it('paste without a clipboard is a no-op', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    expect(store.canPaste).toBe(false)
+    expect(store.pasteClipboard()).toBe(0)
+    expect(store.book.pages[0]!.objects).toHaveLength(2)
+  })
+
+  it('copy skips members whose group is already selected', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a', 'b'])
+    store.groupSelected()
+    const group = store.book.pages[0]!.objects[0]!
+    store.setSelection([group.id, group.children![0]!.id])
+    expect(store.copySelected()).toBe(1)
+    expect(store.clipboard).toHaveLength(1)
+    expect(store.clipboard![0]!.control).toBe('group')
+    expect(store.clipboard![0]!.children).toHaveLength(2)
+  })
+
+  it('cutting a group removes the whole subtree; undo restores it', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a', 'b'])
+    store.groupSelected()
+    const group = store.book.pages[0]!.objects[0]!
+    store.setSelection([group.id])
+    expect(store.cutSelected()).toBe(1)
+    expect(store.book.pages[0]!.objects).toHaveLength(0)
+    store.undo()
+    expect(store.book.pages[0]!.objects[0]!.children).toHaveLength(2)
+  })
+
+  it('paste lands inside a group when the selection shares a group parent', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a', 'b'])
+    store.groupSelected()
+    const group = store.book.pages[0]!.objects[0]!
+    // copied from the group's own members (rebased rects preserved)
+    store.setSelection(group.children!.map((c) => c.id))
+    store.copySelected()
+    expect(store.pasteClipboard()).toBe(2)
+    expect(group.children).toHaveLength(4)
+    expect(group.children![2]!.rects.desktop).toEqual({ x: 24, y: 24, w: 100, h: 50 })
+    expect(group.children![3]!.rects.desktop).toEqual({ x: 144, y: 64, w: 80, h: 60 })
+  })
+
+  it('paste without a shared group parent lands at the top level', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a'])
+    store.copySelected()
+    store.setSelection(['b'])
+    expect(store.pasteClipboard()).toBe(1)
+    expect(store.book.pages[0]!.objects).toHaveLength(3)
+    // pasted copies go to the end (top of z-order)
+    expect(store.book.pages[0]!.objects[2]!.name).toBe('label1')
+  })
+
+  it('repeat paste cascades 24px each time from the copied positions', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a'])
+    store.copySelected()
+    store.pasteClipboard()
+    store.pasteClipboard()
+    const page = store.book.pages[0]!.objects
+    expect(page.map((o) => o.name)).toEqual(['labelA', 'labelB', 'label1', 'label2'])
+    expect(page[2]!.rects.desktop).toEqual({ x: 24, y: 24, w: 100, h: 50 })
+    expect(page[3]!.rects.desktop).toEqual({ x: 48, y: 48, w: 100, h: 50 })
+  })
+
+  it('cut then paste inserts a separate copy; a single undo reverts the paste', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a'])
+    store.cutSelected()
+    store.pasteClipboard()
+    const page = store.book.pages[0]!.objects
+    expect(page.map((o) => o.name)).toEqual(['labelB', 'label1'])
+    store.undo()
+    expect(store.book.pages[0]!.objects).toHaveLength(1)
+  })
+})
+
 describe('book store — backgrounds', () => {
   beforeEach(() => {
     vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {} })

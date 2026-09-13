@@ -26,6 +26,7 @@ import {
 } from '@toolback/format'
 import { sampleBook } from '@toolback/format/src/sample'
 import type { EditorToCanvasMessage, ObjectRects } from '@toolback/runtime'
+import { clipboardToJson, copyText } from '../copyJson'
 import {
   getRecentBook,
   getRecents,
@@ -78,6 +79,14 @@ export const useBookStore = defineStore('book', () => {
   const paletteWidth = ref<number>(
     Number(localStorage.getItem('toolback.paletteWidth')) || 220,
   )
+  /**
+   * The toolback clipboard: deep-cloned plain copies of the last copied/cut
+   * selection, so pasting stays independent of later edits. Pasting reads this
+   * in-app mirror; the tagged JSON is also written to the OS clipboard
+   * (durable + inspectable elsewhere).
+   */
+  const clipboard = ref<PageObject[] | null>(null)
+  const canPaste = computed(() => !!clipboard.value && !isRunning.value)
 
   const activePage = computed(
     () => book.value.pages[currentPageIndex.value] ?? book.value.pages[0]!,
@@ -764,17 +773,7 @@ export const useBookStore = defineStore('book', () => {
     // names are script handles (controls[name]): a background's objects and
     // its member pages' objects share one namespace at run time, so both
     // sides are reserved in either editing context
-    const existing = new Set(flattenObjects(targetObjects.value).map((o) => o.name))
-    if (editing.value.kind === 'background') {
-      for (const p of book.value.pages) {
-        if (p.backgroundId === editing.value.id) {
-          for (const o of flattenObjects(p.objects)) existing.add(o.name)
-        }
-      }
-    } else {
-      const bg = backgroundFor(book.value, activePage.value)
-      if (bg) for (const o of flattenObjects(bg.objects)) existing.add(o.name)
-    }
+    const existing = collectUsedNames()
     let n = 1
     while (existing.has(`${control}${n}`)) n++
     return `${control}${n}`
@@ -875,13 +874,65 @@ export const useBookStore = defineStore('book', () => {
     sync()
   }
 
-  /**
-   * Duplicate the selection: deep copies (groups copy their whole `children`
-   * subtree), every object re-ided and re-named, inserted directly after its
-   * original, duplicates selected. Undoable in one step.
-   */
-  function duplicateSelected(): void {
-    if (selectionIds.value.length === 0) return
+  /** how far a duplicate/paste nudges copies down-right so they separate */
+  const DUP_OFFSET = 24
+
+  /** all script-handle names in the current page+background namespace */
+  function collectUsedNames(): Set<string> {
+    // names are script handles (controls[name]): a background's objects and
+    // its member pages' objects share one namespace at run time, so both
+    // sides are reserved in either editing context
+    const names = new Set(flattenObjects(targetObjects.value).map((o) => o.name))
+    if (editing.value.kind === 'background') {
+      for (const p of book.value.pages) {
+        if (p.backgroundId === editing.value.id) {
+          for (const o of flattenObjects(p.objects)) names.add(o.name)
+        }
+      }
+    } else {
+      const bg = backgroundFor(book.value, activePage.value)
+      if (bg) for (const o of flattenObjects(bg.objects)) names.add(o.name)
+    }
+    return names
+  }
+
+  /** fresh-name allocator: `(control) => labelN`, reserving each issued name
+   *  so nested group levels never collide within one batch */
+  function nameAllocator(used: Set<string>): (control: ControlKind) => string {
+    return (control: ControlKind): string => {
+      let n = 1
+      while (used.has(`${control}${n}`)) n++
+      used.add(`${control}${n}`)
+      return `${control}${n}`
+    }
+  }
+
+  /** deep clone of an object (or whole group subtree) with a fresh id and name */
+  function cloneObjectTree(src: PageObject, freshName: (c: ControlKind) => string): PageObject {
+    const copy = JSON.parse(JSON.stringify(src)) as PageObject
+    copy.id = newId('obj')
+    copy.name = freshName(src.control)
+    if (copy.children?.length) {
+      const kids: PageObject[] = []
+      for (const k of src.children!) kids.push(cloneObjectTree(k, freshName))
+      copy.children = kids
+    }
+    return copy
+  }
+
+  /** nudge a top-level copy's own rects down-right — members stay relative
+   *  to their group, which moves as a whole */
+  function offsetCopyRects(copy: PageObject, offset: number): void {
+    for (const bp of BREAKPOINTS) {
+      const r = copy.rects[bp]
+      if (!r) continue
+      copy.rects[bp] = { ...r, x: r.x + offset, y: r.y + offset }
+    }
+  }
+
+  /** the selection's top-level originals: members of a selected group are
+   *  skipped — their copies ride inside the group's subtree copy */
+  function topLevelSelection(): PageObject[] {
     const sel = new Set(selectionIds.value)
     const originals: PageObject[] = []
     for (const id of selectionIds.value) {
@@ -896,66 +947,121 @@ export const useBookStore = defineStore('book', () => {
       if (underSelected) continue
       originals.push(found.obj)
     }
+    return originals
+  }
+
+  /**
+   * Duplicate the selection: deep copies (groups copy their whole `children`
+   * subtree), every object re-ided and re-named, inserted directly after its
+   * original, duplicates selected. Undoable in one step.
+   */
+  function duplicateSelected(): void {
+    if (selectionIds.value.length === 0) return
+    const originals = topLevelSelection()
     if (!originals.length) return
 
     record('Duplicate')
-    // fresh names computed once so nested group levels never collide (the
-    // clones aren't on the page until the recursion is done)
-    const usedNames = (() => {
-      // same namespace rule as uniqueName: page + its background (either
-      // editing direction) share script handles
-      const names = new Set(flattenObjects(targetObjects.value).map((o) => o.name))
-      if (editing.value.kind === 'background') {
-        for (const p of book.value.pages) {
-          if (p.backgroundId === editing.value.id) {
-            for (const o of flattenObjects(p.objects)) names.add(o.name)
-          }
-        }
-      } else {
-        const bg = backgroundFor(book.value, activePage.value)
-        if (bg) for (const o of flattenObjects(bg.objects)) names.add(o.name)
-      }
-      return names
-    })()
-    const freshName = (control: ControlKind): string => {
-      let n = 1
-      while (usedNames.has(`${control}${n}`)) n++
-      usedNames.add(`${control}${n}`)
-      return `${control}${n}`
-    }
-    // nudge the copy down-right so it visibly separates from the original
-    const DUP_OFFSET = 24
+    const freshName = nameAllocator(collectUsedNames())
     const copies: PageObject[] = []
-    const cloneObject = (src: PageObject): PageObject => {
-      const copy = JSON.parse(JSON.stringify(src)) as PageObject
-      copy.id = newId('obj')
-      copy.name = freshName(src.control)
-      if (copy.children?.length) {
-        const kids: PageObject[] = []
-        for (const k of src.children!) kids.push(cloneObject(k))
-        copy.children = kids
-      }
-      return copy
-    }
-    const offsetCopy = (copy: PageObject): void => {
-      for (const bp of BREAKPOINTS) {
-        const r = copy.rects[bp]
-        if (!r) continue
-        copy.rects[bp] = { ...r, x: r.x + DUP_OFFSET, y: r.y + DUP_OFFSET }
-      }
-    }
     for (const o of originals) {
       const found = locateObj(o.id)!
       const at = found.siblings.findIndex((x) => x.id === o.id)
-      const copy = cloneObject(o)
+      const copy = cloneObjectTree(o, freshName)
       // only nudge the top-level copy's own rects — members stay relative to
       // their group, which moves as a whole
-      offsetCopy(copy)
+      offsetCopyRects(copy, DUP_OFFSET)
       found.siblings.splice(at + 1, 0, copy)
       copies.push(copy)
     }
     selectionIds.value = copies.map((c) => c.id)
     sync()
+  }
+
+  // ---- copy / cut / paste ----
+
+  /**
+   * Copy the selection onto the clipboard: internal deep clone (the paste
+   * source) plus the tagged `__toolback` JSON written to the OS clipboard
+   * (durable, inspectable in other apps). Not undoable — nothing changed.
+   * Returns how many top-level objects were copied.
+   */
+  function copySelected(): number {
+    const originals = topLevelSelection()
+    if (!originals.length) return 0
+    // Pinia-proxied objects are not structured-cloneable — mirror plain data
+    const snapshot = JSON.parse(JSON.stringify(originals)) as PageObject[]
+    clipboard.value = snapshot
+    copyText(clipboardToJson(snapshot)).catch(() => {})
+    return snapshot.length
+  }
+
+  /**
+   * Cut the selection: same clipboard capture as copy, then the originals are
+   * removed — one undoable step. Returns how many top-level objects were cut.
+   */
+  function cutSelected(): number {
+    const originals = topLevelSelection()
+    if (!originals.length) return 0
+    record('Cut')
+    const snapshot = JSON.parse(JSON.stringify(originals)) as PageObject[]
+    clipboard.value = snapshot
+    copyText(clipboardToJson(snapshot)).catch(() => {})
+    const affectedParents = new Set<PageObject>()
+    for (const o of originals) {
+      const found = locateObj(o.id)
+      if (!found) continue
+      const idx = found.siblings.findIndex((x) => x.id === o.id)
+      if (idx !== -1) found.siblings.splice(idx, 1)
+      if (found.parent) affectedParents.add(found.parent)
+    }
+    for (const parent of affectedParents) expandGroup(parent)
+    selectionIds.value = []
+    sync()
+    return snapshot.length
+  }
+
+  /** where paste inserts: the group all selected objects share as parent
+   *  (so pasting while drilled into a group lands inside it), else the top
+   *  level of the page/background being edited */
+  function pasteContainer(): { siblings: PageObject[]; parent: PageObject | null } {
+    const sp = selectionParentId.value
+    if (sp && sp !== 'mixed') {
+      const found = locateObj(sp)
+      if (found && found.obj.control === 'group') {
+        const group = found.obj
+        if (!group.children) group.children = []
+        return { siblings: group.children, parent: group }
+      }
+    }
+    return { siblings: targetObjects.value, parent: null }
+  }
+
+  /**
+   * Paste the clipboard into the current edit target (or the selected group
+   * when the selection shares one). Fresh ids + names, nudged +24px down-right
+   * of the copied positions so repeat pastes cascade, pasted copies selected.
+   * One undoable step.
+   */
+  function pasteClipboard(): number {
+    const src = clipboard.value
+    if (!src || !src.length) return 0
+    record('Paste')
+    const freshName = nameAllocator(collectUsedNames())
+    const { siblings, parent } = pasteContainer()
+    const copies: PageObject[] = []
+    for (const o of src) {
+      const copy = cloneObjectTree(o, freshName)
+      offsetCopyRects(copy, DUP_OFFSET)
+      siblings.push(copy)
+      copies.push(copy)
+    }
+    if (parent) expandGroup(parent)
+    // the in-app mirror now tracks the pasted positions, so the next paste
+    // cascades another 24px (the OS clipboard still holds the original copy)
+    clipboard.value = copies
+    selectionIds.value = copies.map((c) => c.id)
+    sync()
+    return copies.length
   }
 
   function reorderSelection(action: 'front' | 'back' | 'forward' | 'backward'): void {
@@ -1137,6 +1243,11 @@ export const useBookStore = defineStore('book', () => {
     updateProps,
     removeSelected,
     duplicateSelected,
+    copySelected,
+    cutSelected,
+    pasteClipboard,
+    clipboard,
+    canPaste,
     reorderSelection,
     groupSelected,
     ungroupSelected,

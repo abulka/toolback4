@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createObject, type Book } from '@toolback/format'
 import { sampleBook } from '@toolback/format/src/sample'
-import { getObjectRects, isGroupKey, listenForEditor, renderBook, renderObjectInto, shouldToggleRun } from './index'
+import { getObjectRects, isCopyKey, isCutKey, isGroupKey, isPasteKey, listenForEditor, renderBook, renderObjectInto, shouldToggleRun } from './index'
 
 const BG = { id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', objects: [] }
 
@@ -283,6 +283,39 @@ describe('runtime', () => {
       const notInput = new KeyboardEvent('keydown', { key: 'g', code: 'KeyG', altKey: true, bubbles: true })
       Object.defineProperty(notInput, 'target', { value: document.body })
       expect(isGroupKey(notInput)).toBe('group')
+      input.remove()
+    })
+  })
+
+  describe('clipboard shortcut', () => {
+    it('classifies ⌘C/⌘X/⌘V (and Ctrl) as copy/cut/paste, rejects other keys', () => {
+      expect(isCopyKey(key('c', 'KeyC', { metaKey: true }))).toBe(true)
+      expect(isCopyKey(key('c', 'KeyC', { ctrlKey: true }))).toBe(true)
+      expect(isCutKey(key('x', 'KeyX', { metaKey: true }))).toBe(true)
+      expect(isCutKey(key('x', 'KeyX', { ctrlKey: true }))).toBe(true)
+      expect(isPasteKey(key('v', 'KeyV', { metaKey: true }))).toBe(true)
+      expect(isCopyKey(key('v', 'KeyV', { metaKey: true }))).toBe(false)
+      expect(isPasteKey(key('c', 'KeyC', { metaKey: true }))).toBe(false)
+      expect(isCutKey(key('c', 'KeyC', { metaKey: true }))).toBe(false)
+      expect(isCopyKey(key('c', 'KeyC'))).toBe(false)
+      expect(isCopyKey(key('c', 'KeyC', { altKey: true, metaKey: true }))).toBe(false)
+      // shift doesn't disqualify (⌘⇧C etc. still copy)
+      expect(isCopyKey(key('c', 'KeyC', { metaKey: true, shiftKey: true }))).toBe(true)
+    })
+
+    it('ignores ⌘C/⌘X/⌘V while typing in editable targets', () => {
+      const input = document.createElement('input')
+      document.body.appendChild(input)
+      const c = new KeyboardEvent('keydown', { key: 'c', code: 'KeyC', metaKey: true, bubbles: true })
+      Object.defineProperty(c, 'target', { value: input })
+      expect(isCopyKey(c)).toBe(false)
+      const v = new KeyboardEvent('keydown', { key: 'v', code: 'KeyV', metaKey: true, bubbles: true })
+      Object.defineProperty(v, 'target', { value: input })
+      expect(isPasteKey(v)).toBe(false)
+
+      const notInput = new KeyboardEvent('keydown', { key: 'c', code: 'KeyC', metaKey: true, bubbles: true })
+      Object.defineProperty(notInput, 'target', { value: document.body })
+      expect(isCopyKey(notInput)).toBe(true)
       input.remove()
     })
   })
