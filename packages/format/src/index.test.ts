@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CONTROL_KINDS,
   DEFAULT_SIZES,
+  IMAGE_PROVIDERS,
   backgroundFor,
   createBook,
   createBackground,
@@ -10,6 +11,7 @@ import {
   createPage,
   flattenObjects,
   parseBook,
+  randomImageUrl,
   rebaseRect,
   resolveObjectRect,
   resolvePageSize,
@@ -436,6 +438,40 @@ describe('resolveObjectRect (responsive glue — lens)', () => {
       ],
     })
     expect(parsed.success).toBe(false)
+  })
+})
+
+describe('randomImageUrl', () => {
+  it('defaults to a seeded picsum photo at 600x400', () => {
+    const url = randomImageUrl()
+    expect(url).toMatch(/^https:\/\/picsum\.photos\/seed\/[\w-]+\/600\/400$/)
+  })
+
+  it('sizes the image to the given dimensions', () => {
+    expect(randomImageUrl(320, 240, 'picsum')).toMatch(/\/320\/240$/)
+    const di = randomImageUrl(320, 240, 'dummyimage')
+    expect(di).toMatch(/^https:\/\/dummyimage\.com\/320x240\//)
+    expect(di).toContain('&text=')
+  })
+
+  it('falls back to sane sizes for junk dimensions', () => {
+    expect(randomImageUrl(0, -5)).toMatch(/\/600\/400$/)
+  })
+
+  it('produces a readable dummyimage placeholder (colour + encoded label)', () => {
+    const url = randomImageUrl(600, 400, 'dummyimage')
+    expect(url).toMatch(/^https:\/\/dummyimage\.com\/600x400\/[0-9a-f]{6}\/[0-9a-f]{6}&text=\w+$/)
+  })
+
+  it('varies the URL on every call (cache-busting nonce)', () => {
+    // picsum is seeded, so two calls almost never collide
+    const a = new Set()
+    for (let i = 0; i < 20; i++) a.add(randomImageUrl(600, 400, 'picsum'))
+    expect(a.size).toBeGreaterThan(1)
+  })
+
+  it('exposes the providers the UI offers', () => {
+    expect(IMAGE_PROVIDERS).toEqual(['picsum', 'dummyimage'])
   })
 })
 

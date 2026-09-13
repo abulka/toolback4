@@ -298,6 +298,80 @@ export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
   group: {},
 }
 
+/**
+ * Free, key-less image hosts behind the image control's "generate" button. All
+ * work in a plain `<img src>` (no CORS, no auth) — which is all a page needs.
+ * `picsum` returns *actual* photographs; `dummyimage` returns a solid-colour
+ * block with a random label, handy when you only need a placeholder sized to
+ * the object rather than a real picture.
+ */
+export const IMAGE_PROVIDERS = ['picsum', 'dummyimage'] as const
+export type ImageProvider = (typeof IMAGE_PROVIDERS)[number]
+
+/** words the dummyimage placeholder prints so its block looks intentional */
+const PLACEHOLDER_WORDS = [
+  'Lorem', 'ipsum', 'dolor', 'sit', 'amet', 'hello', 'world', 'welcome',
+  'image', 'photo', 'picture', 'graphic', 'artwork', 'illustration',
+  'demo', 'sample', 'example', 'preview', 'mockup', 'wireframe', 'draft',
+  'logo', 'avatar', 'profile', 'portrait', 'headshot', 'cover', 'hero',
+  'banner', 'thumb', 'thumbnail', 'poster', 'card', 'tile', 'panel',
+  'canvas', 'design', 'layout', 'template', 'theme', 'style', 'concept',
+  'gallery', 'album', 'slide', 'screen', 'display', 'view', 'frame',
+  'background', 'texture', 'pattern', 'gradient', 'palette', 'colour',
+  'landscape', 'cityscape', 'nature', 'abstract', 'minimal', 'modern',
+  'retro', 'vintage', 'bright', 'shadow', 'glow', 'focus', 'motion',
+  'content', 'media', 'visual', 'render', 'shot', 'snapshot', 'capture',
+] as const
+
+/** [background, foreground] hex pairs with comfortable contrast */
+const PLACEHOLDER_PALETTES = [
+  ['000000', 'ffffff'],
+  ['ffffff', '000000'],
+  ['3b82f6', 'ffffff'],
+  ['22c55e', '000000'],
+  ['ef4444', 'ffffff'],
+  ['a855f7', 'ffffff'],
+  ['f97316', '000000'],
+  ['0d9488', 'ffffff'],
+] as const
+
+function randomSeed(): string {
+  return (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID().replace(/-/g, '').slice(0, 8)
+    : Math.random().toString(36).slice(2, 10))
+}
+
+function pick<T>(arr: readonly T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]!
+}
+
+/**
+ * Build a URL to a random image from a free host, sized to (w × h) so the
+ * picture fills the image object's own box 1:1. A per-call nonce keeps every
+ * click different. `picsum` seeds the photo so a given URL always shows the
+ * same picture; `dummyimage` instead prints a random word on a random colour
+ * block.
+ */
+export function randomImageUrl(
+  w: number = 600,
+  h: number = 400,
+  provider: ImageProvider = 'picsum',
+): string {
+  let width = Math.round(w)
+  let height = Math.round(h)
+  if (!Number.isFinite(width) || width < 1) width = 600
+  if (!Number.isFinite(height) || height < 1) height = 400
+  const nonce = randomSeed()
+  switch (provider) {
+    case 'dummyimage': {
+      const [bg, fg] = pick(PLACEHOLDER_PALETTES)
+      return `https://dummyimage.com/${width}x${height}/${bg}/${fg}&text=${encodeURIComponent(pick(PLACEHOLDER_WORDS))}`
+    }
+    default:
+      return `https://picsum.photos/seed/${nonce}/${width}/${height}`
+  }
+}
+
 export function safeParseBook(data: unknown) {
   return BookSchema.safeParse(migrateObjects(migrateBackgrounds(data)))
 }

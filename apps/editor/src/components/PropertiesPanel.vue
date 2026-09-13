@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import type { Rect } from '@toolback/format'
 import { useBookStore } from '../stores/book'
 import { collectStoreKeys } from '../storeKeys'
-import { FONT_FAMILIES } from '@toolback/format'
+import { FONT_FAMILIES, IMAGE_PROVIDERS, randomImageUrl, type ImageProvider } from '@toolback/format'
 import { copyText, objectsToJson } from '../copyJson'
 import ScriptEditor from './ScriptEditor.vue'
 import HelpButton from './HelpButton.vue'
@@ -170,6 +170,19 @@ function onPropValue(key: string, v: string): void {
   store.updateProps(sel.value.id, { [key]: v })
 }
 
+// image "generate": fill the selected image object's `src` with a random URL
+// from a free host, sized to the object's own box so it fills the frame 1:1.
+const imageProvider = ref<ImageProvider>('picsum')
+function onProviderChange(e: Event): void {
+  imageProvider.value = (e.target as HTMLSelectElement).value as ImageProvider
+}
+function onGenerateImage(): void {
+  if (!sel.value) return
+  store.updateProps(sel.value.id, {
+     src: randomImageUrl(sel.value.rect.w, sel.value.rect.h, imageProvider.value),
+  })
+}
+
 function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
   if (!sel.value) return
   const n = Math.max(8, Math.round(Number((e.target as HTMLInputElement).value)) || 0)
@@ -292,7 +305,33 @@ function onPaste(): void {
         :store-keys="storeKeyList"
         @update:model-value="onPropValue(f.key, $event)"
       />
-      <input v-else :value="propValue(f.key)" @input="onProp(f.key, $event)" />
+      <input
+        v-else-if="f.key !== 'src'"
+         :value="propValue(f.key)"
+          @input="onProp(f.key, $event)"
+        />
+         <div v-else class="url-row">
+          <input
+           class="url-input"
+            :value="propValue('src')"
+            placeholder="https://…"
+            @input="onProp('src', $event)"
+          />
+          <select
+           class="url-provider"
+            :value="imageProvider"
+            title="Random image source"
+            @change="onProviderChange"
+          >
+           <option v-for="p in IMAGE_PROVIDERS" :key="p" :value="p">{{ p }}</option>
+          </select>
+          <button
+          type="button"
+          class="url-dice"
+          title="Generate a random image URL"
+           @click="onGenerateImage"
+          >🎲</button>
+          </div>
     </div>
     <div v-if="hasStyleRow" class="field">
       <label>Font size · Font</label>
@@ -571,6 +610,49 @@ function onPaste(): void {
 .color-swatch::-webkit-color-swatch {
   border: none;
   border-radius: 4px;
+}
+
+/* image URL field: the input shares its row with the source picker + 🎲 */
+.url-row {
+  display: flex;
+  gap: 6px;
+}
+
+/* beat `.field input { width: 100% }` so the input flexes inside the row */
+.field .url-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
+.url-provider {
+  flex: 0 0 auto;
+  max-width: 120px;
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  color: var(--ed-text);
+  padding: 6px 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.url-dice {
+  flex: 0 0 auto;
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  background: var(--ed-bg);
+  color: var(--ed-text);
+  cursor: pointer;
+  padding: 0 10px;
+  font-size: 15px;
+  line-height: 1;
+  transition: border-color 0.12s, color 0.12s;
+}
+
+.url-dice:hover {
+  border-color: var(--ed-accent);
+  color: var(--ed-accent);
 }
 
 /* beats `.field input`'s width: 100% */
