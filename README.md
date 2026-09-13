@@ -1,5 +1,9 @@
 # Toolback
 
+[![Netlify Status](https://api.netlify.com/api/v1/badges/423a3b82-0672-47e6-957f-4272b6a5948b/deploy-status)](https://app.netlify.com/sites/toolback/deploys)
+
+Try it live: **[toolback.netlify.app](https://toolback.netlify.app)**
+
 A modern **ToolBook** spiritual successor: *book → pages → objects*, authored
 visually, scripted in **plain JavaScript**. If you ever built something in
 ToolBook or HyperCard, you'll feel at home — everything else is 2026.
