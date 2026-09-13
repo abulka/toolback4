@@ -174,6 +174,49 @@ reusable widget/component library, version history, AI helpers, analytics.
 - **Group scripts** — ✅ shipped in M5 (groups are parent objects; DOM bubbling powers group handlers)
 - **Book script layer** — one shared script above background in the page/background/book hierarchy, running once per book (bookEnter hook). Natural home for global npm imports: import once, stash on `window`, use everywhere (see scripting guide "Using one library across the whole book"). See also PLAN-NPM-SUPPORT.md.
 
+## Copy / paste — design & future-proofing notes
+
+Shipped 2026-09-13 (⌘C/⌘X/⌘V; see Progress log). One in-app clipboard mirror in the
+store (`stores/book.ts`) holds a deep JSON clone of the top-level selection; copy/cut
+also write a `{ "__toolback": 1, "objects": … }` tagged payload to the system clipboard
+(`copyJson.ts`). Paste re-ids/re-names, offsets +24px, cascades on repeat, targets the
+selection's group (else top level). Copy = no undo step; cut/paste = one each.
+
+**Why copy/paste is future-proof by construction:** both copy and paste deep-clone the
+*whole* object graph as opaque JSON (`JSON.parse(JSON.stringify(…))`), not field by
+field — so any future leaf on `PageObject` (style, states, accessibility, renderer
+data, …) automatically rides through copy, across containers, and back through paste.
+Only proviso: values must be JSON-serializable, which is already a book-wide structural
+constraint (the book always crosses the iframe as a JSON clone).
+
+**Known limitations** (as of the shipped build):
+
+1. **Re-id/re-name recurses only into `children`** — `cloneObjectTree` regenerates
+   `id`/`name` for the object and its group members. If the format later gains a
+   *second* nested container with its own ids/names (e.g. `states: […]`, `layers: […]`),
+   those nested ids would be copied verbatim → duplicate handles/collisions. New leaf
+   fields are safe; nested-identity fields are not.
+2. **No per-instance freshness for arbitrary new fields** — anything a future feature
+   needs regenerated per copy (a UUID, a unique key outside `id`/`name`) is copied
+   as-is. Same limitation duplicate already has.
+3. **Envelope is version-locked (`__toolback: 1`)** — `parseClipboardJson` rejects any
+   other version (safe: never misparses). The app-side paste only reads the in-app
+   mirror, so the envelope version doesn't gate the core flow; it matters only if an
+   OS-clipboard paste path is wired up later.
+4. **Paste doesn't re-validate via zod** — pasted objects bypass `PageObjectSchema.parse`,
+   so no default backfill on paste. Harmless today (the mirror came from a validated
+   book); only relevant if paste ever reads the OS clipboard.
+
+**Potential hardenings** (deferred — do when a future feature needs them, not before):
+
+- **`refreshObjectIdentity(src, freshName)` seam** — extract a single identity-refresh
+  seam from `cloneObjectTree` (recursing `children` today) so a future nested container
+  is one registration point instead of a rewrite of the clone logic.
+- **Schema-parse on paste** — run pasted clones through `PageObjectSchema.parse` to
+  backfill new defaults and catch schema drift (~3 lines, belts-and-braces).
+- **Version-tolerant envelope** — accept `__toolback >= 1` to smooth cross-version
+  copy/paste if the payload shape ever evolves.
+
 ## Risks
 
 - **M1 editor chrome is the biggest single build item** — it's custom, so no library can stall it; budget attention there first.
