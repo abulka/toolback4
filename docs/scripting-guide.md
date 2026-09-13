@@ -66,13 +66,37 @@ the shortcut again duplicates the duplicates (each one cascades further).
   groups behave exactly alike
 - Undoable in one step (and redoable)
 
-## Copy JSON
+## Copy · cut · paste
 
-The Selection panel has a **{ } JSON** button (next to the object name; the
-multi-selection panel has a **Copy JSON** action). It copies the selected
-object — including any sub-objects — to the clipboard as pretty-printed JSON
-(a multi-selection copies an array). Handy for inspecting and describing
-structures, and the seed of a future copy/paste feature.
+Copy, cut and paste move objects around — a single object, or any multi-selection
+of objects, however disparate. Groups copy with their whole subtree.
+
+- **Keyboard:** `⌘C` copy · `⌘X` cut · `⌘V` paste (Ctrl on Windows/Linux) — work
+  with the canvas focused too
+- **Selection panel:** Copy / Cut / Paste buttons (Paste is disabled until
+  something is on the clipboard)
+- Copies land **24px down-right** of where the copied objects were, so repeat
+  pastes cascade. A multi-selection pastes as a set, keeping each object's
+  position relative to the others
+- **Paste target:** pasting while the selection is inside a group inserts the
+  copies into that group; otherwise they go to the top level of the page or
+  background being edited
+- Pasted and cut-then-pasted objects get fresh ids and names (`label1`,
+  `group1`, …) in the shared page+background namespace, so script handles never
+  collide with existing ones
+- Cut removes the originals; **one undo** brings them back (cut and paste are
+  each a single undo step)
+- Pasting only accepts toolback clipboard data: a copy writes a JSON payload
+  tagged with a `__toolback` key to the system clipboard, so pasting in other
+  apps shows that JSON and random copied text can never be pasted as objects
+- Object copy/cut/paste never interferes with the **text** clipboard — inside
+  script editors, text fields or inputs, `⌘C`/`⌘X`/`⌘V` still copy, cut and
+  paste text as usual
+
+The **{ } JSON** button (next to the object name; the multi-selection panel has
+a **Copy JSON** action) is unchanged: it copies the selection — subtree included
+— to the clipboard as plain pretty-printed JSON, useful for inspecting and
+describing structures.
 
 ## Undo / redo
 

@@ -99,6 +99,21 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
       case 'toolback:ungroup':
         store.ungroupSelected()
         break
+      case 'toolback:copy': {
+        const n = store.copySelected()
+        if (n) store.flashCanvasNote(`Copied ${n} object${n === 1 ? '' : 's'}`)
+        break
+      }
+      case 'toolback:cut': {
+        const n = store.cutSelected()
+        if (n) store.flashCanvasNote(`Cut ${n} object${n === 1 ? '' : 's'}`)
+        break
+      }
+      case 'toolback:paste': {
+        const n = store.pasteClipboard()
+        if (n) store.flashCanvasNote(`Pasted ${n} object${n === 1 ? '' : 's'}`)
+        break
+      }
     }
   })
 }

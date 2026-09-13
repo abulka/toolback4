@@ -219,6 +219,22 @@ async function copyJson(): Promise<void> {
   clearTimeout(copiedTimer)
   copiedTimer = setTimeout(() => (copied.value = false), 1500)
 }
+
+function flash(n: number, word: string): void {
+  if (n) store.flashCanvasNote(`${word} ${n} object${n === 1 ? '' : 's'}`)
+}
+
+function onCopy(): void {
+  flash(store.copySelected(), 'Copied')
+}
+
+function onCut(): void {
+  flash(store.cutSelected(), 'Cut')
+}
+
+function onPaste(): void {
+  flash(store.pasteClipboard(), 'Pasted')
+}
 </script>
 
 <template>
@@ -236,8 +252,13 @@ async function copyJson(): Promise<void> {
     <div class="actions">
       <button class="action" :disabled="!store.groupEligible" @click="store.groupSelected()">Group</button>
       <button class="action" :disabled="!store.ungroupEligible" @click="onUngroup">Ungroup</button>
-      <button class="action" @click="copyJson">{{ copied ? '✓ Copied' : 'Copy JSON' }}</button>
       <button class="action danger" @click="store.removeSelected()">Delete</button>
+    </div>
+    <div class="actions">
+      <button class="action" @click="onCopy">Copy</button>
+      <button class="action" @click="onCut">Cut</button>
+      <button class="action" :disabled="!store.canPaste" @click="onPaste">Paste</button>
+      <button class="action" @click="copyJson">{{ copied ? '✓ Copied' : 'Copy JSON' }}</button>
     </div>
     <p v-if="store.selectionIds.length >= 2 && !store.groupEligible" class="hint warn">
       Grouping needs all selected objects under the same parent.
@@ -254,6 +275,12 @@ async function copyJson(): Promise<void> {
         title="Copy this object's JSON (including sub-objects) to the clipboard"
         @click="copyJson"
       >{{ copied ? '✓ Copied' : '{ } JSON' }}</button>
+    </div>
+
+    <div class="actions">
+      <button class="action" @click="onCopy">Copy</button>
+      <button class="action" @click="onCut">Cut</button>
+      <button class="action" :disabled="!store.canPaste" @click="onPaste">Paste</button>
     </div>
 
     <h2>Content</h2>
