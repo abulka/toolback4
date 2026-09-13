@@ -4,3 +4,6 @@ dist/
 .DS_Store
 .playwright-mcp/
 examples/vscode-sync/
+# generated bundles — rebuilt by build-player.mjs / build-libs.mjs
+apps/editor/public/libs/
+apps/editor/public/toolback-player.js
