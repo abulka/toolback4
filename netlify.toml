@@ -2,6 +2,9 @@
   command = "pnpm install && pnpm build"
   publish = "apps/editor/dist"
 
+[build.environment]
+  NODE_VERSION = "24"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
