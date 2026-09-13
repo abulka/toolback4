@@ -21,13 +21,13 @@ export function sampleBook(): Book {
         objects: [          createObject(
             'label',
             'helloLabel',
-            { desktop: { x: 96, y: 96, w: 480, h: 56 } },
+            { x: 96, y: 96, w: 480, h: 56 },
             { text: 'Hello, Toolbook nostalgia!' },
           ),
           createObject(
             'button',
             'myButton',
-            { desktop: { x: 96, y: 184, w: 176, h: 48 } },
+            { x: 96, y: 184, w: 176, h: 48 },
             { text: 'Click me' },
           ),
         ],

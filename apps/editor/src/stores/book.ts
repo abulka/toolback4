@@ -12,20 +12,23 @@ import {
   newId,
   parseBook,
   rebaseRect,
+  resolveObjectRect,
+  unlensObjectRect,
   resolvePageSize,
+  scaleRect,
   unionRects,
   unrebaseRect,
-  BREAKPOINTS,
   type Background,
   type Book,
   type Breakpoint,
   type CanvasSize,
   type ControlKind,
+  type FitHintMode,
   type PageObject,
   type Rect,
 } from '@toolback/format'
 import { sampleBook } from '@toolback/format/src/sample'
-import type { EditorToCanvasMessage, ObjectRects } from '@toolback/runtime'
+import type { EditorToCanvasMessage, HandleDir, ObjectRects } from '@toolback/runtime'
 import {
   getRecentBook,
   getRecents,
@@ -78,6 +81,21 @@ export const useBookStore = defineStore('book', () => {
   const paletteWidth = ref<number>(
     Number(localStorage.getItem('toolback.paletteWidth')) || 220,
   )
+  /** which objects show glue-spring hints (toolbar control) */
+  function readFitHintsMode(): FitHintMode {
+    const raw = localStorage.getItem('toolback.fitHints')
+    if (raw === '1') return 'all'
+    if (raw === '0') return 'off'
+    if (raw === 'all' || raw === 'selected' || raw === 'off') return raw
+    return 'all'
+  }
+  const fitHintMode = ref<FitHintMode>(readFitHintsMode())
+
+  function setFitHintMode(mode: FitHintMode): void {
+    fitHintMode.value = mode
+    localStorage.setItem('toolback.fitHints', mode)
+    sync()
+  }
 
   const activePage = computed(
     () => book.value.pages[currentPageIndex.value] ?? book.value.pages[0]!,
@@ -251,6 +269,7 @@ export const useBookStore = defineStore('book', () => {
           : { kind: 'page', index: currentPageIndex.value },
       design: !isRunning.value,
       selection: selectionIds.value,
+      fitHints: fitHintMode.value,
     })
     clearTimeout(autosaveTimer)
     autosaveTimer = setTimeout(() => {
@@ -307,6 +326,27 @@ export const useBookStore = defineStore('book', () => {
     return walk(targetObjects.value, [])
   }
 
+  /** the rect a group is actually RENDERED at in a given breakpoint — the
+   *  lensed rect for a top-level group, else its relative base rect. Members
+   *  are positioned relative to the rendered box, so this is the origin. */
+  function renderedRectFor(obj: PageObject, bp: Breakpoint): Rect {
+    const found = locateObj(obj.id)
+    if (found && found.parent === null) {
+      const bg =
+        editing.value.kind === 'background'
+          ? (activeBackground.value ?? undefined)
+          : backgroundFor(book.value, activePage.value)
+      const pageSize = resolvePageSize(book.value, bg, bp)
+      const refSize = resolvePageSize(book.value, bg, 'desktop')
+      return resolveObjectRect(obj, pageSize, refSize)
+    }
+    return obj.rect
+  }
+
+  function renderedRectOf(obj: PageObject): Rect {
+    return renderedRectFor(obj, breakpoint.value)
+  }
+
   /** absolute page-space origin of an object (sum of ancestor group origins) */
   function absOriginOf(id: string): { x: number; y: number } {
     const chain = locateChain(id)
@@ -315,7 +355,7 @@ export const useBookStore = defineStore('book', () => {
     let y = 0
     for (let i = 0; i < chain.length - 1; i++) {
       const g = chain[i]!
-      const r = g.rects[breakpoint.value] ?? g.rects.desktop
+      const r = renderedRectOf(g)
       x += r.x
       y += r.y
     }
@@ -782,63 +822,175 @@ export const useBookStore = defineStore('book', () => {
 
   function addObject(control: ControlKind, rect: Rect): void {
     record('Add ' + control)
-    const obj = createObject(control, uniqueName(control), { desktop: rect }, { ...DEFAULT_PROPS[control] })
+    const obj = createObject(control, uniqueName(control), rect, { ...DEFAULT_PROPS[control] })
     targetObjects.value.push(obj)
     selectionIds.value = [obj.id]
     sync()
   }
 
-  function applyRects(list: Array<{ id: string; rect: Rect }>): void {
+  /**
+   * Apply committed geometry from a canvas drag. There is one authored layout;
+   * a top-level object's dragged rect is folded through the lens back onto its
+   * base rect (constrained axes re-anchor, free axes take the value), so every
+   * breakpoint follows. Center is rigid (the canvas clamps that axis). A member
+   * is positioned relative to its group's rendered box. Panel/script writes use
+   * setGeometry.
+   */
+  function applyRects(
+    list: Array<{ id: string; rect: Rect }>,
+    opts?: { dir?: HandleDir },
+  ): void {
     if (!list.some(({ id }) => locateObj(id))) return
+    const bp = breakpoint.value
+    const bg =
+      editing.value.kind === 'background'
+        ? (activeBackground.value ?? undefined)
+        : backgroundFor(book.value, activePage.value)
+    const pageSize = resolvePageSize(book.value, bg, bp)
+    const refSize = resolvePageSize(book.value, bg, 'desktop')
     const key = 'rect:' + [...new Set(list.map((l) => l.id))].sort().join(',')
     record('Move/Resize', key)
+    // a group in the batch handles its own members: skip their entries (the
+    // design payload lists the pre-scaled page-absolute rects for them)
+    const skip = new Set<string>()
+    const markSubtree = (obj: PageObject): void => {
+      for (const c of obj.children ?? []) {
+        skip.add(c.id)
+        markSubtree(c)
+      }
+    }
+    for (const { id } of list) {
+      const f = locateObj(id)
+      if (f && f.obj.control === 'group') markSubtree(f.obj)
+    }
+    // scale a group's whole subtree onto its new box around the handle corner
+    const scaleChildren = (group: PageObject, oldRect: Rect, newRect: Rect): void => {
+      const fx = oldRect.w === 0 ? 1 : newRect.w / oldRect.w
+      const fy = oldRect.h === 0 ? 1 : newRect.h / oldRect.h
+      const dir = opts?.dir
+      const corner = {
+        x: dir?.includes('w') ? oldRect.x + oldRect.w : oldRect.x,
+        y: dir?.includes('n') ? oldRect.y + oldRect.h : oldRect.y,
+      }
+      const walk = (
+        parent: PageObject,
+        parentOld: { x: number; y: number },
+        parentNew: { x: number; y: number },
+      ): void => {
+        for (const c of parent.children ?? []) {
+          const oldAbs = { x: parentOld.x + c.rect.x, y: parentOld.y + c.rect.y, w: c.rect.w, h: c.rect.h }
+          const newAbs = scaleRect(oldAbs, corner, fx, fy)
+          c.rect = { x: newAbs.x - parentNew.x, y: newAbs.y - parentNew.y, w: newAbs.w, h: newAbs.h }
+          if (c.children?.length) walk(c, { x: oldAbs.x, y: oldAbs.y }, { x: newAbs.x, y: newAbs.y })
+        }
+      }
+      walk(group, { x: oldRect.x, y: oldRect.y }, { x: newRect.x, y: newRect.y })
+    }
     const affectedParents = new Set<PageObject>()
     for (const { id, rect } of list) {
+      if (skip.has(id)) continue
       const found = locateObj(id)
       if (!found) continue
-      const origin = absOriginOf(id)
-      const local = found.parent ? rebaseRect(rect, origin) : rect
-      found.obj.rects = { ...found.obj.rects, [breakpoint.value]: local }
+      const obj = found.obj
+      const oldRect = obj.rect
+      const newRect = found.parent
+        ? rebaseRect(rect, absOriginOf(id))
+        : unlensObjectRect(oldRect, rect, obj.fit, pageSize, refSize)
+      if (
+        obj.control === 'group' &&
+        obj.children?.length &&
+        (newRect.w !== oldRect.w || newRect.h !== oldRect.h)
+      ) {
+        scaleChildren(obj, oldRect, newRect)
+      }
+      obj.rect = newRect
       if (found.parent) affectedParents.add(found.parent)
     }
     for (const parent of affectedParents) expandGroup(parent)
     sync()
   }
 
+  /** human label for the declared constraints, e.g. "Center · Middle" —
+   *  Free axes are omitted ("Free" when nothing is constrained) */
+  function fitLabelOf(obj: PageObject): string {
+    const parts: string[] = []
+    const H: Record<string, string> = { left: 'Left', center: 'Center', right: 'Right', stretch: 'Stretch' }
+    const V: Record<string, string> = { top: 'Top', center: 'Center', bottom: 'Bottom', stretch: 'Stretch' }
+    const hm = obj.fit?.x
+    const vm = obj.fit?.y
+    if (hm && hm !== 'free') parts.push(H[hm] ?? hm)
+    if (vm && vm !== 'free') parts.push(V[vm] ?? vm)
+    return parts.join(' · ') || 'Free'
+  }
+
+  /** drop one fit axis (used when a write can't be expressed through it) */
+  function clearFitAxis(obj: PageObject, axis: 'x' | 'y'): void {
+    if (!obj.fit) return
+    const next = { ...obj.fit }
+    delete next[axis]
+    obj.fit = Object.keys(next).length === 0 ? undefined : next
+  }
+
   /**
-   * Recompute a group's rect as the tight bounds of its members — the box
-   * always hugs the content: it grows when a member moves out AND shrinks
-   * when members move in. If the origin moves, all members shift by the
-   * origin delta so nothing jumps on screen. Recurses up for nested groups.
+   * One undoable geometry patch (panel fields + author bridge). For a top-level
+   * object the typed value describes the RENDERED rect; it is folded through the
+   * lens back onto the object's one base rect (glue survives). Center position
+   * writes release that axis (a centered coordinate has no offset to edit). A
+   * member patches its relative base directly.
+   */
+  function setGeometry(id: string, patch: { x?: number; y?: number; w?: number; h?: number }): void {
+    const found = locateObj(id)
+    if (!found) return
+    const obj = found.obj
+    const keys = Object.keys(patch).filter((k) => patch[k as keyof typeof patch] !== undefined)
+    if (!keys.length) return
+    record('Geometry', `geo:${id}:${keys.sort().join(',')}`)
+    // a typed position on a centered axis can't be represented — un-glue it
+    if (patch.x !== undefined && obj.fit?.x === 'center') clearFitAxis(obj, 'x')
+    if (patch.y !== undefined && obj.fit?.y === 'center') clearFitAxis(obj, 'y')
+    const applyPatch = (r: Rect): void => {
+      if (patch.x !== undefined) r.x = Math.round(patch.x)
+      if (patch.y !== undefined) r.y = Math.round(patch.y)
+      if (patch.w !== undefined) r.w = Math.max(1, Math.round(patch.w))
+      if (patch.h !== undefined) r.h = Math.max(1, Math.round(patch.h))
+    }
+    if (found.parent) {
+      const rect: Rect = { ...obj.rect }
+      applyPatch(rect)
+      obj.rect = rect
+      expandGroup(found.parent)
+    } else {
+      const bg =
+        editing.value.kind === 'background'
+          ? (activeBackground.value ?? undefined)
+          : backgroundFor(book.value, activePage.value)
+      const pageSize = resolvePageSize(book.value, bg, breakpoint.value)
+      const refSize = resolvePageSize(book.value, bg, 'desktop')
+      const dragged = { ...resolveObjectRect(obj, pageSize, refSize) }
+      applyPatch(dragged)
+      obj.rect = unlensObjectRect(obj.rect, dragged, obj.fit, pageSize, refSize)
+    }
+    sync()
+  }
+
+  /**
+   * Keep a group's box hugging its members, in the group's own (relative)
+   * frame: shift members so their union starts at the local origin and set the
+   * box to the union. Member absolute positions are preserved; recurses up for
+   * nested groups. This is breakpoint-independent — members are relative, so
+   * one base layout covers every page size.
    */
   function expandGroup(parent: PageObject): void {
-    const bp = breakpoint.value
-    const before = parent.rects[bp] ?? parent.rects.desktop
     const kids = parent.children ?? []
     if (!kids.length) return
-    const childAbs = kids.map((c) =>
-      unrebaseRect(c.rects[bp] ?? c.rects.desktop, { x: before.x, y: before.y }),
-    )
-    const grown = unionRects(childAbs)
-    if (
-      grown.x === before.x &&
-      grown.y === before.y &&
-      grown.w === before.w &&
-      grown.h === before.h
-    ) {
-      return
+    const union = unionRects(kids.map((c) => c.rect))
+    const dx = -union.x
+    const dy = -union.y
+    if (dx === 0 && dy === 0 && union.w === parent.rect.w && union.h === parent.rect.h) return
+    for (const c of kids) {
+      c.rect = { ...c.rect, x: c.rect.x + dx, y: c.rect.y + dy }
     }
-    const dx = before.x - grown.x
-    const dy = before.y - grown.y
-    parent.rects = { ...parent.rects, [bp]: grown }
-    const shift = (objs: PageObject[]): void => {
-      for (const c of objs) {
-        const r = c.rects[bp] ?? c.rects.desktop
-        c.rects = { ...c.rects, [bp]: { x: r.x + dx, y: r.y + dy, w: r.w, h: r.h } }
-      }
-    }
-    shift(kids)
-    // the group's own abs rect may now exceed (or no longer fill) ITS parent
+    parent.rect = { x: parent.rect.x - dx, y: parent.rect.y - dy, w: union.w, h: union.h }
     const grand = locateObj(parent.id)?.parent
     if (grand) expandGroup(grand)
   }
@@ -856,6 +1008,40 @@ export const useBookStore = defineStore('book', () => {
     for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k]
     obj.props = next
     sync()
+  }
+
+  /**
+   * Set the responsive glue (see format FitSpec). The constraint is a
+   * non-destructive render LENS: it never writes the rect — the canvas
+   * re-renders with the constrained axes derived (the base size included), and
+   * switching back to Free restores the authored layout exactly. Group members
+   * sit relative to their group — fit is top-level only.
+   */
+  function setObjectFit(id: string, axis: 'x' | 'y', mode: string | null): void {
+    const found = locateObj(id)
+    if (!found || found.parent) return
+    const obj = found.obj
+    record('Responsive', `fit:${id}`)
+    const next: Record<string, string> = { ...(obj.fit ?? {}) }
+    if (mode === null || mode === '') delete next[axis]
+    else next[axis] = mode
+    obj.fit = Object.keys(next).length === 0 ? undefined : ({ ...next } as PageObject['fit'])
+    sync()
+  }
+
+  /** effective (rendered) rect of an object at the active breakpoint —
+   *  the glue-derived fit; what the canvas actually shows (the X/Y/W/H
+   *  fields must match it) */
+  function effectiveRectOf(id: string): Rect | null {
+    const obj = locateObj(id)?.obj
+    if (!obj) return null
+    const bg =
+      editing.value.kind === 'background'
+        ? (activeBackground.value ?? undefined)
+        : backgroundFor(book.value, activePage.value)
+    const pageSize = resolvePageSize(book.value, bg, breakpoint.value)
+    const refSize = resolvePageSize(book.value, bg, 'desktop')
+    return resolveObjectRect(obj, pageSize, refSize)
   }
 
   function removeSelected(): void {
@@ -938,17 +1124,13 @@ export const useBookStore = defineStore('book', () => {
       return copy
     }
     const offsetCopy = (copy: PageObject): void => {
-      for (const bp of BREAKPOINTS) {
-        const r = copy.rects[bp]
-        if (!r) continue
-        copy.rects[bp] = { ...r, x: r.x + DUP_OFFSET, y: r.y + DUP_OFFSET }
-      }
+      copy.rect = { ...copy.rect, x: copy.rect.x + DUP_OFFSET, y: copy.rect.y + DUP_OFFSET }
     }
     for (const o of originals) {
       const found = locateObj(o.id)!
       const at = found.siblings.findIndex((x) => x.id === o.id)
       const copy = cloneObject(o)
-      // only nudge the top-level copy's own rects — members stay relative to
+      // only nudge the top-level copy.s own rect — members stay relative to
       // their group, which moves as a whole
       offsetCopy(copy)
       found.siblings.splice(at + 1, 0, copy)
@@ -999,19 +1181,13 @@ export const useBookStore = defineStore('book', () => {
     const insertAt = Math.max(...indices) - (members.length - 1)
 
     record('Group')
-    const groupRects: Record<string, Rect> = {}
-    for (const bp of BREAKPOINTS) {
-      const rectsForBp = members.map((m) => m.rects[bp] ?? m.rects.desktop)
-      groupRects[bp] = unionRects(rectsForBp)
-    }
+    const groupRect = unionRects(members.map((m) => m.rect))
     const rebased = members.map((m) => {
       const next: PageObject = JSON.parse(JSON.stringify(m))
-      for (const bp of BREAKPOINTS) {
-        next.rects[bp] = rebaseRect(next.rects[bp] ?? next.rects.desktop, groupRects[bp]!)
-      }
+      next.rect = rebaseRect(next.rect, groupRect)
       return next
     })
-    const group = createGroup(uniqueName('group'), groupRects as never, rebased)
+    const group = createGroup(uniqueName('group'), groupRect, rebased)
 
     for (const m of members) {
       const i = siblings.indexOf(m)
@@ -1030,15 +1206,10 @@ export const useBookStore = defineStore('book', () => {
     const idx = found.siblings.findIndex((o) => o.id === found.obj.id)
     const children = group.children ?? []
     for (const child of children) {
-      const nextRects: Record<string, Rect> = {}
-      for (const bp of BREAKPOINTS) {
-        const groupR = group.rects[bp] ?? group.rects.desktop
-        nextRects[bp] = unrebaseRect(child.rects[bp] ?? child.rects.desktop, {
-          x: groupR.x,
-          y: groupR.y,
-        })
-      }
-      child.rects = nextRects as never
+      // place members where the group is actually rendered at the current bp
+      // so ungrouping never jumps them on screen
+      const groupR = renderedRectOf(group)
+      child.rect = unrebaseRect(child.rect, { x: groupR.x, y: groupR.y })
     }
     found.siblings.splice(idx, 1, ...children)
     selectionIds.value = children.map((c) => c.id)
@@ -1102,6 +1273,8 @@ export const useBookStore = defineStore('book', () => {
     setPaletteWidth,
     savePaletteWidth,
     resetPaletteWidth,
+    fitHintMode,
+    setFitHintMode,
     setEventScript,
     setPageScript,
     setDesignStore,
@@ -1135,6 +1308,9 @@ export const useBookStore = defineStore('book', () => {
     applyRect,
     applyRects,
     updateProps,
+    setObjectFit,
+    setGeometry,
+    effectiveRectOf,
     removeSelected,
     duplicateSelected,
     reorderSelection,

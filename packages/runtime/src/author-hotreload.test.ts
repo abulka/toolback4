@@ -27,12 +27,12 @@ describe('repro: c is not defined', () => {
       id: 'b', title: 'T', canvas: { desktop: { width: 800, height: 600 } },
       backgrounds: [{ id: 'bg1', name: 'M', color: '#fff', script: '', objects: [] }],
       pages: [
-        { id: 'p1', name: 'C', script: '', backgroundId: 'bg1', objects: [createObject('label', 'target', { desktop: { x: 0, y: 0, w: 50, h: 20 } })] },
+        { id: 'p1', name: 'C', script: '', backgroundId: 'bg1', objects: [createObject('label', 'target', { x: 0, y: 0, w: 50, h: 20 })] },
         {
           id: 'p2', name: 'MyPlugin', script: '', backgroundId: 'bg1',
           objects: [
-            { ...createObject('button', 'button1', { desktop: { x: 8, y: 8, w: 120, h: 36 } }), on: { click: GUIDE_RECIPE } },
-            { ...createObject('label', 'pluginLabel', { desktop: { x: 8, y: 80, w: 220, h: 30 } }), props: { text: 'note={{lastNote}}' } },
+            { ...createObject('button', 'button1', { x: 8, y: 8, w: 120, h: 36 }), on: { click: GUIDE_RECIPE } },
+            { ...createObject('label', 'pluginLabel', { x: 8, y: 80, w: 220, h: 30 }), props: { text: 'note={{lastNote}}' } },
           ],
         },
       ],
@@ -97,11 +97,11 @@ for (const o of objs) await o.set({ color: c })`
       id: 'b', title: 'T', canvas: { desktop: { width: 800, height: 600 } },
       backgrounds: [{ id: 'bg1', name: 'M', color: '#fff', script: '', objects: [] }],
       pages: [
-        { id: 'p1', name: 'C', script: '', backgroundId: 'bg1', objects: [createObject('label', 'target', { desktop: { x: 0, y: 0, w: 50, h: 20 } })] },
+        { id: 'p1', name: 'C', script: '', backgroundId: 'bg1', objects: [createObject('label', 'target', { x: 0, y: 0, w: 50, h: 20 })] },
         {
           id: 'p2', name: 'MyPlugin', script: '', backgroundId: 'bg1',
           objects: [
-            { ...createObject('button', 'button1', { desktop: { x: 8, y: 8, w: 120, h: 36 } }), on: { click: draftScript } },
+            { ...createObject('button', 'button1', { x: 8, y: 8, w: 120, h: 36 }), on: { click: draftScript } },
           ],
         },
       ],

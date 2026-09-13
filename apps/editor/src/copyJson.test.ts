@@ -4,8 +4,8 @@ import { objectsToJson } from './copyJson'
 
 describe('objectsToJson', () => {
   it('serializes a single object with its sub-object subtree', () => {
-    const kid = createObject('button', 'kid', { desktop: { x: 0, y: 0, w: 40, h: 20 } })
-    const group = createGroup('grp', { desktop: { x: 10, y: 10, w: 100, h: 50 } }, [kid])
+    const kid = createObject('button', 'kid', { x: 0, y: 0, w: 40, h: 20 })
+    const group = createGroup('grp', { x: 10, y: 10, w: 100, h: 50 }, [kid])
     const json = objectsToJson([group])
     const parsed = JSON.parse(json)
     expect(parsed.name).toBe('grp')
@@ -14,8 +14,8 @@ describe('objectsToJson', () => {
   })
 
   it('serializes multi-selections as an array', () => {
-    const a = createObject('label', 'a', { desktop: { x: 0, y: 0, w: 10, h: 10 } })
-    const b = createObject('label', 'b', { desktop: { x: 20, y: 0, w: 10, h: 10 } })
+    const a = createObject('label', 'a', { x: 0, y: 0, w: 10, h: 10 })
+    const b = createObject('label', 'b', { x: 20, y: 0, w: 10, h: 10 })
     const parsed = JSON.parse(objectsToJson([a, b]))
     expect(Array.isArray(parsed)).toBe(true)
     expect(parsed.map((o: { name: string }) => o.name)).toEqual(['a', 'b'])

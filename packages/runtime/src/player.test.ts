@@ -102,11 +102,11 @@ describe('groups', () => {
     const child = createObject(
       'button',
       'kidBtn',
-      { desktop: { x: 10, y: 10, w: 100, h: 40 } },
+      { x: 10, y: 10, w: 100, h: 40 },
       { text: 'kid' },
     )
     child.on = opts?.childOn ?? {}
-    const group = createGroup('myGroup', { desktop: { x: 40, y: 40, w: 200, h: 100 } }, [child])
+    const group = createGroup('myGroup', { x: 40, y: 40, w: 200, h: 100 }, [child])
     group.on = opts?.groupOn ?? {}
     const book: Book = {
       id: 'bg',
@@ -329,9 +329,9 @@ describe('groups', () => {
 
   it('nested groups render and script through the tree', () => {
     const root = document.createElement('div')
-    const leaf = createObject('label', 'leaf', { desktop: { x: 4, y: 4, w: 50, h: 20 } }, { text: 'leaf' })
-    const inner = createGroup('inner', { desktop: { x: 8, y: 8, w: 60, h: 40 } }, [leaf])
-    const outer = createGroup('outer', { desktop: { x: 20, y: 20, w: 100, h: 80 } }, [inner])
+    const leaf = createObject('label', 'leaf', { x: 4, y: 4, w: 50, h: 20 }, { text: 'leaf' })
+    const inner = createGroup('inner', { x: 8, y: 8, w: 60, h: 40 }, [leaf])
+    const outer = createGroup('outer', { x: 20, y: 20, w: 100, h: 80 }, [inner])
     const book: Book = {
       id: 'bn',
       title: 'N',
@@ -368,7 +368,7 @@ function makeBook(opts: {
           const obj = createObject(
             o.control,
             o.name,
-            { desktop: { x: 0, y: 0, w: 100, h: 40 } },
+            { x: 0, y: 0, w: 100, h: 40 },
             o.text !== undefined ? { text: o.text, ...(o.props ?? {}) } : (o.props ?? {}),
           )
           return { ...obj, on: o.on ?? {} }
@@ -728,7 +728,7 @@ describe('player', () => {
             backgroundId: 'bg1',
             objects: [
               {
-                ...createObject('button', 'answer', { desktop: { x: 0, y: 0, w: 100, h: 40 } }),
+                ...createObject('button', 'answer', { x: 0, y: 0, w: 100, h: 40 }),
                 on: { click: `store.set('from', 'quiz'); page.go('Results')` },
               },
             ],
@@ -740,7 +740,7 @@ describe('player', () => {
             backgroundId: 'bg1',
             objects: [
               {
-                ...createObject('label', 'scoreLabel', { desktop: { x: 0, y: 0, w: 200, h: 40 } }),
+                ...createObject('label', 'scoreLabel', { x: 0, y: 0, w: 200, h: 40 }),
                 props: { text: 'Score: {{score}}' },
               },
             ],
@@ -811,7 +811,7 @@ describe('player', () => {
 
   describe('rect properties', () => {
     function rectBook(on?: Record<string, string>): Book {
-      const obj = createObject('label', 'box', { desktop: { x: 40, y: 60, w: 120, h: 80 } }, { text: 'box' })
+      const obj = createObject('label', 'box', { x: 40, y: 60, w: 120, h: 80 }, { text: 'box' })
       const book = makeBook({ objects: [] })
       book.pages[0]!.objects = [{ ...obj, on: on ?? {} }]
       return book
@@ -849,7 +849,7 @@ describe('player', () => {
       expect(wrapper.style.width).toBe('300px')
       expect(wrapper.style.height).toBe('40px')
 
-      const stored = book.pages[0]!.objects[0]!.rects.desktop
+      const stored = book.pages[0]!.objects[0]!.rect
       expect(stored).toEqual({ x: 200, y: 90, w: 300, h: 40 })
       handle.stop()
     })
@@ -899,34 +899,30 @@ describe('player', () => {
       root.remove()
     })
 
-    it('writing on a breakpoint without its own rect creates it, desktop stays untouched', () => {
+    it('a scripted write edits the one shared rect, whichever breakpoint runs', () => {
       const book = rectBook()
       const root = document.createElement('div')
       const handle = runBook(book, root, 'tablet')
       handle.controls['box']!.x = 500
 
       const obj = book.pages[0]!.objects[0]!
-      expect(obj.rects.desktop.x).toBe(40)
-      expect(obj.rects.tablet).toEqual({ x: 500, y: 60, w: 120, h: 80 })
+      expect(obj.rect.x).toBe(500)
       handle.stop()
     })
 
-    it('reads x/y on tablet from the tablet rect when present', () => {
-      const obj = createObject('label', 'box', {
-        desktop: { x: 40, y: 60, w: 120, h: 80 },
-        tablet: { x: 10, y: 20, w: 90, h: 30 },
-      })
+    it('reads x/y through the lens and writes the shared rect', () => {
+      const obj = createObject('label', 'box', { x: 40, y: 60, w: 120, h: 80 })
       const book = makeBook({ objects: [] })
       book.pages[0]!.objects = [{ ...obj, on: {} }]
       const root = document.createElement('div')
       const handle = runBook(book, root, 'tablet')
       const box = handle.controls['box']!
-      expect(box.x).toBe(10)
-      expect(box.y).toBe(20)
-      expect(box.width).toBe(90)
+      // free fit: the authored position applies at every size
+      expect(box.x).toBe(40)
+      expect(box.y).toBe(60)
+      expect(box.width).toBe(120)
       box.x = 99
-      expect(book.pages[0]!.objects[0]!.rects.tablet!.x).toBe(99)
-      expect(book.pages[0]!.objects[0]!.rects.desktop.x).toBe(40)
+      expect(book.pages[0]!.objects[0]!.rect.x).toBe(99)
       handle.stop()
     })
   })

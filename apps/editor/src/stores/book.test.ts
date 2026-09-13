@@ -43,12 +43,12 @@ function twoObjectBook(): Book {
         id: 'p1',
         name: 'P',
         objects: [
-          { id: 'a', name: 'labelA', control: 'label', rects: { desktop: { x: 0, y: 0, w: 100, h: 50 } } },
+          { id: 'a', name: 'labelA', control: 'label', rect: { x: 0, y: 0, w: 100, h: 50 } },
           {
             id: 'b',
             name: 'labelB',
             control: 'label',
-            rects: { desktop: { x: 120, y: 40, w: 80, h: 60 }, tablet: { x: 10, y: 10, w: 80, h: 60 } },
+            rect: { x: 120, y: 40, w: 80, h: 60 },
           },
         ],
       },
@@ -74,17 +74,15 @@ describe('book store — groups and arrange', () => {
     const group = page.objects[0]!
     expect(group.control).toBe('group')
     expect(group.name).toBe('group1')
-    expect(group.rects.desktop).toEqual({ x: 0, y: 0, w: 200, h: 100 })
-    // tablet union: a falls back to its desktop rect, b uses its tablet rect
-    expect(group.rects.tablet).toEqual({ x: 0, y: 0, w: 100, h: 70 })
+    expect(group.rect).toEqual({ x: 0, y: 0, w: 200, h: 100 })
     const kids = group.children!
-    expect(kids[0]!.rects.desktop).toEqual({ x: 0, y: 0, w: 100, h: 50 })
-    expect(kids[1]!.rects.desktop).toEqual({ x: 120, y: 40, w: 80, h: 60 })
+    expect(kids[0]!.rect).toEqual({ x: 0, y: 0, w: 100, h: 50 })
+    expect(kids[1]!.rect).toEqual({ x: 120, y: 40, w: 80, h: 60 })
     // group is selected after grouping
     expect(store.selectionIds).toEqual([group.id])
   })
 
-  it('ungroup promotes children with unrebased rects on every breakpoint', () => {
+  it('ungroup promotes children with unrebased rects', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
     store.setSelection(['a', 'b'])
@@ -96,8 +94,7 @@ describe('book store — groups and arrange', () => {
     const [a, b] = page.objects
     expect(a!.name).toBe('labelA')
     expect(b!.name).toBe('labelB')
-    expect(b!.rects.desktop).toEqual({ x: 120, y: 40, w: 80, h: 60 })
-    expect(b!.rects.tablet).toEqual({ x: 10, y: 10, w: 80, h: 60 })
+    expect(b!.rect).toEqual({ x: 120, y: 40, w: 80, h: 60 })
     // children are selected after ungrouping
     expect(store.selectionIds).toEqual([a!.id, b!.id])
   })
@@ -105,8 +102,8 @@ describe('book store — groups and arrange', () => {
   it('refuses to group objects with different parents', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
-    const kid = createObject('label', 'kid', { desktop: { x: 0, y: 0, w: 10, h: 10 } })
-    const group = createGroup('group1', { desktop: { x: 300, y: 300, w: 100, h: 100 } }, [kid])
+    const kid = createObject('label', 'kid', { x: 0, y: 0, w: 10, h: 10 })
+    const group = createGroup('group1', { x: 300, y: 300, w: 100, h: 100 }, [kid])
     store.book.pages[0]!.objects.push(group)
     store.setSelection(['a', kid.id]) // top-level + member of group1
     expect(store.groupEligible).toBe(false)
@@ -132,32 +129,32 @@ describe('book store — groups and arrange', () => {
   it('applyRects converts page-absolute rects to parent-relative for group members', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
-    const kid = createObject('label', 'kid', { desktop: { x: 10, y: 10, w: 40, h: 20 } })
+    const kid = createObject('label', 'kid', { x: 10, y: 10, w: 40, h: 20 })
     const kidId = kid.id
-    const group = createGroup('group1', { desktop: { x: 100, y: 100, w: 300, h: 200 } }, [kid])
+    const group = createGroup('group1', { x: 100, y: 100, w: 300, h: 200 }, [kid])
     store.book.pages[0]!.objects.push(group)
     const kidInBook = store.book.pages[0]!.objects[2]!.children![0]!
     expect(kidInBook.id).toBe(kidId)
 
     // child commit arrives in page coordinates (design canvas space)
     store.applyRects([{ id: kidId, rect: { x: 350, y: 120, w: 60, h: 30 } }])
-    expect(kidInBook.rects.desktop).toEqual({ x: 0, y: 0, w: 60, h: 30 })
+    expect(kidInBook.rect).toEqual({ x: 0, y: 0, w: 60, h: 30 })
     // single-member group hugs its member
-    expect(store.book.pages[0]!.objects[2]!.rects.desktop).toEqual({ x: 350, y: 120, w: 60, h: 30 })
+    expect(store.book.pages[0]!.objects[2]!.rect).toEqual({ x: 350, y: 120, w: 60, h: 30 })
 
     // top-level objects keep page coordinates
     store.applyRect('a', { x: 16, y: 16, w: 40, h: 40 })
-    expect(store.book.pages[0]!.objects[0]!.rects.desktop).toEqual({ x: 16, y: 16, w: 40, h: 40 })
+    expect(store.book.pages[0]!.objects[0]!.rect).toEqual({ x: 16, y: 16, w: 40, h: 40 })
   })
 
   it('member moves snap the group to the tight union of its members', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
-    const kid = createObject('label', 'kid', { desktop: { x: 0, y: 0, w: 40, h: 20 } })
-    const kid2 = createObject('label', 'kid2', { desktop: { x: 200, y: 100, w: 50, h: 30 } })
+    const kid = createObject('label', 'kid', { x: 0, y: 0, w: 40, h: 20 })
+    const kid2 = createObject('label', 'kid2', { x: 200, y: 100, w: 50, h: 30 })
     const kidId = kid.id
     const kid2Id = kid2.id
-    const group = createGroup('group1', { desktop: { x: 100, y: 100, w: 300, h: 200 } }, [kid, kid2])
+    const group = createGroup('group1', { x: 100, y: 100, w: 300, h: 200 }, [kid, kid2])
     store.book.pages[0]!.objects.push(group)
     const g = store.book.pages[0]!.objects[2]!
     const kidInBook = g.children![0]!
@@ -166,41 +163,41 @@ describe('book store — groups and arrange', () => {
     // kid dragged right, past the manual (oversized) group rect — bounds snap
     // tight around both members
     store.applyRect(kidId, { x: 450, y: 120, w: 40, h: 20 })
-    expect(g.rects.desktop).toEqual({ x: 300, y: 120, w: 190, h: 110 })
-    expect(kidInBook.rects.desktop).toEqual({ x: 150, y: 0, w: 40, h: 20 })
-    expect(kid2InBook.rects.desktop).toEqual({ x: 0, y: 80, w: 50, h: 30 })
+    expect(g.rect).toEqual({ x: 300, y: 120, w: 190, h: 110 })
+    expect(kidInBook.rect).toEqual({ x: 150, y: 0, w: 40, h: 20 })
+    expect(kid2InBook.rect).toEqual({ x: 0, y: 80, w: 50, h: 30 })
 
     // kid2 dragged up-left: origin moves, siblings shift to stay put
     store.applyRect(kid2Id ?? kid2InBook.id, { x: 60, y: 80, w: 50, h: 30 })
-    expect(g.rects.desktop).toEqual({ x: 60, y: 80, w: 430, h: 60 })
-    expect(kidInBook.rects.desktop).toEqual({ x: 390, y: 40, w: 40, h: 20 })
-    expect(kid2InBook.rects.desktop).toEqual({ x: 0, y: 0, w: 50, h: 30 })
+    expect(g.rect).toEqual({ x: 60, y: 80, w: 430, h: 60 })
+    expect(kidInBook.rect).toEqual({ x: 390, y: 40, w: 40, h: 20 })
+    expect(kid2InBook.rect).toEqual({ x: 0, y: 0, w: 50, h: 30 })
   })
 
   it('deleting a member snaps the remaining bounds tight', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
-    const kid = createObject('label', 'kid', { desktop: { x: 0, y: 0, w: 40, h: 20 } })
-    const kid2 = createObject('label', 'kid2', { desktop: { x: 200, y: 100, w: 50, h: 30 } })
+    const kid = createObject('label', 'kid', { x: 0, y: 0, w: 40, h: 20 })
+    const kid2 = createObject('label', 'kid2', { x: 200, y: 100, w: 50, h: 30 })
     const kidId = kid.id
-    const group = createGroup('group1', { desktop: { x: 100, y: 100, w: 300, h: 200 } }, [kid, kid2])
+    const group = createGroup('group1', { x: 100, y: 100, w: 300, h: 200 }, [kid, kid2])
     store.book.pages[0]!.objects.push(group)
     const g = store.book.pages[0]!.objects[2]!
 
     store.setSelection([kid.id])
     store.removeSelected()
     expect(g.children).toHaveLength(1)
-    expect(g.rects.desktop).toEqual({ x: 300, y: 200, w: 50, h: 30 })
+    expect(g.rect).toEqual({ x: 300, y: 200, w: 50, h: 30 })
   })
 
   it('nested groups expand their ancestors too', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
-    const leaf = createObject('label', 'leaf', { desktop: { x: 0, y: 0, w: 40, h: 20 } })
+    const leaf = createObject('label', 'leaf', { x: 0, y: 0, w: 40, h: 20 })
     const leafId = leaf.id
-    const inner = createGroup('inner', { desktop: { x: 10, y: 10, w: 60, h: 40 } }, [leaf])
+    const inner = createGroup('inner', { x: 10, y: 10, w: 60, h: 40 }, [leaf])
     const innerId = inner.id
-    const outer = createGroup('outer', { desktop: { x: 200, y: 200, w: 300, h: 300 } }, [inner])
+    const outer = createGroup('outer', { x: 200, y: 200, w: 300, h: 300 }, [inner])
     store.book.pages[0]!.objects.push(outer)
     const outerInBook = store.book.pages[0]!.objects[2]!
     const innerInBook = outerInBook.children![0]!
@@ -210,17 +207,17 @@ describe('book store — groups and arrange', () => {
     // move the leaf far right: inner hugs it, outer hugs inner
     // (leaf abs position = outer origin + inner rel + leaf rel)
     store.applyRect(leafId, { x: 580, y: 210, w: 40, h: 20 })
-    expect(leafInBook.rects.desktop).toEqual({ x: 0, y: 0, w: 40, h: 20 })
-    expect(innerInBook.rects.desktop).toEqual({ x: 0, y: 0, w: 40, h: 20 })
-    expect(outerInBook.rects.desktop).toEqual({ x: 580, y: 210, w: 40, h: 20 })
+    expect(leafInBook.rect).toEqual({ x: 0, y: 0, w: 40, h: 20 })
+    expect(innerInBook.rect).toEqual({ x: 0, y: 0, w: 40, h: 20 })
+    expect(outerInBook.rect).toEqual({ x: 580, y: 210, w: 40, h: 20 })
     void innerId
   })
 
   it('deletes the whole selection including group subtrees', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
-    const kid = createObject('label', 'kid', { desktop: { x: 0, y: 0, w: 10, h: 10 } })
-    const group = createGroup('group1', { desktop: { x: 300, y: 300, w: 100, h: 100 } }, [kid])
+    const kid = createObject('label', 'kid', { x: 0, y: 0, w: 10, h: 10 })
+    const group = createGroup('group1', { x: 300, y: 300, w: 100, h: 100 }, [kid])
     store.book.pages[0]!.objects.push(group)
 
     store.setSelection([group.id])
@@ -250,11 +247,11 @@ describe('book store — groups and arrange', () => {
   it('duplicateSelected deep-copies a group with its whole subtree re-ided and re-named', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
-    const kid = createObject('label', 'kid', { desktop: { x: 0, y: 0, w: 40, h: 20 } })
+    const kid = createObject('label', 'kid', { x: 0, y: 0, w: 40, h: 20 })
     const kidId = kid.id
-    const inner = createGroup('inner', { desktop: { x: 10, y: 10, w: 60, h: 40 } }, [kid])
+    const inner = createGroup('inner', { x: 10, y: 10, w: 60, h: 40 }, [kid])
     const innerId = inner.id
-    const outer = createGroup('outer', { desktop: { x: 200, y: 200, w: 300, h: 300 } }, [inner])
+    const outer = createGroup('outer', { x: 200, y: 200, w: 300, h: 300 }, [inner])
     store.book.pages[0]!.objects.push(outer)
     const origIds = new Set(flattenObjects(store.book.pages[0]!.objects).map((o) => o.id))
     expect(origIds).toContain(kidId)
@@ -271,7 +268,7 @@ describe('book store — groups and arrange', () => {
     expect(dup).not.toBe(outer)
     expect(dup.id).not.toBe(outer.id)
     // nudged down-right so it visibly separates from the original
-    expect(dup.rects.desktop).toEqual({ x: 224, y: 224, w: 300, h: 300 })
+    expect(dup.rect).toEqual({ x: 224, y: 224, w: 300, h: 300 })
     const dupInner = dup.children![0]!
     expect(dupInner.name).toBe('group2')
     expect(dupInner.id).not.toBe(innerId)
@@ -284,7 +281,7 @@ describe('book store — groups and arrange', () => {
     // duplicates are selected
     expect(store.selectionIds).toEqual([dup.id])
     // scripts copy over
-    expect(dupKid.rects.desktop).toEqual(kid.rects.desktop)
+    expect(dupKid.rect).toEqual(kid.rect)
   })
 
   it('duplicateSelected duplicates plain multi-selections next to their originals', () => {
@@ -296,8 +293,8 @@ describe('book store — groups and arrange', () => {
     const page = store.book.pages[0]!.objects
     expect(page.map((o) => o.name)).toEqual(['labelA', 'label1', 'labelB', 'label2'])
     // duplicates are offset down-right, members relative to group untouched
-    expect(page[1]!.rects.desktop).toEqual({ x: 24, y: 24, w: 100, h: 50 })
-    expect(page[3]!.rects.desktop).toEqual({ x: 144, y: 64, w: 80, h: 60 })
+    expect(page[1]!.rect).toEqual({ x: 24, y: 24, w: 100, h: 50 })
+    expect(page[3]!.rect).toEqual({ x: 144, y: 64, w: 80, h: 60 })
     expect(store.selectionIds).toEqual([page[1]!.id, page[3]!.id])
   })
 
@@ -358,7 +355,7 @@ describe('book store — backgrounds', () => {
 
     // page-level adds avoid names owned by the page's background too
     const bg1 = store.book.backgrounds[0]!
-    bg1.objects.push(createObject('button', 'button1', { desktop: { x: 0, y: 0, w: 90, h: 30 } }))
+    bg1.objects.push(createObject('button', 'button1', { x: 0, y: 0, w: 90, h: 30 }))
     store.editPage(0)
     store.addObject('button', { x: 0, y: 0, w: 100, h: 40 })
     const names = store.activePage.objects.map((o) => o.name)
@@ -430,7 +427,7 @@ describe('book store — backgrounds', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
     const bg1 = store.book.backgrounds[0]!
-    bg1.objects.push(createObject('button', 'navBtn', { desktop: { x: 0, y: 0, w: 100, h: 40 } }))
+    bg1.objects.push(createObject('button', 'navBtn', { x: 0, y: 0, w: 100, h: 40 }))
     store.duplicateBackground(bg1.id)
     expect(store.book.backgrounds).toHaveLength(2)
     const copy = store.book.backgrounds[1]!
@@ -556,5 +553,315 @@ describe('book store — save / rename / delete (IndexedDB)', () => {
     await store.renameRecent(store.book.id, 'Live rename')
     expect(store.book.title).toBe('Live rename')
     expect(store.recents[0]!.title).toBe('Live rename')
+  })
+})
+describe('book store — responsive glue (lens)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('setObjectFit stores the glue without touching the rect', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    const before = JSON.parse(JSON.stringify(store.book.pages[0]!.objects[0]!.rect))
+    store.setObjectFit(id, 'x', 'right')
+    expect(store.book.pages[0]!.objects[0]!.fit).toEqual({ x: 'right' })
+    expect(store.book.pages[0]!.objects[0]!.rect).toEqual(before)
+  })
+
+  it('setObjectFit replaces only the changed axis', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    store.setObjectFit(id, 'x', 'right')
+    store.setObjectFit(id, 'y', 'bottom')
+    expect(store.book.pages[0]!.objects[0]!.fit).toEqual({ x: 'right', y: 'bottom' })
+    store.setObjectFit(id, 'x', 'center')
+    expect(store.book.pages[0]!.objects[0]!.fit).toEqual({ x: 'center', y: 'bottom' })
+  })
+
+  it('setObjectFit with null removes the axis, then the whole fit', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    store.setObjectFit(id, 'x', 'right')
+    store.setObjectFit(id, 'y', 'bottom')
+    store.setObjectFit(id, 'x', null)
+    expect(store.book.pages[0]!.objects[0]!.fit).toEqual({ y: 'bottom' })
+    store.setObjectFit(id, 'y', null)
+    expect(store.book.pages[0]!.objects[0]!.fit).toBeUndefined()
+  })
+
+  it('effectiveRectOf lenses the constrained axis at desktop too', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook()) // desktop canvas 800x600
+    const id = store.book.pages[0]!.objects[0]!.id
+    const o = store.book.pages[0]!.objects.find((x) => x.id === id)!
+    o.rect = { x: 100, y: 100, w: 100, h: 50 }
+    o.fit = { x: 'center' }
+    // the stored rect keeps the authored x=100; the lens renders x=(800-100)/2
+    expect(o.rect!.x).toBe(100)
+    expect(store.effectiveRectOf(id)!.x).toBe(350)
+  })
+
+  it('switching back to Free restores the authored position exactly', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    const o = store.book.pages[0]!.objects.find((x) => x.id === id)!
+    o.rect = { x: 100, y: 100, w: 100, h: 50 }
+    store.setObjectFit(id, 'x', 'center')
+    expect(store.effectiveRectOf(id)!.x).toBe(350)
+    store.setObjectFit(id, 'x', null)
+    expect(store.effectiveRectOf(id)!.x).toBe(100) // authored spot restored
+  })
+
+  it('undo reverts a glue change', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    store.setObjectFit(id, 'x', 'right')
+    store.undo()
+    const o = store.book.pages[0]!.objects.find((x) => x.id === id)!
+    expect(o.fit).toBeUndefined()
+  })
+})
+
+describe('book store — glued objects re-anchor on drag', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('dragging a right-glued object edits its reference (desktop)', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook()) // desktop 800x600
+    const id = store.book.pages[0]!.objects[0]!.id
+    const o = store.book.pages[0]!.objects.find((x) => x.id === id)!
+    o.rect = { x: 600, y: 24, w: 100, h: 48 }
+    o.fit = { x: 'right' }
+    store.applyRects([{ id, rect: { x: 500, y: 24, w: 100, h: 48 } }])
+    // the authored reference moved so the right gap follows the drag
+    expect(o.rect!.x).toBe(500)
+    expect(o.fit).toEqual({ x: 'right' })
+  })
+
+  it('a mobile drag re-anchors the shared base rect', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    const o = store.book.pages[0]!.objects.find((x) => x.id === id)!
+    o.rect = { x: 600, y: 24, w: 100, h: 48 }
+    o.fit = { x: 'right' }
+    store.setBreakpoint('mobile')
+    const before = store.effectiveRectOf(id)!
+    store.applyRects([{ id, rect: { x: before.x - 20, y: before.y, w: 100, h: 48 } }])
+    expect(o.fit).toEqual({ x: 'right' }) // glue preserved
+    expect(store.effectiveRectOf(id)!.x).toBe(before.x - 20) // follows exactly
+  })
+
+  it('center is rigid: a horizontal drag does not move it, the free axis commits', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook()) // desktop 800x600
+    const id = store.book.pages[0]!.objects[0]!.id
+    const o = store.book.pages[0]!.objects.find((x) => x.id === id)!
+    o.rect = { x: 100, y: 24, w: 100, h: 48 }
+    o.fit = { x: 'center' }
+    store.applyRects([{ id, rect: { x: 260, y: 160, w: 100, h: 48 } }])
+    expect(o.rect!.x).toBe(100) // center has no offset to edit
+    expect(o.rect!.y).toBe(160) // free axis accepted
+    expect(store.effectiveRectOf(id)!.x).toBe(350) // still centered
+    expect(store.effectiveRectOf(id)!.y).toBe(160)
+  })
+
+  it('resizing a stretched object edits its reference width', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    const o = store.book.pages[0]!.objects.find((x) => x.id === id)!
+    o.rect = { x: 0, y: 0, w: 200, h: 40 }
+    o.fit = { x: 'stretch' }
+    store.applyRects([{ id, rect: { x: 0, y: 0, w: 300, h: 40 } }])
+    expect(o.rect!.w).toBe(300)
+    expect(o.fit).toEqual({ x: 'stretch' })
+  })
+
+  it('an unglued drag edits the one shared rect (any breakpoint)', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setBreakpoint('mobile')
+    const id = store.book.pages[0]!.objects[0]!.id
+    const o = store.book.pages[0]!.objects.find((x) => x.id === id)!
+    o.rect = { x: 600, y: 24, w: 100, h: 48 }
+    store.applyRects([{ id, rect: { x: 5, y: 5, w: 100, h: 48 } }])
+    expect(o.rect.x).toBe(5)
+  })
+
+  it('a glued group re-anchors too (no wholesale rejection)', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const page = store.book.pages[0]!
+    const member = page.objects[0]!
+    const group = createGroup('g1', { x: 600, y: 0, w: 200, h: 100 }, [member])
+    group.fit = { x: 'right' }
+    page.objects = [group]
+    store.applyRects([{ id: group.id, rect: { x: 500, y: 0, w: 200, h: 100 } }])
+    expect(group.rect!.x).toBe(500)
+    expect(group.fit).toEqual({ x: 'right' })
+  })
+
+  it('a top-level group can be constrained and lenses; a member cannot', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook()) // desktop 800x600
+    const page = store.book.pages[0]!
+    const member = createObject('button', 'ok', { x: 10, y: 10, w: 80, h: 40 })
+    const group = createGroup('g1', { x: 600, y: 100, w: 200, h: 100 }, [member])
+    page.objects = [group]
+    store.setObjectFit(group.id, 'x', 'right')
+    expect(group.fit).toEqual({ x: 'right' })
+    // the group box lenses (right, proportional): 800·390/800 − 200 = 190
+    store.setBreakpoint('mobile')
+    expect(store.effectiveRectOf(group.id)!.x).toBe(190)
+    // members carry no fit of their own
+    store.setObjectFit(group.children![0]!.id, 'x', 'right')
+    expect(group.children![0]!.fit).toBeUndefined()
+  })
+
+  it('resizing a glued group edits its base rect and scales members', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook()) // desktop 800x600
+    const page = store.book.pages[0]!
+    const member = createObject('button', 'ok', { x: 10, y: 10, w: 80, h: 40 })
+    const group = createGroup('g1', { x: 600, y: 100, w: 200, h: 100 }, [member])
+    page.objects = [group]
+    group.fit = { x: 'right' }
+    store.setBreakpoint('mobile') // group renders at x=190
+    const child = group.children![0]!
+    // shrink from the WEST handle: rendered group {230,100,160,100}; the batch
+    // also carries the pre-scaled member entry (which must be ignored)
+    store.applyRects(
+      [
+        { id: group.id, rect: { x: 230, y: 100, w: 160, h: 100 } },
+        { id: child.id, rect: { x: 238, y: 110, w: 64, h: 40 } },
+      ],
+      { dir: 'w' },
+    )
+    // base edit: right edge stays flush (800), width authored to 160
+    expect(group.rect).toEqual({ x: 640, y: 100, w: 160, h: 100 })
+    expect(group.fit).toEqual({ x: 'right' })
+    // member scaled in the base frame around the fixed (east) corner
+    expect(child.rect).toEqual({ x: 8, y: 10, w: 64, h: 40 })
+  })
+
+  it('ungrouping a centered group places members at their rendered spots', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook()) // desktop 800x600
+    const page = store.book.pages[0]!
+    const ok = createObject('button', 'ok', { x: 0, y: 0, w: 100, h: 40 })
+    const cancel = createObject('button', 'cancel', { x: 120, y: 0, w: 100, h: 40 })
+    const group = createGroup('g1', { x: 300, y: 200, w: 220, h: 40 }, [ok, cancel])
+    page.objects = [group]
+    store.setObjectFit(group.id, 'x', 'center')
+    const rendered = store.effectiveRectOf(group.id)!
+    store.applySelection([group.id])
+    store.ungroupSelected()
+    const [a, b] = page.objects
+    // the authored group x was 300; centered it renders at (800−220)/2 = 290
+    expect(rendered.x).toBe(290)
+    expect(a!.rect!.x).toBe(rendered.x + 0)
+    expect(b!.rect!.x).toBe(rendered.x + 120)
+  })
+
+  it('setGeometry edits a base reference instead of releasing the glue', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook()) // desktop 800x600
+    const id = store.book.pages[0]!.objects[0]!.id
+    const o = store.book.pages[0]!.objects.find((x) => x.id === id)!
+    o.rect = { x: 600, y: 24, w: 100, h: 48 }
+    o.fit = { x: 'right' }
+    store.setGeometry(id, { x: 500 })
+    expect(o.rect!.x).toBe(500)
+    expect(o.fit).toEqual({ x: 'right' })
+  })
+
+  it('setGeometry on a centered x releases that axis (no offset to edit)', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    const o = store.book.pages[0]!.objects.find((x) => x.id === id)!
+    o.rect = { x: 100, y: 24, w: 100, h: 48 }
+    o.fit = { x: 'center' }
+    store.setGeometry(id, { x: 200 })
+    expect(o.rect!.x).toBe(200)
+    expect(o.fit).toBeUndefined()
+  })
+
+  it('a size write on a centered axis keeps the glue and re-centers', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    const o = store.book.pages[0]!.objects.find((x) => x.id === id)!
+    o.rect = { x: 100, y: 24, w: 100, h: 48 }
+    o.fit = { x: 'center' }
+    store.setGeometry(id, { w: 200 })
+    expect(o.fit).toEqual({ x: 'center' })
+    expect(o.rect!.w).toBe(200)
+    expect(store.effectiveRectOf(id)!.x).toBe((800 - 200) / 2)
+  })
+
+  it('free and glued objects in the same commit both commit', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const [glued, free] = store.book.pages[0]!.objects
+    glued!.fit = { x: 'right' }
+    glued!.rect = { x: 600, y: 24, w: 100, h: 48 }
+    store.applyRects([
+      { id: glued!.id, rect: { x: 500, y: 10, w: 100, h: 48 } },
+      { id: free!.id, rect: { x: 50, y: 50, w: 100, h: 48 } },
+    ])
+    expect(glued!.rect!.x).toBe(500)
+    expect(glued!.fit).toEqual({ x: 'right' })
+    expect(free!.rect!.x).toBe(50)
+  })
+
+  it('a group member dragged (no fit) always moves', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const page = store.book.pages[0]!
+    const member = page.objects[0]!
+    const group = createGroup('g1', { x: 0, y: 0, w: 200, h: 100 }, [member])
+    page.objects = [group]
+    store.applyRects([{ id: member.id, rect: { x: 40, y: 40, w: 100, h: 48 } }])
+    // the tight-bounds rule moves the group origin so the member keeps its
+    // visual position: member rel x = 40 - group.x(40) = 0
+    expect(group.rect!.x).toBe(40)
+    expect(member.rect!.x).toBe(0)
+  })
+})
+
+describe('book store — glue-spring hint mode', () => {
+  it('persists the selected mode and updates the ref', () => {
+    const setItem = vi.fn()
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem })
+    setActivePinia(createPinia())
+    const store = useBookStore()
+    expect(store.fitHintMode).toBe('all')
+    store.setFitHintMode('selected')
+    expect(store.fitHintMode).toBe('selected')
+    expect(setItem).toHaveBeenCalledWith('toolback.fitHints', 'selected')
+  })
+
+  it.each([
+    [null, 'all'],
+    ['all', 'all'],
+    ['selected', 'selected'],
+    ['off', 'off'],
+    ['1', 'all'],
+    ['0', 'off'],
+    ['bogus', 'all'],
+  ] as const)('reads stored %s as %s', (raw, expected) => {
+    vi.stubGlobal('localStorage', { getItem: () => raw, setItem: () => {} })
+    setActivePinia(createPinia())
+    expect(useBookStore().fitHintMode).toBe(expected)
   })
 })

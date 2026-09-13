@@ -25,7 +25,7 @@ export function authorRef(o: { id: string; name: string; control: string }): {
 function objectSnapshot(store: Store, id: string): Record<string, unknown> | null {
   const obj = store.allObjects.find((o) => o.id === id)
   if (!obj) return null
-  const r = obj.rects[store.breakpoint] ?? obj.rects.desktop
+  const r = store.effectiveRectOf(obj.id) ?? obj.rect
   return {
     id: obj.id,
     name: obj.name,
@@ -107,12 +107,13 @@ export function executeAuthorOp(store: Store, op: string, args: unknown): unknow
         if (geomKeys.length) {
           const obj = store.allObjects.find((o) => o.id === id)
           if (!obj) throw new Error(`author.updateProps: unknown id "${id}"`)
-          const r = { ...(obj.rects[store.breakpoint] ?? obj.rects.desktop) }
-          if (patch['x'] !== undefined) r.x = Math.round(Number(patch['x']))
-          if (patch['y'] !== undefined) r.y = Math.round(Number(patch['y']))
-          if (patch['width'] !== undefined) r.w = Math.max(1, Math.round(Number(patch['width'])))
-          if (patch['height'] !== undefined) r.h = Math.max(1, Math.round(Number(patch['height'])))
-          store.applyRects([{ id, rect: r }])
+          // deliberate writes release the glued axes they touch
+          store.setGeometry(id, {
+            ...(patch['x'] !== undefined ? { x: Math.round(Number(patch['x'])) } : {}),
+            ...(patch['y'] !== undefined ? { y: Math.round(Number(patch['y'])) } : {}),
+            ...(patch['width'] !== undefined ? { w: Math.max(1, Math.round(Number(patch['width']))) } : {}),
+            ...(patch['height'] !== undefined ? { h: Math.max(1, Math.round(Number(patch['height']))) } : {}),
+          })
         }
         if (Object.keys(props).length) store.updateProps(id, props)
       }
@@ -137,8 +138,8 @@ export function executeAuthorOp(store: Store, op: string, args: unknown): unknow
       const dy = typeof pos[2] === 'number' ? (pos[2] as number) : 0
       const obj = store.allObjects.find((o) => o.id === id)
       if (!obj) throw new Error(`author.moveObject: unknown id "${id}"`)
-      const r = obj.rects[store.breakpoint] ?? obj.rects.desktop
-      store.applyRects([{ id, rect: { x: r.x + dx, y: r.y + dy, w: r.w, h: r.h } }])
+      const r = store.effectiveRectOf(obj.id) ?? obj.rect
+      store.setGeometry(id, { x: r.x + dx, y: r.y + dy })
       return { id }
     }
     case 'command': {

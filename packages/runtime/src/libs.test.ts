@@ -52,7 +52,7 @@ describe('scanLibImports', () => {
               id: 'o1',
               name: 'btn',
               control: 'button',
-              rects: { desktop: { x: 0, y: 0, w: 1, h: 1 } },
+              rect: { x: 0, y: 0, w: 1, h: 1 },
               props: {},
               on: { click: "await import('./rel.js'); await import('https://x/y.js')" },
               children: [],

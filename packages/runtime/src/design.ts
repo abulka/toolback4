@@ -1,4 +1,4 @@
-import type { ControlKind, Rect } from '@toolback/format'
+import type { ControlKind, FitHMode, FitHintMode, FitVMode, Rect } from '@toolback/format'
 import { scaleRect } from '@toolback/format'
 import { DEFAULT_PROPS } from '@toolback/format'
 import { renderObject } from '@toolback/controls'
@@ -54,11 +54,16 @@ export type DesignOutMessage =
       type: 'toolback:commit'
       kind: 'move' | 'resize'
       objects: Array<{ id: string; rect: Rect }>
+      /** resize handle direction, so the store can scale a glued group's
+       *  members around the same fixed corner */
+      dir?: HandleDir
     }
 
 export interface DesignController {
   attach(wrapper: HTMLElement): void
   setEnabled(enabled: boolean): void
+  /** which objects draw the glue-spring hints on the canvas */
+  setFitHintMode(mode: FitHintMode): void
   onRendered(selection: string[]): void
   dragOver(control: ControlKind, rect: Rect): void
   dragEnd(): void
@@ -180,6 +185,367 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       if (el.closest('[data-tb-bg]')) bgRects.set(id, rel)
       else rects.set(id, rel)
     }
+    drawClipIndicators()
+    drawFitHints()
+  }
+
+  /** the page box relative to the overlay (the "viewport" clips against) */
+  function pageBounds(): { w: number; h: number } {
+    const page = pageRoot
+    if (!page) return { w: 0, h: 0 }
+    const base = wrapper!.getBoundingClientRect()
+    const r = page.getBoundingClientRect()
+    return { w: r.width, h: r.height }
+  }
+
+  /** the page's top-left relative to the wrapper/overlay (rects are wrapper-relative) */
+  function pageOrigin(): { x: number; y: number } {
+    const page = pageRoot
+    if (!page) return { x: 0, y: 0 }
+    const base = wrapper!.getBoundingClientRect()
+    const r = page.getBoundingClientRect()
+    return { x: r.left - base.left, y: r.top - base.top }
+  }
+
+  /** objects sticking out of the page get a dashed red outline so the
+   *  "dumb clipping" is visible instead of mysterious */
+  let clipBoxes = new Map<string, HTMLElement>()
+  function drawClipIndicators(): void {
+    if (!overlay || !enabled || !pageRoot) return
+    const bounds = pageBounds()
+    const seen = new Set<string>()
+    for (const [id, r] of [...rects, ...bgRects]) {
+      const clipped =
+        r.x < -0.5 || r.y < -0.5 || r.x + r.w > bounds.w + 0.5 || r.y + r.h > bounds.h + 0.5
+      seen.add(id)
+      if (clipped) {
+        let box = clipBoxes.get(id)
+        if (!box) {
+          box = wrapper!.ownerDocument.createElement('div')
+          box.className = 'tb-clip'
+          overlay!.appendChild(box)
+          clipBoxes.set(id, box)
+        }
+        box.style.display = 'block'
+        box.style.left = `${Math.max(0, r.x)}px`
+        box.style.top = `${Math.max(0, r.y)}px`
+        box.style.width = `${Math.min(r.w, bounds.w - r.x)}px`
+        box.style.height = `${Math.min(r.h, bounds.h - r.y)}px`
+      } else {
+        const box = clipBoxes.get(id)
+        if (box) box.style.display = 'none'
+      }
+    }
+    for (const [id, box] of clipBoxes) {
+      if (!seen.has(id)) box.remove()
+    }
+    clipBoxes = new Map([...clipBoxes].filter(([id, box]) => seen.has(id) && box.isConnected))
+  }
+
+  /**
+   * The declared responsive glue of every object drawn as slate "springs":
+   * coil springs from each constrained object to the page edge it's glued to
+   * (with a square anchor at the edge); center/middle draws two springs
+   * pushing from either side onto the object's two sides. So you can see at a
+   * glance what every object is constrained to — background objects included.
+   * Default Free (left/top) draws nothing. Hidden by the ≋ toolbar control
+   * (All / Selected / Off).
+   */
+  let fitHintMode: FitHintMode = 'all'
+  let fitHint: HTMLElement | null = null
+
+  function clearFitHint(): void {
+    fitHint?.remove()
+    fitHint = null
+  }
+
+  /**
+   * A spring between two points. `edge` glue is a solid zigzag; `center` is a
+   * plain straight (dashed) line; `stretch` is a circular coil (a real spring)
+   * dashed. Every spring is drawn twice — a translucent white halo under the
+   * coloured stroke — so it stays legible on dark pages. Short edge/stretch
+   * spans fall back to a plain stub.
+   */
+  type SpringKind = 'edge' | 'center' | 'stretch'
+  type SpringDir = 'left' | 'right' | 'top' | 'bottom' | 'up' | 'down'
+
+  const SVG_NS = 'http://www.w3.org/2000/svg'
+  const SPRING_AMP = 3
+  const SPRING_COIL = 9
+  const COIL_RADIUS = 3.5
+  const COIL_PITCH = 10
+
+  /** triangular-wave path touching both ends */
+  function zigzagD(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    minx: number,
+    miny: number,
+    len: number,
+  ): string {
+    const coils = Math.max(2, Math.round(len / SPRING_COIL))
+    const step = len / coils
+    const ux = (x2 - x1) / len
+    const uy = (y2 - y1) / len
+    const px = -uy
+    const py = ux
+    let d = `M ${x1 - minx} ${y1 - miny}`
+    for (let k = 1; k < coils; k++) {
+      const t = k * step
+      const side = k % 2 === 1 ? -1 : 1
+      d += ` L ${(x1 + ux * t + px * side * SPRING_AMP - minx).toFixed(1)} ${(y1 + uy * t + py * side * SPRING_AMP - miny).toFixed(1)}`
+    }
+    d += ` L ${x2 - minx} ${y2 - miny}`
+    return d
+  }
+
+  /**
+   * A helix projected onto the page (prolate cycloid) — loops when the loop
+   * radius beats L/(2πN), which is what makes it read as a coiled spring
+   * rather than a wave. `perp` is 0 at both ends so it touches each terminus.
+   */
+  function coilD(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    minx: number,
+    miny: number,
+    len: number,
+    n: number,
+  ): string {
+    const loopRadius = (len / n) * 0.35
+    const ux = (x2 - x1) / len
+    const uy = (y2 - y1) / len
+    const px = -uy
+    const py = ux
+    const steps = n * 18
+    let d = ''
+    for (let i = 0; i <= steps; i++) {
+      const th = (2 * Math.PI * n * i) / steps
+      const along = len * (i / steps) + loopRadius * Math.sin(th)
+      const perp = COIL_RADIUS * Math.sin(th)
+      const x = x1 + ux * along + px * perp
+      const y = y1 + uy * along + py * perp
+      d += `${i === 0 ? 'M' : ' L'} ${(x - minx).toFixed(1)} ${(y - miny).toFixed(1)}`
+    }
+    return d
+  }
+
+  /** a plain straight segment (the center connector) */
+  function lineD(x1: number, y1: number, x2: number, y2: number, minx: number, miny: number): string {
+    return `M ${(x1 - minx).toFixed(1)} ${(y1 - miny).toFixed(1)} L ${(x2 - minx).toFixed(1)} ${(y2 - miny).toFixed(1)}`
+  }
+
+  function addPath(svg: Element, doc: Document, d: string, cls: string, stroke: string, width: number): void {
+    const path = doc.createElementNS(SVG_NS, 'path')
+    path.setAttribute('class', cls)
+    path.setAttribute('d', d)
+    path.setAttribute('fill', 'none')
+    path.setAttribute('stroke', stroke)
+    path.setAttribute('stroke-width', String(width))
+    path.setAttribute('stroke-linejoin', 'round')
+    path.setAttribute('stroke-linecap', 'round')
+    svg.appendChild(path)
+  }
+
+  function drawSpring(
+    hint: HTMLElement,
+    doc: Document,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    kind: SpringKind,
+  ): void {
+    const len = Math.hypot(x2 - x1, y2 - y1)
+    if (kind !== 'center' && len < (kind === 'edge' ? 12 : 16)) {
+      const e = doc.createElement('div')
+      e.className = `tb-fithint-line tb-fithint-line--${kind}`
+      e.style.left = `${Math.min(x1, x2)}px`
+      e.style.top = `${Math.min(y1, y2) - 1}px`
+      e.style.width = `${Math.max(2, Math.abs(x2 - x1))}px`
+      e.style.height = `${Math.max(2, Math.abs(y2 - y1))}px`
+      hint.appendChild(e)
+      return
+    }
+    if (kind === 'center' && len < 1) return
+    const n = Math.max(2, Math.round(len / COIL_PITCH))
+    const reach = kind === 'edge' ? SPRING_AMP : kind === 'center' ? 2 : Math.max(COIL_RADIUS, (len / n) * 0.35)
+    const pad = reach + 2
+    const minx = Math.min(x1, x2) - pad
+    const miny = Math.min(y1, y2) - pad
+    const w = Math.abs(x2 - x1) + pad * 2
+    const h = Math.abs(y2 - y1) + pad * 2
+    const svg = doc.createElementNS(SVG_NS, 'svg')
+    svg.setAttribute('class', `tb-fithint-spring tb-fithint-spring--${kind}`)
+    svg.style.left = `${minx}px`
+    svg.style.top = `${miny}px`
+    svg.style.width = `${w}px`
+    svg.style.height = `${h}px`
+    svg.style.overflow = 'visible'
+    const d =
+      kind === 'edge'
+        ? zigzagD(x1, y1, x2, y2, minx, miny, len)
+        : kind === 'center'
+          ? lineD(x1, y1, x2, y2, minx, miny)
+          : coilD(x1, y1, x2, y2, minx, miny, len, n)
+    addPath(svg, doc, d, 'tb-fithint-halo', 'rgba(255, 255, 255, 0.55)', 4)
+    addPath(svg, doc, d, 'tb-fithint-spring-path', 'currentColor', 1.5)
+    hint.appendChild(svg)
+  }
+
+  /** anchor glyph at a page edge: square (edge), circle (center), triangle (stretch) */
+  function drawAnchor(
+    hint: HTMLElement,
+    doc: Document,
+    x: number,
+    y: number,
+    kind: SpringKind,
+    dir: SpringDir,
+  ): void {
+    // the hint layer is inside the page (which clips at its edges); nudge the
+    // glyph just inside its edge so the whole marker stays visible
+    const nudge = 3.5
+    let ax = x
+    let ay = y
+    if (dir === 'left') ax += nudge
+    else if (dir === 'right') ax -= nudge
+    else if (dir === 'top') ay += nudge
+    else if (dir === 'bottom') ay -= nudge
+    const e = doc.createElement('div')
+    e.className = `tb-fithint-anchor tb-fithint-anchor--${kind} tb-fithint-anchor--${dir}`
+    e.style.left = `${ax - 3}px`
+    e.style.top = `${ay - 3}px`
+    hint.appendChild(e)
+  }
+
+  /** arrowhead at the object end of an edge spring, pointing at the object */
+  function drawArrow(hint: HTMLElement, doc: Document, x: number, y: number, dir: SpringDir): void {
+    const e = doc.createElement('div')
+    e.className = `tb-fithint-arrow tb-fithint-arrow--${dir}`
+    e.style.left = `${x - 4}px`
+    e.style.top = `${y - 4}px`
+    hint.appendChild(e)
+  }
+
+  /** horizontal glue spring for one object */
+  function drawAxisH(
+    hint: HTMLElement,
+    doc: Document,
+    r: Rect,
+    bounds: { w: number; h: number },
+    fx: FitHMode | undefined,
+  ): void {
+    const cy = r.y + r.h / 2
+    switch (fx) {
+      case undefined:
+      case 'free':
+        return // Free = no constraint, nothing to show
+      case 'right':
+        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'edge')
+        drawAnchor(hint, doc, bounds.w, cy, 'edge', 'right')
+        drawArrow(hint, doc, r.x + r.w, cy, 'left')
+        break
+      case 'center':
+        // two coils pushing from either side onto the object's two sides
+        drawSpring(hint, doc, 0, cy, r.x, cy, 'center')
+        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'center')
+        drawAnchor(hint, doc, 0, cy, 'center', 'left')
+        drawAnchor(hint, doc, bounds.w, cy, 'center', 'right')
+        break
+      case 'stretch':
+        drawSpring(hint, doc, 0, cy, r.x, cy, 'stretch')
+        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'stretch')
+        drawAnchor(hint, doc, 0, cy, 'stretch', 'left')
+        drawAnchor(hint, doc, bounds.w, cy, 'stretch', 'right')
+        break
+      case 'left':
+        drawSpring(hint, doc, 0, cy, r.x, cy, 'edge')
+        drawAnchor(hint, doc, 0, cy, 'edge', 'left')
+        drawArrow(hint, doc, r.x, cy, 'right')
+        break
+    }
+  }
+
+  /** vertical mirror */
+  function drawAxisV(
+    hint: HTMLElement,
+    doc: Document,
+    r: Rect,
+    bounds: { w: number; h: number },
+    fy: FitVMode | undefined,
+  ): void {
+    const cx = r.x + r.w / 2
+    switch (fy) {
+      case undefined:
+      case 'free':
+        return // Free = no constraint, nothing to show
+      case 'bottom':
+        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'edge')
+        drawAnchor(hint, doc, cx, bounds.h, 'edge', 'bottom')
+        drawArrow(hint, doc, cx, r.y + r.h, 'up')
+        break
+      case 'center':
+        drawSpring(hint, doc, cx, 0, cx, r.y, 'center')
+        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'center')
+        drawAnchor(hint, doc, cx, 0, 'center', 'top')
+        drawAnchor(hint, doc, cx, bounds.h, 'center', 'bottom')
+        break
+      case 'stretch':
+        drawSpring(hint, doc, cx, 0, cx, r.y, 'stretch')
+        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'stretch')
+        drawAnchor(hint, doc, cx, 0, 'stretch', 'top')
+        drawAnchor(hint, doc, cx, bounds.h, 'stretch', 'bottom')
+        break
+      case 'top':
+        drawSpring(hint, doc, cx, 0, cx, r.y, 'edge')
+        drawAnchor(hint, doc, cx, 0, 'edge', 'top')
+        drawArrow(hint, doc, cx, r.y, 'down')
+        break
+    }
+  }
+
+  function drawFitHints(): void {
+    clearFitHint()
+    if (!overlay || !enabled || !pageRoot || fitHintMode === 'off') return
+    const bounds = pageBounds()
+    if (bounds.w <= 0 || bounds.h <= 0) return
+
+    const doc = wrapper!.ownerDocument
+    const hint = doc.createElement('div')
+    hint.className = 'tb-fithint'
+    // draw underneath the page's controls (but above the page background) rather
+    // than over them: the hint is the page's first child, so later object
+    // siblings paint on top. Its box is shifted/ sized so drawing can keep using
+    // wrapper-relative coordinates.
+    const origin = pageOrigin()
+    hint.style.left = `${-origin.x}px`
+    hint.style.top = `${-origin.y}px`
+    hint.style.width = `${bounds.w}px`
+    hint.style.height = `${bounds.h}px`
+    pageRoot.insertBefore(hint, pageRoot.firstChild)
+    fitHint = hint
+
+    let drew = false
+    for (const el of Array.from(pageRoot.querySelectorAll<HTMLElement>('[data-tb-id]'))) {
+      const id = el.dataset.tbId
+      if (!id) continue
+      // group members are relative to their group — no independent fit
+      if (el.parentElement?.closest('[data-tb-id]')) continue
+      if (fitHintMode === 'selected' && !selected.has(id)) continue
+      const r = rects.get(id) ?? bgRects.get(id)
+      if (!r) continue
+      const fx = el.dataset.tbFitX as FitHMode | undefined
+      const fy = el.dataset.tbFitY as FitVMode | undefined
+      if ((!fx || fx === 'free') && (!fy || fy === 'free')) continue
+      drawAxisH(hint, doc, r, bounds, fx)
+      drawAxisV(hint, doc, r, bounds, fy)
+      drew = true
+    }
+    if (!drew) clearFitHint()
   }
 
   /** group wrapper element of an object (null for top-level) */
@@ -335,11 +701,13 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
         badge.style.left = `${r.x}px`
         badge.style.top = `${r.y + r.h + 8}px`
         badge.textContent = `${Math.round(r.w)} × ${Math.round(r.h)}`
+        drawFitHints()
         return
       }
     }
     for (const h of handles) h.style.display = 'none'
     badge.style.display = 'none'
+    drawFitHints()
   }
 
   function setSelected(ids: Iterable<string>): void {
@@ -470,13 +838,25 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       for (const id of drag.ids) {
         const base = drag.start.get(id)
         if (!base) continue
-        const moved = { x: base.x + dx, y: base.y + dy, w: base.w, h: base.h }
+        // Center/Middle position is fully determined by the page: don't let the
+        // ghost slide on a locked axis while the glue lens is live there
+        const el = objectEl(id)
+        const lockX = el?.dataset.tbLensX === '1' && el.dataset.tbFitX === 'center'
+        const lockY = el?.dataset.tbLensY === '1' && el.dataset.tbFitY === 'center'
+        const moved = {
+          x: base.x + (lockX ? 0 : dx),
+          y: base.y + (lockY ? 0 : dy),
+          w: base.w,
+          h: base.h,
+        }
         rects.set(id, moved) // keep the hit-test/outline map in sync so the outline follows
         applyGhostRect(id, moved)
       }
       redrawSelection()
+      drawClipIndicators()
     } else {
       drag.ghost = resizeRect(drag.rect, drag.dir, rawDx, rawDy)
+      rects.set(drag.id, drag.ghost) // clip indicator tracks the ghost live
       if (isGroupEl(drag.id)) {
         // live feedback: CSS-scale the subtree from the fixed corner only —
         // the layout box must stay untouched, or the visual double-scales and
@@ -487,6 +867,7 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
         applyGhostRect(drag.id, drag.ghost)
       }
       redrawSelection(drag.ghost)
+      drawClipIndicators()
     }
   }
 
@@ -522,7 +903,7 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
           objects.push({ id: d.id, rect: scaleRect(d.rect, { x: ox, y: oy }, fx, fy) })
         }
       }
-      send({ type: 'toolback:commit', kind: 'resize', objects })
+      send({ type: 'toolback:commit', kind: 'resize', objects, dir: drag.dir })
       // leave the transform in place: it maps the stale layout exactly onto
       // the committed state until the sync re-renders (clearing it here would
       // flicker the group back to its pre-resize size for a frame)
@@ -610,6 +991,12 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     setEnabled(on: boolean): void {
       applyEnabled(on)
     },
+    setFitHintMode(mode: FitHintMode): void {
+      if (fitHintMode === mode) return
+      fitHintMode = mode
+      if (mode === 'off') clearFitHint()
+      else if (enabled && pageRoot) drawFitHints()
+    },
     dragOver(control: ControlKind, rect: Rect): void {
       if (!wrapper || !enabled) return
       if (!phantom || phantomKind !== control) {
@@ -623,7 +1010,7 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
             id: 'ghost',
             name: 'ghost',
             control,
-            rects: { desktop: rect },
+            rect,
             props: { ...DEFAULT_PROPS[control] },
             on: {},
           }),

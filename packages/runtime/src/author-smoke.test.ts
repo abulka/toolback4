@@ -17,7 +17,7 @@ describe('author smoke', () => {
         {
           id: 'p2', name: 'MyPlugin', script: 'let booted = false', backgroundId: 'bg1',
           objects: [
-            { ...createObject('button', 'pluginBtn', { desktop: { x: 8, y: 8, w: 120, h: 36 } }),
+            { ...createObject('button', 'pluginBtn', { x: 8, y: 8, w: 120, h: 36 }),
               on: { click: 'window.__clicked = true' } },
           ],
         },

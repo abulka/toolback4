@@ -43,7 +43,7 @@ function popupBook(opts?: {
         backgroundId: 'bg1',
         objects: [
           {
-            ...createObject('button', 'openBtn', { desktop: { x: 0, y: 0, w: 100, h: 40 } }),
+            ...createObject('button', 'openBtn', { x: 0, y: 0, w: 100, h: 40 }),
             on: { click: opts?.openScript ?? `page.popupOpen('Dialog'${optsArg})` },
           },
         ],
@@ -55,11 +55,11 @@ function popupBook(opts?: {
         backgroundId: 'bgDialog',
         objects: [
           {
-            ...createObject('button', 'okBtn', { desktop: { x: 8, y: 8, w: 80, h: 30 } }, { text: 'OK' }),
+            ...createObject('button', 'okBtn', { x: 8, y: 8, w: 80, h: 30 }, { text: 'OK' }),
             on: { click: `store.set('ok', true); page.popupClose('Dialog')` },
           },
           {
-            ...createObject('label', 'dialogLabel', { desktop: { x: 8, y: 100, w: 200, h: 30 } }, { text: 'in dialog' }),
+            ...createObject('label', 'dialogLabel', { x: 8, y: 100, w: 200, h: 30 }, { text: 'in dialog' }),
           },
         ],
       },
@@ -189,12 +189,12 @@ describe('popups', () => {
       script: '',
       backgroundId: 'bgDialog',
       objects: [
-        createObject('label', 'd2', { desktop: { x: 0, y: 0, w: 100, h: 30 } }, { text: 'two' }),
-        { ...createObject('button', 'navBtn', { desktop: { x: 8, y: 160, w: 80, h: 30 } }), on: { click: `page.go('Dialog')` } },
+        createObject('label', 'd2', { x: 0, y: 0, w: 100, h: 30 }, { text: 'two' }),
+        { ...createObject('button', 'navBtn', { x: 8, y: 160, w: 80, h: 30 }), on: { click: `page.go('Dialog')` } },
       ],
     })
     book.pages[0]!.objects.push({
-      ...createObject('button', 'openBtn2', { desktop: { x: 150, y: 0, w: 100, h: 40 } }),
+      ...createObject('button', 'openBtn2', { x: 150, y: 0, w: 100, h: 40 }),
       on: { click: `page.popupOpen('Dialog2', { chrome: 'none' })` },
     })
     // open two DIFFERENT popups — they stack
@@ -233,7 +233,7 @@ describe('popups', () => {
       objects: [],
     })
     book.pages[0]!.objects.push({
-      ...createObject('button', 'navAway', { desktop: { x: 200, y: 0, w: 100, h: 30 } }),
+      ...createObject('button', 'navAway', { x: 200, y: 0, w: 100, h: 30 }),
       on: { click: `page.go('Other')` },
     })
     const handle = runBook(book, root, 'desktop', (m) => {
@@ -293,7 +293,7 @@ describe('background scripts', () => {
           name: 'One',
           script: `function pageEnter() { store.set('n', helper() + 1) }`,
           backgroundId: 'bg1',
-          objects: [createObject('label', 'l', { desktop: { x: 0, y: 0, w: 50, h: 20 } })],
+          objects: [createObject('label', 'l', { x: 0, y: 0, w: 50, h: 20 })],
         },
         {
           id: 'p2',
@@ -317,7 +317,7 @@ describe('background scripts', () => {
   it('background event scripts run: a button on the background works from every page', async () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
-    const nav = createObject('button', 'navBtn', { desktop: { x: 0, y: 0, w: 80, h: 30 } }, { text: 'Go' })
+    const nav = createObject('button', 'navBtn', { x: 0, y: 0, w: 80, h: 30 }, { text: 'Go' })
     nav.on = { click: `store.set('clicked', (store.get('clicked') ?? 0) + 1); page.go('Two')` }
     const book: Book = {
       id: 'b',

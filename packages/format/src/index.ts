@@ -15,6 +15,36 @@ export type ControlKind = (typeof CONTROL_KINDS)[number]
 export const BREAKPOINTS = ['desktop', 'tablet', 'mobile'] as const
 export type Breakpoint = (typeof BREAKPOINTS)[number]
 
+/**
+ * Responsive ("glue") modes. The stored desktop rect is the reference; when a
+ * breakpoint has no explicit rect of its own, the renderer derives one from
+ * the desktop rect + the fit spec against the page sizes.
+ *
+ * Horizontal:
+ *   free     x stays at the authored px (the default — absolute from left)
+ *   left     x scales with the page: x·(W/W₀) — the left ratio is preserved
+ *   center   x = (W − w)/2
+ *   right    the gap to the right edge scales: x = (r.x+r.w)·(W/W₀) − w
+ *   stretch  both margins scale: x = r.x·(W/W₀), w = r.w·(W/W₀) — a true scale
+ *
+ * Vertical mirrors with free / top / center / bottom / stretch on y/h.
+ *
+ * `left`/`right`/`top`/`bottom`/`stretch` keep the VISUAL PROPORTION of the
+ * anchored margin (it scales with the page). A constant-pixel margin from
+ * right/bottom is a future "pin" mode (see PLAN-CONSTRAINTS.md Phase 4).
+ */
+export const FIT_H_MODES = ['free', 'left', 'center', 'right', 'stretch'] as const
+export const FIT_V_MODES = ['free', 'top', 'center', 'bottom', 'stretch'] as const
+export type FitHMode = (typeof FIT_H_MODES)[number]
+export type FitVMode = (typeof FIT_V_MODES)[number]
+export interface FitSpec {
+  x?: FitHMode
+  y?: FitVMode
+}
+
+/** which objects show glue-spring hints in the editor (persisted UI state) */
+export type FitHintMode = 'all' | 'selected' | 'off'
+
 const RectSchema = z.object({
   x: z.number(),
   y: z.number(),
@@ -23,22 +53,18 @@ const RectSchema = z.object({
 })
 export type Rect = z.infer<typeof RectSchema>
 
-const RectsSchema = z.object({
-  desktop: RectSchema,
-  tablet: RectSchema.optional(),
-  mobile: RectSchema.optional(),
-})
-export type Rects = z.infer<typeof RectsSchema>
-
 export interface PageObject {
   id: string
   name: string
   control: ControlKind
-  rects: Rects
+  /** the object's one authored layout; `fit` adapts it to each page size */
+  rect: Rect
   props: Record<string, unknown>
   on: Record<string, string>
   /** groups only: member objects, positioned relative to the group */
   children?: PageObject[]
+  /** responsive glue: how `rect` adapts at each breakpoint page size */
+  fit?: FitSpec
 }
 
 // recursive schema (groups contain groups) — explicit interface + z.lazy
@@ -47,10 +73,16 @@ const PageObjectSchema: z.ZodType<PageObject, z.ZodTypeDef, unknown> = z.lazy(()
     id: z.string().min(1),
     name: z.string().min(1),
     control: z.enum(CONTROL_KINDS),
-    rects: RectsSchema,
+    rect: RectSchema,
     props: z.record(z.unknown()).default({}),
     on: z.record(z.string()).default({}),
     children: z.array(PageObjectSchema).optional(),
+    fit: z
+      .object({
+        x: z.enum(FIT_H_MODES).optional(),
+        y: z.enum(FIT_V_MODES).optional(),
+      })
+      .optional(),
   }),
 )
 
@@ -172,7 +204,58 @@ function migrateBackgrounds(data: unknown): unknown {
 }
 
 export function parseBook(data: unknown): Book {
-  return BookSchema.parse(migrateBackgrounds(data))
+  return BookSchema.parse(migrateObjects(migrateBackgrounds(data)))
+}
+
+/**
+ * Legacy object upgrade, applied recursively before validation:
+ *  - `rects.tablet` / `rects.mobile` are dropped; the authored layout is
+ *    `rect = rects.desktop` (constraints-only model — per-breakpoint rects are
+ *    no longer supported).
+ *  - legacy fit tokens: `prop`→`left`/`top`, `middle`→`center`. `left`/`top`
+ *    are NOT rewritten — they are first-class modes in the current model
+ *    (proportional left/top margins) and the editor writes them directly.
+ */
+const FIT_TOKEN_MAP: Record<'x' | 'y', Record<string, string>> = {
+  x: { prop: 'left' },
+  y: { middle: 'center', prop: 'top' },
+}
+
+function migrateObjects(data: unknown): unknown {
+  if (!data || typeof data !== 'object') return data
+  const raw = data as Record<string, unknown>
+  const mapObjects = (objs: unknown): void => {
+    if (!Array.isArray(objs)) return
+    for (const o of objs) {
+      if (!o || typeof o !== 'object') continue
+      const obj = o as Record<string, unknown>
+      const rects = obj['rects']
+      if (rects && typeof rects === 'object') {
+        const legacy = rects as Record<string, unknown>
+        if (legacy['desktop'] && typeof legacy['desktop'] === 'object') {
+          obj['rect'] = legacy['desktop']
+        }
+        delete obj['rects']
+      }
+      const fit = obj['fit']
+      if (fit && typeof fit === 'object') {
+        const f = fit as Record<string, unknown>
+        for (const axis of ['x', 'y'] as const) {
+          const cur = f[axis]
+          const mapped = typeof cur === 'string' ? FIT_TOKEN_MAP[axis][cur] : undefined
+          if (mapped) f[axis] = mapped
+        }
+      }
+      mapObjects(obj['children'])
+    }
+  }
+  if (Array.isArray(raw['pages'])) {
+    for (const p of raw['pages'] as Array<Record<string, unknown>>) mapObjects(p['objects'])
+  }
+  if (Array.isArray(raw['backgrounds'])) {
+    for (const b of raw['backgrounds'] as Array<Record<string, unknown>>) mapObjects(b['objects'])
+  }
+  return data
 }
 
 export const DEFAULT_SIZES: Record<ControlKind, { w: number; h: number }> = {
@@ -216,7 +299,7 @@ export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
 }
 
 export function safeParseBook(data: unknown) {
-  return BookSchema.safeParse(data)
+  return BookSchema.safeParse(migrateObjects(migrateBackgrounds(data)))
 }
 
 let idCounter = 0
@@ -233,14 +316,14 @@ export function newId(prefix: string): string {
 export function createObject(
   control: ControlKind,
   name: string,
-  rects: Rects,
+  rect: Rect,
   props: Record<string, unknown> = {},
 ): PageObject {
   return PageObjectSchema.parse({
     id: newId('obj'),
     name,
     control,
-    rects,
+    rect,
     props,
   })
 }
@@ -299,12 +382,12 @@ export function createBook(title: string): Book {
   })
 }
 
-export function createGroup(name: string, rects: Rects, children: PageObject[]): PageObject {
+export function createGroup(name: string, rect: Rect, children: PageObject[]): PageObject {
   return PageObjectSchema.parse({
     id: newId('obj'),
     name,
     control: 'group',
-    rects,
+    rect,
     props: {},
     on: {},
     children,
@@ -398,4 +481,109 @@ export function scaleRect(
     w,
     h,
   }
+}
+
+const DEFAULT_FIT: FitSpec = { x: 'free', y: 'free' }
+
+/**
+ * The rect an object renders at for a page size — the responsive "lens".
+ *
+ * The object has ONE authored `rect`; `fit` derives the constrained axes for
+ * the target page size while free axes keep their authored coordinate. At the
+ * base size (page size == the desktop reference) Free/Left/Right/Top/Bottom/
+ * Stretch are identity and only Center visibly moves — so setting Center shows
+ * the object centered where you are, without writing anything.
+ */
+export function resolveObjectRect(
+  obj: PageObject,
+  pageSize: CanvasSize,
+  refSize: CanvasSize,
+): Rect {
+  const r = obj.rect
+  const fit = obj.fit ?? DEFAULT_FIT
+  const W = pageSize.width
+  const H = pageSize.height
+  const W0 = refSize.width
+  const H0 = refSize.height
+  const ratioX = W0 === 0 ? 1 : W / W0
+  const ratioY = H0 === 0 ? 1 : H / H0
+  const round = (n: number): number => Math.max(1, Math.round(n))
+  // stretch keeps BOTH margins proportional, so the size scales by the same
+  // ratio as the page (and the position rides with the left/top margin)
+  const w = fit.x === 'stretch' ? round(r.w * ratioX) : r.w
+  const h = fit.y === 'stretch' ? round(r.h * ratioY) : r.h
+  const x =
+    fit.x === 'center'
+      ? (W - w) / 2
+      : fit.x === 'left' || fit.x === 'stretch'
+        ? r.x * ratioX
+        : fit.x === 'right'
+          ? (r.x + r.w) * ratioX - w
+          : r.x // free
+  const y =
+    fit.y === 'center'
+      ? (H - h) / 2
+      : fit.y === 'top' || fit.y === 'stretch'
+        ? r.y * ratioY
+        : fit.y === 'bottom'
+          ? (r.y + r.h) * ratioY - h
+          : r.y // free
+  return { x: Math.round(x), y: Math.round(y), w, h }
+}
+
+/**
+ * Inverse of the position/size lens: given the rect the author DRAGGED at the
+ * current breakpoint, derive the base rect that produces it.
+ *
+ * This is what makes a glued object draggable: the drag edits the reference
+ * (the free parameter behind the constraint) at every breakpoint instead of
+ * being rejected. `center` has no free parameter (its position is fully
+ * determined), so its reference axis is left untouched. At desktop the page
+ * size equals the reference, so every inverse is the identity.
+ */
+export function unlensObjectRect(
+  ref: Rect,
+  dragged: Rect,
+  fit: FitSpec | undefined,
+  pageSize: CanvasSize,
+  refSize: CanvasSize,
+): Rect {
+  const W = pageSize.width
+  const H = pageSize.height
+  const W0 = refSize.width
+  const H0 = refSize.height
+  const ratioX = W === 0 ? 1 : W0 / W
+  const ratioY = H === 0 ? 1 : H0 / H
+  const round = (n: number): number => Math.max(1, Math.round(n))
+  const fx = fit?.x
+  const fy = fit?.y
+  const w = fx === 'stretch' ? round(dragged.w * ratioX) : dragged.w
+  const h = fy === 'stretch' ? round(dragged.h * ratioY) : dragged.h
+  const x =
+    fx === 'left' || fx === 'stretch'
+      ? dragged.x * ratioX
+      : fx === 'right'
+        ? (dragged.x + dragged.w) * ratioX - dragged.w
+        : fx === 'center'
+          ? ref.x // rigid: centered is fully determined
+          : dragged.x // free
+  const y =
+    fy === 'top' || fy === 'stretch'
+      ? dragged.y * ratioY
+      : fy === 'bottom'
+        ? (dragged.y + dragged.h) * ratioY - dragged.h
+        : fy === 'center'
+          ? ref.y
+          : dragged.y // free
+  return { x: Math.round(x), y: Math.round(y), w, h }
+}
+
+/** does the object declare a real constraint on the horizontal axis? */
+export function constrainsX(obj: PageObject): boolean {
+  return obj.fit?.x !== undefined && obj.fit.x !== 'free'
+}
+
+/** does the object declare a real constraint on the vertical axis? */
+export function constrainsY(obj: PageObject): boolean {
+  return obj.fit?.y !== undefined && obj.fit.y !== 'free'
 }

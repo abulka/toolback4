@@ -1,4 +1,4 @@
-import type { Book, Breakpoint, ControlKind, Rect } from '@toolback/format'
+import type { Book, Breakpoint, ControlKind, FitHintMode, Rect } from '@toolback/format'
 import {
   createStore,
   getObjectRects,
@@ -6,7 +6,7 @@ import {
   renderBookPage,
   renderDynamicText,
 } from './index'
-import { createDesignController, type DesignOutMessage } from './design'
+import { createDesignController, type DesignOutMessage, type HandleDir } from './design'
 import { popupEscape, runBook, stopRun } from './player'
 import { startAuthorMode, stopAuthor, syncAuthorScripts } from './author'
 import { loadShelfManifest, setLibMap } from './libs'
@@ -28,6 +28,8 @@ export type EditorToCanvasMessage =
       view?: ToolbackView
       design?: boolean
       selection?: string[] | null
+      /** which objects draw glue-spring hints on the canvas (toolbar control) */
+      fitHints?: FitHintMode
     }
   | { type: 'toolback:dragOver'; control: ControlKind; rect: Rect }
   | { type: 'toolback:dragEnd' }
@@ -39,7 +41,7 @@ export type CanvasToEditorMessage =
   | { type: 'toolback:ready' }
   | { type: 'toolback:rects'; rects: ObjectRects }
   | { type: 'toolback:selection'; ids: string[] }
-  | { type: 'toolback:commit'; kind: 'move' | 'resize'; objects: Array<{ id: string; rect: Rect }> }
+  | { type: 'toolback:commit'; kind: 'move' | 'resize'; objects: Array<{ id: string; rect: Rect }>; dir?: HandleDir }
   | { type: 'toolback:scriptError'; message: string }
   | { type: 'toolback:error'; message: string }
   | { type: 'toolback:runToggle' }
@@ -304,6 +306,7 @@ export function listenForEditor(
         }
         send({ type: 'toolback:rects', rects: pageRoot ? getObjectRects(pageRoot) : {} })
         design.setEnabled(true)
+        design.setFitHintMode(data.fitHints ?? 'all')
         design.onRendered(data.selection ?? [])
         // a running author plugin hot-reloads when its page's scripts changed
         syncAuthorScripts(data.book)

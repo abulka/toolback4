@@ -26,7 +26,7 @@ function bgBook(opts?: { bgObjects?: ReturnType<typeof createObject>[]; bgSize?:
         name: 'P1',
         script: '',
         backgroundId: 'bg1',
-        objects: [createObject('label', 'pageLabel', { desktop: { x: 0, y: 0, w: 80, h: 30 } })],
+        objects: [createObject('label', 'pageLabel', { x: 0, y: 0, w: 80, h: 30 })],
       },
       {
         id: 'p2',
@@ -59,7 +59,7 @@ describe('backgrounds (runtime)', () => {
 
   it('renders background objects below page objects, tagged data-tb-bg', () => {
     const root = document.createElement('div')
-    const navBtn = createObject('button', 'navBtn', { desktop: { x: 0, y: 0, w: 100, h: 40 } }, { text: 'Home' })
+    const navBtn = createObject('button', 'navBtn', { x: 0, y: 0, w: 100, h: 40 }, { text: 'Home' })
     const book = bgBook({ bgObjects: [navBtn] })
     renderBookPage(book, 0, root, 'desktop')
     const wrappers = root.querySelectorAll<HTMLElement>('.tb-object')
@@ -74,7 +74,7 @@ describe('backgrounds (runtime)', () => {
 
   it('background objects run: ControlApis, event scripts and controls[name] work', () => {
     const root = document.createElement('div')
-    const navBtn = createObject('button', 'navBtn', { desktop: { x: 0, y: 0, w: 100, h: 40 } })
+    const navBtn = createObject('button', 'navBtn', { x: 0, y: 0, w: 100, h: 40 })
     navBtn.on = { click: `store.set('nav', 1)` }
     const book = bgBook({ bgObjects: [navBtn] })
     const handle = runBook(book, root, 'desktop', (m) => {
@@ -90,8 +90,8 @@ describe('backgrounds (runtime)', () => {
   it('page object names collide-checked against background names: bg element wins the lookup', () => {
     // documents current behaviour: querySelector finds the bg wrapper first
     const root = document.createElement('div')
-    const bgLabel = createObject('label', 'dup', { desktop: { x: 0, y: 0, w: 50, h: 20 } }, { text: 'from bg' })
-    const pageLabel = createObject('label', 'dup', { desktop: { x: 100, y: 0, w: 50, h: 20 } }, { text: 'from page' })
+    const bgLabel = createObject('label', 'dup', { x: 0, y: 0, w: 50, h: 20 }, { text: 'from bg' })
+    const pageLabel = createObject('label', 'dup', { x: 100, y: 0, w: 50, h: 20 }, { text: 'from page' })
     const book = bgBook({ bgObjects: [bgLabel] })
     book.pages[0]!.objects.push(pageLabel)
     const handle = runBook(book, root, 'desktop')
@@ -101,7 +101,7 @@ describe('backgrounds (runtime)', () => {
 
   it('renderBackgroundView shows only the background objects, editable (no data-tb-bg)', () => {
     const root = document.createElement('div')
-    const navBtn = createObject('button', 'navBtn', { desktop: { x: 0, y: 0, w: 100, h: 40 } }, { text: 'Home' })
+    const navBtn = createObject('button', 'navBtn', { x: 0, y: 0, w: 100, h: 40 }, { text: 'Home' })
     const book = bgBook({ bgObjects: [navBtn], bgSize: { desktop: { width: 320, height: 240 } } })
     renderBackgroundView(book, 'bg1', root, 'desktop')
     const pageRoot = root.querySelector<HTMLElement>('.tb-page')!
@@ -120,7 +120,7 @@ describe('backgrounds (runtime)', () => {
     const sent: Array<{ type: string }> = []
     const cleanup = listenForEditor(root, (m) => sent.push(m))
     try {
-      const navBtn = createObject('button', 'navBtn', { desktop: { x: 0, y: 0, w: 100, h: 40 } }, { text: 'Home' })
+      const navBtn = createObject('button', 'navBtn', { x: 0, y: 0, w: 100, h: 40 }, { text: 'Home' })
       const book = bgBook({ bgObjects: [navBtn] })
       window.dispatchEvent(
         new MessageEvent('message', {

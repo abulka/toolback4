@@ -361,6 +361,113 @@ body {
   z-index: 21;
 }
 
+/* object sticking out of the page at the current breakpoint — the visible
+   part gets a dashed red outline so clipping is seen, not guessed */
+.tb-clip {
+  position: absolute;
+  outline: 2px dashed #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+  pointer-events: none;
+  display: none;
+  z-index: 21;
+}
+
+/* responsive glue ("spring") hints: shape + muted colour per constraint kind.
+   edge = solid zigzag, square anchor; center = plain dashed line, circle
+   anchor; stretch = dashed circular coil, triangle anchor. Sits as the page's
+   first child so it paints above the page background but UNDER the controls. */
+.tb-fithint {
+  position: absolute;
+  pointer-events: none;
+}
+
+.tb-fithint-line,
+.tb-fithint-spring,
+.tb-fithint-anchor,
+.tb-fithint-arrow {
+  position: absolute;
+}
+
+.tb-fithint-line {
+  background: rgba(100, 116, 139, 0.85);
+  border-radius: 1px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
+.tb-fithint-line--stretch {
+  background: rgba(217, 119, 6, 0.72);
+}
+
+.tb-fithint-spring--edge {
+  color: rgba(100, 116, 139, 0.85);
+}
+
+.tb-fithint-spring--center {
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.tb-fithint-spring--center .tb-fithint-halo,
+.tb-fithint-spring--center .tb-fithint-spring-path,
+.tb-fithint-spring--stretch .tb-fithint-halo,
+.tb-fithint-spring--stretch .tb-fithint-spring-path {
+  stroke-dasharray: 5 4;
+}
+
+.tb-fithint-spring--stretch {
+  color: rgba(217, 119, 6, 0.72);
+}
+
+.tb-fithint-anchor {
+  width: 6px;
+  height: 6px;
+  background: rgba(100, 116, 139, 0.9);
+  border-radius: 2px;
+}
+
+.tb-fithint-anchor--center {
+  background: rgba(148, 163, 184, 0.95);
+  border-radius: 50%;
+}
+
+.tb-fithint-anchor--stretch {
+  width: 7px;
+  height: 7px;
+  background: rgba(217, 119, 6, 0.85);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.tb-fithint-anchor--stretch.tb-fithint-anchor--down {
+  transform: rotate(180deg);
+}
+
+.tb-fithint-anchor--stretch.tb-fithint-anchor--left {
+  transform: rotate(-90deg);
+}
+
+.tb-fithint-anchor--stretch.tb-fithint-anchor--right {
+  transform: rotate(90deg);
+}
+
+.tb-fithint-arrow {
+  width: 8px;
+  height: 8px;
+  background: rgba(100, 116, 139, 0.9);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.7));
+}
+
+.tb-fithint-arrow--right {
+  transform: rotate(90deg);
+}
+
+.tb-fithint-arrow--left {
+  transform: rotate(-90deg);
+}
+
+.tb-fithint-arrow--down {
+  transform: rotate(180deg);
+}
+
 .tb-marquee {
   position: absolute;
   border: 1px dashed var(--tb-accent);

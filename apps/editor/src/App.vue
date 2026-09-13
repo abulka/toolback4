@@ -405,6 +405,18 @@ const canvasStyle = computed(() => {
   return { width: `${size.width}px`, height: `${size.height}px` }
 })
 
+/** objects rendered at least partly outside the current page box (the clip
+ *  indicators on the canvas + this chip make the clipping visible) */
+const offPageCount = computed(() => {
+  if (store.isRunning || !store.canvasReady) return 0
+  const size = store.activeCanvasSize
+  let n = 0
+  for (const r of Object.values(store.rects)) {
+    if (r.x < -0.5 || r.y < -0.5 || r.x + r.w > size.width + 0.5 || r.y + r.h > size.height + 0.5) n++
+  }
+  return n
+})
+
 /** what the status bar calls the thing being edited */
 const targetLabel = computed(() =>
   store.editing.kind === 'background'
@@ -497,6 +509,61 @@ function startPaletteSplitDrag(e: PointerEvent): void {
           >
             {{ bp[0]!.toUpperCase() + bp.slice(1) }}
           </button>
+        </div>
+        <div class="spring-wrap">
+          <div class="spring-switch" title="Glue springs — which objects to show">
+            <span class="spring-glyph" aria-hidden="true">≋</span>
+            <button
+              class="spring-toggle"
+              :class="{ on: store.fitHintMode === 'all' }"
+              :disabled="store.isRunning"
+              title="All glued objects"
+              @click="store.setFitHintMode('all')"
+            >All</button>
+            <button
+              class="spring-toggle"
+              :class="{ on: store.fitHintMode === 'selected' }"
+              :disabled="store.isRunning"
+              title="Selected object(s) only"
+              @click="store.setFitHintMode('selected')"
+            >Sel</button>
+            <button
+              class="spring-toggle"
+              :class="{ on: store.fitHintMode === 'off' }"
+              :disabled="store.isRunning"
+              title="Hide all springs"
+              @click="store.setFitHintMode('off')"
+            >Off</button>
+          </div>
+          <div class="spring-legend" role="tooltip">
+            <div class="spring-legend-inner">
+              <div class="legend-row">
+                <svg class="legend-swatch" width="34" height="12" viewBox="0 0 34 12" aria-hidden="true">
+                  <path class="lz-edge" d="M2 6 L6 3 L10 9 L14 3 L18 9 L22 3 L26 9 L30 6" />
+                  <rect class="la-edge" x="0" y="3" width="4" height="6" />
+                  <path class="lz-edge" d="M29 2 L34 6 L29 10" />
+                </svg>
+                <span><b>Edge</b> Left / Top / Right / Bottom — solid zigzag, square anchor, arrow points at the object</span>
+              </div>
+              <div class="legend-row">
+                <svg class="legend-swatch" width="34" height="12" viewBox="0 0 34 12" aria-hidden="true">
+                  <path class="lz-center" d="M3 6 L31 6" />
+                  <circle class="la-center" cx="3" cy="6" r="2.5" />
+                  <circle class="la-center" cx="31" cy="6" r="2.5" />
+                </svg>
+                <span><b>Center</b> — plain dashed line, circle anchor</span>
+              </div>
+              <div class="legend-row">
+                <svg class="legend-swatch" width="34" height="12" viewBox="0 0 34 12" aria-hidden="true">
+                  <path class="lz-stretch" d="M2 6 C4 1 7 1 9 6 S14 11 16 6 S21 1 23 6 S28 11 30 6" />
+                  <polygon class="la-stretch" points="2,2 0,6 2,10" />
+                  <polygon class="la-stretch" points="32,2 34,6 32,10" />
+                </svg>
+                <span><b>Stretch</b> — dashed circular coil, triangle anchor</span>
+              </div>
+              <p class="legend-note">Muted colours: slate = edge, pale grey = center, amber = stretch.</p>
+            </div>
+          </div>
         </div>
       </div>
         <div class="right-group">
@@ -759,6 +826,7 @@ function startPaletteSplitDrag(e: PointerEvent): void {
         <span class="mode" :class="{ running: store.isRunning }">{{ store.isRunning ? 'RUNNING' : 'design' }}</span>
         <span>{{ targetLabel }} · {{ store.objectCount }} objects · "{{ store.book.title }}"</span>
         <span v-if="store.popupsOpen.length" class="popups">popup: {{ store.popupsOpen.join(', ') }}</span>
+        <span v-if="offPageCount" class="offpage" :title="'Objects sticking out of the ' + store.breakpoint + ' page — dashed red outline on the canvas. Use the Responsive glue (Right/Stretch/…) or drag them back in.'">{{ offPageCount }} off-page</span>
         <span v-if="store.authorActive" class="author-chip">⚡ plugin: {{ store.authorActive }}</span>
         <span v-if="store.savedAt" class="dim">saved {{ new Date(store.savedAt).toLocaleTimeString() }}</span>
         <span v-if="store.autosaveAt" class="dim">autosaved {{ new Date(store.autosaveAt).toLocaleTimeString() }}</span>
@@ -1021,6 +1089,126 @@ body.tb-palette-dragging * {
   cursor: not-allowed;
 }
 
+.spring-wrap {
+  position: relative;
+}
+
+.spring-switch {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  padding: 2px;
+  background: var(--ed-bg);
+}
+
+.spring-legend {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 90;
+  padding-top: 8px;
+}
+
+.spring-wrap:hover .spring-legend,
+.spring-wrap:focus-within .spring-legend {
+  display: block;
+}
+
+.spring-legend-inner {
+  width: 320px;
+  background: var(--ed-panel);
+  border: 1px solid var(--ed-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.legend-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 8px;
+  font: 400 11px/1.35 system-ui, sans-serif;
+  color: var(--ed-text-dim);
+}
+
+.legend-row b {
+  color: var(--ed-text);
+}
+
+.legend-swatch {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.legend-swatch path {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.lz-edge {
+  stroke: rgba(100, 116, 139, 0.9);
+}
+
+.la-edge {
+  fill: rgba(100, 116, 139, 0.9);
+}
+
+.lz-center {
+  stroke: rgba(148, 163, 184, 0.95);
+  stroke-dasharray: 4 3;
+}
+
+.la-center {
+  fill: rgba(148, 163, 184, 0.95);
+}
+
+.lz-stretch {
+  stroke: rgba(217, 119, 6, 0.8);
+  stroke-dasharray: 4 3;
+}
+
+.la-stretch {
+  fill: rgba(217, 119, 6, 0.85);
+}
+
+.legend-note {
+  margin: 2px 0 0;
+  font-size: 10.5px;
+  color: var(--ed-text-dim);
+}
+
+.spring-glyph {
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 3px 0 4px;
+  color: var(--ed-text-dim);
+}
+
+.spring-toggle {
+  font: 500 11px/1 system-ui, sans-serif;
+  color: var(--ed-text-dim);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.spring-toggle.on {
+  color: #fff;
+  background: var(--ed-accent);
+}
+
+.spring-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .dim {
   color: var(--ed-text-dim);
   opacity: 0.8;
@@ -1241,6 +1429,14 @@ body.tb-palette-dragging * {
   color: var(--ed-accent);
 }
 
+.layout-block {
+  margin-bottom: 14px;
+}
+
+.layout-block .hint {
+  margin: 0 0 8px;
+}
+
 .bg-color {
   width: 64px;
   height: 34px;
@@ -1258,6 +1454,15 @@ body.tb-palette-dragging * {
 .status .popups {
   color: var(--ed-ok);
   border: 1px solid var(--ed-ok);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+}
+
+.status .offpage {
+  color: var(--ed-err);
+  border: 1px solid var(--ed-err);
   border-radius: 999px;
   padding: 1px 8px;
   font-size: 10px;
@@ -1515,6 +1720,16 @@ h2:first-child {
   color: var(--ed-text-dim);
   background: var(--ed-panel);
   border-top: 1px solid var(--ed-border);
+}
+
+.pop-enter-active,
+.pop-leave-active {
+  transition: opacity 120ms ease;
+}
+
+.pop-enter-from,
+.pop-leave-to {
+  opacity: 0;
 }
 
 .ok {

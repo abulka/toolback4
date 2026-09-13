@@ -21,7 +21,7 @@ describe('collectStoreKeys', () => {
               id: 'o1',
               name: 'a',
               control: 'label',
-              rects: { desktop: { x: 0, y: 0, w: 1, h: 1 } },
+              rect: { x: 0, y: 0, w: 1, h: 1 },
               props: { text: 'Score: {{score}} of {{max}}' },
               on: { click: "store.set('clicked', true); store.set('score', 1)" },
             },

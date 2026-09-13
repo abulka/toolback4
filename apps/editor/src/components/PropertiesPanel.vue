@@ -15,9 +15,60 @@ const store = useBookStore()
 const storeKeyList = computed(() => [...collectStoreKeys(store.book), 'self.name'])
 const sel = computed(() => store.selectedObject)
 const multi = computed(() => store.selectionIds.length > 1)
+// the rect the canvas actually renders (glue-derived) so the
+// X/Y/W/H fields always match what's on screen
 const rect = computed<Rect | null>(() =>
-  sel.value ? (sel.value.rects[store.breakpoint] ?? sel.value.rects.desktop) : null,
+  sel.value ? store.effectiveRectOf(sel.value.id) : null,
 )
+
+// ---- responsive glue ----
+// 'free' = no constraint (the authored coordinate applies everywhere)
+const FIT_H: Array<{ id: string; label: string }> = [
+  { id: 'free', label: 'Free' },
+  { id: 'left', label: 'Left' },
+  { id: 'center', label: 'Center' },
+  { id: 'right', label: 'Right' },
+  { id: 'stretch', label: 'Stretch' },
+]
+const FIT_V: Array<{ id: string; label: string }> = [
+  { id: 'free', label: 'Free' },
+  { id: 'top', label: 'Top' },
+  { id: 'center', label: 'Center' },
+  { id: 'bottom', label: 'Bottom' },
+  { id: 'stretch', label: 'Stretch' },
+]
+/** one-line "what does this do" for the active pair of modes */
+const FIT_DESC: Record<string, string> = {
+  free: 'position fixed at its authored spot',
+  left: 'left margin keeps its share of the page',
+  top: 'top margin keeps its share of the page',
+  right: 'right margin keeps its share of the page',
+  bottom: 'bottom margin keeps its share of the page',
+  center: 'always centered on the page',
+  stretch: 'size and margins scale with the page',
+}
+const fitH = computed(() => sel.value?.fit?.x ?? 'free')
+const fitV = computed(() => sel.value?.fit?.y ?? 'free')
+/** only real constraints show in the badge — Free axes are omitted */
+const fitLabel = computed<string>(() => {
+  const parts: string[] = []
+  if (fitH.value !== 'free') parts.push(FIT_H.find((f) => f.id === fitH.value)?.label ?? fitH.value)
+  if (fitV.value !== 'free') parts.push(FIT_V.find((f) => f.id === fitV.value)?.label ?? fitV.value)
+  return parts.join(' · ')
+})
+const fitHint = computed<string>(() => {
+  if (!isGlued.value) return 'Free — the layout stays exactly where you put it.'
+  const h = fitH.value !== 'free' ? `H: ${FIT_DESC[fitH.value] ?? fitH.value}` : ''
+  const v = fitV.value !== 'free' ? `V: ${FIT_DESC[fitV.value] ?? fitV.value}` : ''
+  return [h, v].filter(Boolean).join(' · ')
+})
+const isGlued = computed(() => fitLabel.value !== '')
+function onFitH(e: Event): void {
+  if (sel.value) store.setObjectFit(sel.value.id, 'x', (e.target as HTMLSelectElement).value)
+}
+function onFitV(e: Event): void {
+  if (sel.value) store.setObjectFit(sel.value.id, 'y', (e.target as HTMLSelectElement).value)
+}
 
 const EVENTS = ['click', 'dblclick', 'change', 'input', 'mouseenter', 'mouseleave'] as const
 const currentEvent = ref<(typeof EVENTS)[number]>('click')
@@ -120,13 +171,26 @@ function onPropValue(key: string, v: string): void {
 }
 
 function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
-  if (!sel.value || !rect.value) return
+  if (!sel.value) return
   const n = Math.max(8, Math.round(Number((e.target as HTMLInputElement).value)) || 0)
-  store.applyRect(sel.value.id, { ...rect.value, [field]: n })
+  // deliberate typed writes release the glued axis they touch
+  store.setGeometry(sel.value.id, { [field]: n })
 }
 
 function isGroupSel(): boolean {
   return sel.value?.control === 'group'
+}
+
+/** the selection is a single group member (fit is top-level only) */
+function isMember(): boolean {
+  return store.selectionIds.length === 1 && store.selectionParentId !== null
+}
+
+/** responsive UI for any top-level object — groups included (a group's box
+ *  carries the glue; members ride it and stretch scales them). Members and
+ *  nested objects have no fit of their own, so they're excluded. */
+function canFit(): boolean {
+  return !isMember()
 }
 
 /** ungrouping discards the group's own scripts — ask before destroying them */
@@ -183,6 +247,7 @@ async function copyJson(): Promise<void> {
     <div class="head">
       <span class="obj-kind">{{ sel!.control }}</span>
       <span class="obj-name">{{ sel!.name }}</span>
+      <span v-if="canFit() && isGlued" class="fit-badge" :title="`Responsive glue: ${fitLabel}. The canvas derives the constrained axis from the shared layout at every page size.`">{{ fitLabel }}</span>
       <button
         class="copy-json"
         :class="{ ok: copied }"
@@ -285,7 +350,27 @@ async function copyJson(): Promise<void> {
       <button class="action" @click="onUngroup">Ungroup</button>
     </div>
 
-    <h2>Geometry · {{ store.breakpoint }}</h2>
+    <h2 v-if="canFit()">Responsive · {{ store.breakpoint }}</h2>
+    <div v-if="canFit()" class="fit-row">
+      <div class="fit-axis">
+        <label>Horizontal</label>
+        <select :value="fitH" @change="onFitH">
+          <option v-for="f in FIT_H" :key="f.id" :value="f.id">{{ f.label }}</option>
+        </select>
+      </div>
+      <div class="fit-axis">
+        <label>Vertical</label>
+        <select :value="fitV" @change="onFitV">
+          <option v-for="f in FIT_V" :key="f.id" :value="f.id">{{ f.label }}</option>
+        </select>
+      </div>
+    </div>
+    <p v-if="canFit()" class="hint fit-desc">{{ fitHint }}</p>
+    <p v-if="canFit() && isGlued" class="hint responsive-hint">
+      Edits here adjust the shared layout at every breakpoint.
+    </p>
+
+    <h2>Geometry</h2>
     <div class="geo">
       <div class="field">
         <label>X</label>
@@ -334,6 +419,17 @@ async function copyJson(): Promise<void> {
   background: rgba(99, 102, 241, 0.12);
   border-radius: 4px;
   padding: 2px 6px;
+}
+
+.fit-badge {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #fff;
+  background: var(--ed-accent);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
 }
 
 .obj-name {
@@ -462,6 +558,66 @@ async function copyJson(): Promise<void> {
   display: grid;
   grid-template-columns: 1fr 1fr;
   column-gap: 8px;
+}
+
+.responsive-hint {
+  font-size: 10.5px;
+  color: var(--ed-accent);
+}
+
+.fit-desc {
+  margin: -6px 0 10px;
+}
+
+.fit-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.fit-axis {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.fit-axis label {
+  font-size: 11px;
+  color: var(--ed-text-dim);
+}
+
+.fit-axis select {
+  width: 100%;
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  color: var(--ed-text);
+  padding: 6px;
+  font: inherit;
+}
+
+.bp-dots {
+  font-size: 9.5px;
+  color: var(--ed-accent);
+  margin-left: 6px;
+}
+
+.reset-inherit {
+  margin-top: 6px;
+  width: 100%;
+  font: 500 11.5px/1 system-ui, sans-serif;
+  color: var(--ed-text);
+  background: var(--ed-bg);
+  border: 1px dashed var(--ed-accent);
+  border-radius: 8px;
+  padding: 7px 0;
+  cursor: pointer;
+}
+
+.reset-inherit:hover {
+  color: #fff;
+  border-color: var(--ed-accent);
 }
 
 .delete {

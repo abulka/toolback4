@@ -22,7 +22,7 @@ function pluginBook(pluginScript = '', buttonScript = ''): Book {
         name: 'Content',
         script: '',
         backgroundId: 'bg1',
-        objects: [createObject('label', 'contentLabel', { desktop: { x: 0, y: 0, w: 100, h: 30 } })],
+        objects: [createObject('label', 'contentLabel', { x: 0, y: 0, w: 100, h: 30 })],
       },
       {
         id: 'p2',
@@ -32,10 +32,10 @@ function pluginBook(pluginScript = '', buttonScript = ''): Book {
         backgroundId: 'bg1',
         objects: [
           {
-            ...createObject('button', 'pluginBtn', { desktop: { x: 8, y: 8, w: 100, h: 32 } }, { text: 'Stamp' }),
+            ...createObject('button', 'pluginBtn', { x: 8, y: 8, w: 100, h: 32 }, { text: 'Stamp' }),
             on: { click: buttonScript },
           },
-          { ...createObject('label', 'pluginLabel', { desktop: { x: 8, y: 80, w: 200, h: 30 } }), props: { text: 'plugin ui' } },
+          { ...createObject('label', 'pluginLabel', { x: 8, y: 80, w: 200, h: 30 }), props: { text: 'plugin ui' } },
         ],
       },
     ],

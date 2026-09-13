@@ -1,5 +1,5 @@
 import type { Background, Book, Breakpoint, PageObject, Rect } from '@toolback/format'
-import { backgroundFor, flattenObjects, FONT_STACKS, resolveColor } from '@toolback/format'
+import { backgroundFor, flattenObjects, FONT_STACKS, resolveColor, resolveObjectRect, unlensObjectRect, resolvePageSize } from '@toolback/format'
 import { renderBookPage } from './index'
 import { rewriteLibImports, toolbackImport } from './libs'
 
@@ -71,8 +71,8 @@ export function makeControlApi(
   obj: PageObject,
   el: HTMLElement,
   wrapper: HTMLElement,
-  breakpoint: Breakpoint,
   listeners: Array<() => void>,
+  size?: { page: { width: number; height: number }; ref: { width: number; height: number } },
 ): ControlApi {
   const input = el instanceof HTMLInputElement ? el : null
   const checkbox = el instanceof HTMLInputElement ? null : (el.querySelector?.('input[type="checkbox"]') as HTMLInputElement | null)
@@ -80,9 +80,32 @@ export function makeControlApi(
   // the member DOM, so text/value are inert for them
   const isGroup = obj.control === 'group'
 
-  const rectNow = (): Rect => obj.rects[breakpoint] ?? obj.rects.desktop
-  const writeRect = (r: Rect): void => {
-    obj.rects = { ...obj.rects, [breakpoint]: r }
+  const rectNow = (): Rect =>
+    size ? resolveObjectRect(obj, size.page, size.ref) : obj.rect
+  /**
+   * A scripted write to a glued axis releases that axis — deliberate acts win
+   * over the constraint. Position writes (x/y) always release; size writes
+   * (width/height) release only a STRETCH axis, whose size IS the constraint —
+   * for center/right/bottom the size stays authored and the position simply
+   * re-derives around it.
+   */
+  const releaseForWrite = (part: 'x' | 'y' | 'w' | 'h'): void => {
+    const fit = obj.fit
+    if (!fit) return
+    const axis: 'x' | 'y' = part === 'x' || part === 'w' ? 'x' : 'y'
+    const mode = fit[axis]
+    if (mode === undefined || mode === 'free') return
+    const sizeWrite = part === 'w' || part === 'h'
+    if (sizeWrite && mode !== 'stretch') return
+    const next = { ...fit }
+    delete next[axis]
+    if (Object.keys(next).length === 0) delete obj.fit
+    else obj.fit = next
+  }
+  const writeRendered = (r: Rect): void => {
+    // fold the rendered target back onto the one authored rect (free axes take
+    // it directly; constrained axes derive the reference that produces it)
+    obj.rect = size ? unlensObjectRect(obj.rect, r, obj.fit, size.page, size.ref) : r
     wrapper.style.left = `${r.x}px`
     wrapper.style.top = `${r.y}px`
     wrapper.style.width = `${r.w}px`
@@ -93,7 +116,8 @@ export function makeControlApi(
     if (!Number.isFinite(n)) return
     const r = { ...rectNow() }
     r[part] = part === 'x' || part === 'y' ? Math.round(n) : Math.max(1, Math.round(n))
-    writeRect(r)
+    releaseForWrite(part)
+    writeRendered(r)
   }
 
   return {
@@ -409,6 +433,9 @@ function runPage(st: RunState, scope: Scope, idx: number): void {
     const bg = backgroundFor(st.book, page)
     renderBookPage(st.book, idx, scope.root, st.breakpoint)
     const pageRoot = scope.root.querySelector<HTMLElement>('.tb-page')!
+    // the page sizes that make fit-aware ControlApi reads agree with render
+    const apiSize =
+      bg ? { page: resolvePageSize(st.book, bg, st.breakpoint), ref: resolvePageSize(st.book, bg, 'desktop') } : null
     // background objects are first-class at run time: they get ControlApis,
     // can carry event scripts, and are addressable as controls[name] (names
     // are unique across the page and its background)
@@ -419,7 +446,7 @@ function runPage(st: RunState, scope: Scope, idx: number): void {
       const wrapper = controlWrapper(pageRoot, obj.name)
       const el = (wrapper?.firstElementChild as HTMLElement | null) ?? null
       if (el && wrapper) {
-        scope.controls[obj.name] = makeControlApi(obj, el, wrapper, st.breakpoint, scope.listeners)
+        scope.controls[obj.name] = makeControlApi(obj, el, wrapper, scope.listeners, apiSize ?? undefined)
       }
     }
 

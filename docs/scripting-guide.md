@@ -157,15 +157,93 @@ Get/set properties:
   simplified, web-safe set; works on switches too)
 
 Geometry changes apply immediately, and they stick for the whole run — even
-across `page.go` navigations. Each breakpoint (desktop/tablet/mobile) keeps its
-own position, so editing `x` while running the desktop preview only changes the
-desktop rect.
+across `page.go` navigations. An object has **one layout** shared by every
+breakpoint; a geometry write edits that layout (constrained axes re-derive
+through their glue), so the change is visible at every page size.
 
 Methods:
 
 - `on(event, fn)` — attach an extra handler in code,
   e.g. `controls.myButton.on('click', () => { ... })`
 - `el` — the raw DOM element, if you need something the API above doesn't cover
+
+### Responsive breakpoints (glue)
+
+Every object can carry a **Responsive** setting — a horizontal and a vertical
+"glue" mode, edited in the Selection panel (the *Responsive* row). It answers
+the question *"how should this object adapt when the page is a different
+size?"* The two axes are independent: constraining one leaves the other free.
+Each object has **one authored layout**; at every breakpoint the page size
+changes and the constrained axes re-derive from that layout.
+
+Modes (per axis):
+
+- **Free** *(default)* — no constraint on that axis: it keeps the authored
+  coordinate everywhere.
+- **Left / Top** — the margin to that edge keeps its share of the page: the
+  coordinate scales with the page size (proportional).
+- **Center** — the object's **middle** is centered on that axis.
+- **Right / Bottom** — the gap to that edge keeps its share of the page.
+- **Stretch** — a true scale: both margins keep their share, so position *and*
+  size scale with the page (a full-width nav bar, a footer).
+
+Example: a hamburger button designed 24px from the right edge of a 1280px
+desktop page. Set Horizontal: **Right** and on the 640px mobile page its right
+gap scales down with the page, keeping the same visual proportion. Set
+Horizontal: **Center** and its middle stays on the page's horizontal axis at
+every size.
+
+Things to know:
+
+- **Free is the default.** Every object starts **Free** — positioned by its
+  top/left coordinates, draggable anywhere. A constraint only exists on an
+  axis where you picked one; the two axes are fully independent. Setting
+  Horizontal to Center constrains *only* the horizontal axis — the object
+  stays free to move vertically.
+- **Constraints never write the layout.** A constraint is a render *lens*: the
+  canvas derives the constrained axis at each page size; switching the mode
+  back to Free restores the authored layout exactly. Center always aligns the
+  object's **middle** to the page axis.
+- **At the base size the constrained axes are identity** — the authored layout
+  already encodes that gap or size, so only Center moves anything on the page
+  you designed. Constraints govern the *other* sizes.
+- **Dragging edits the shared layout.** There is no per-breakpoint override:
+  dragging edits the one layout, and glued axes re-anchor around the drag, so
+  the change is visible at every size. Center is rigid — dragging along a
+  centered axis does nothing (change the mode to move it).
+- **Deliberate writes win silently.** Typing X in the Geometry panel (or a
+  script writing `button.x`, or the author bridge) edits the shared layout,
+  re-anchoring a glued axis — no prompt. A size write on a Center/Right/Bottom
+  axis keeps the constraint (the position re-derives around the new size); on a
+  Stretch axis the size is the constraint.
+
+
+- **A spring shows every constraint in the canvas**, with a distinct shape
+  per kind. **Left/Top/Right/Bottom** draw one solid zigzag from the object to
+  the glued page edge — a square anchor sits on the edge and a small arrowhead
+  at the object points back at it, so you can tell which side is glued without
+  hunting for the edge. **Center** draws a **plain dashed pale-grey line** from
+  each page edge to the object's two sides, marked with circle anchors.
+  **Stretch** draws a **dashed circular coil** from both edges with triangle
+  anchors. Muted colours reinforce the shapes (slate = edge, pale grey =
+  center, amber = stretch; every spring sits on a faint white halo for dark
+  pages). The springs are drawn **behind the controls**, so they never cover
+  what's on the page. Background objects show their springs too; Default Free
+  draws nothing. The **≋ All/Sel/Off** control in the top bar shows springs for
+  every object, only the current selection, or none (the choice sticks) — hover
+  it for a legend.
+- Objects that stick out of the current page get a **dashed red outline** on the
+  canvas and the status bar shows an **`N off-page`** chip — the clipping you'd
+  otherwise have to guess at is made visible. Use glue or drag them back in.
+- Scripts read the *rendered* (lensed) rect: a Center-x button reports its
+  centered x. Writing `x`/`y`/`width`/`height` releases the touched axis and
+  applies the value.
+- **Groups**: glue moves the whole box; a stretching group scales its members
+  with it (the same fixed-corner math as group resize). Fit is top-level only
+  — members sit relative to their group and never derive. Dragging a
+  constrained group always asks before moving it.
+- **Backgrounds**: glue works on background objects too — a right-glued nav
+  button on a background follows the edge on every page that shows it.
 
 ### page
 

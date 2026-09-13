@@ -18,7 +18,7 @@ function book(pages: Array<{ script: string; objects: string[] }>): Book {
         id: `o${i}_${j}`,
         name: n,
         control: 'label' as const,
-        rects: { desktop: { x: 0, y: 0, w: 10, h: 10 } },
+        rect: { x: 0, y: 0, w: 10, h: 10 },
         props: {},
         on: {},
       })),

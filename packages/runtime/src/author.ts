@@ -1,5 +1,5 @@
 import type { Book, Breakpoint, Rect } from '@toolback/format'
-import { flattenObjects } from '@toolback/format'
+import { flattenObjects, resolvePageSize } from '@toolback/format'
 import { renderBookPage } from './index'
 import { rewriteLibImports, toolbackImport } from './libs'
 import {
@@ -252,11 +252,14 @@ export function startAuthorMode(
   const flat = flattenObjects([...bgObjects, ...page.objects])
 
   const controls: Record<string, ControlApi> = {}
+  const bg = book.backgrounds.find((b) => b.id === page.backgroundId)
+  const apiSize =
+    bg ? { page: resolvePageSize(book, bg, breakpoint), ref: resolvePageSize(book, bg, 'desktop') } : null
   for (const obj of flat) {
     const wrapper = controlWrapper(pageRoot, obj.name)
     const el = wrapper?.firstElementChild as HTMLElement | null
     if (el && wrapper) {
-      controls[obj.name] = makeControlApi(obj, el, wrapper, breakpoint, listeners)
+      controls[obj.name] = makeControlApi(obj, el, wrapper, listeners, apiSize ?? undefined)
     }
   }
 

@@ -21,6 +21,7 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
           : { kind: 'page', index: store.currentPageIndex },
       design: !store.isRunning,
       selection: [...store.selectionIds],
+      fitHints: store.fitHintMode,
     }
     iframe.contentWindow?.postMessage(msg, '*')
   }
@@ -43,7 +44,7 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
         store.applySelection(msg.ids)
         break
       case 'toolback:commit':
-        store.applyRects(msg.objects)
+        store.applyRects(msg.objects, { dir: msg.dir })
         break
       case 'toolback:scriptError':
         store.scriptError = msg.message

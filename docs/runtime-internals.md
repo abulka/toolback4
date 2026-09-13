@@ -46,8 +46,8 @@ PageObject {
 - Zod schemas with `.default()`s; `parseBook` normalizes on load. Factories
   (`createObject`, `createGroup`, `createPage`, `createBook`) return parsed
   plain objects, safe to JSON round-trip.
-- `rects[bp] ?? rects.desktop` is the universal fallback: a breakpoint without
-  its own rect inherits desktop.
+- Every object has **one authored layout** (`rect`) plus an optional `fit`
+  (see §4.1); there are no per-breakpoint rects.
 - Groups are **parent objects**: a member's rect is relative to its group; a
   group's rect is the tight union of its members (see §5.3).
 - Style props: `color` (colour names via `resolveColor` — a curated map plus
@@ -237,18 +237,63 @@ and communicates with the editor only through messages (`toolback:selection`,
   corner (the layout box is untouched mid-drag); the commit sends the group
   rect plus every descendant scaled around the same fixed corner — preview
   and commit agree for every handle.
+- **Clip indicators**: after every render (and live during drags) the
+  controller lays a dashed red `.tb-clip` box over any object that sticks out
+  of the page; the editor's status bar shows the same count as an
+  `N off-page` chip. The controller's `rects` map is always the source of
+  truth for these — it reads rendered DOM positions, so fit-aware rendering is
+  automatically reflected.
+- **Glue springs**: the `.tb-fithint` overlay draws a spring from every
+  *constrained* object (fit with a non-Free axis) to the page edge(s) it's
+  glued to. Shape encodes the kind: **edge** (left/top/right/bottom) is a
+  solid zigzag with a square anchor and an arrowhead at the object pointing
+  back at it; **center** is a plain straight dashed line with circle anchors;
+  **stretch** is a dashed *circular coil* (a real helix projection) with
+  triangle anchors pointing outward. Muted colour is a redundant accent
+  (slate / pale grey / amber), and every spring is drawn over a translucent
+  white halo so it reads on dark pages. Drawn for all objects — background
+  objects included (`bgRects` fallback) — whenever the `≋` All/Sel/Off control
+  says so (the load message carries `fitHints` as a `FitHintMode`), with a
+  hover legend in the toolbar. `'selected'` draws only the current selection;
+  `'off'` draws nothing. Free renders nothing. The hint is the page's first
+  child, so it paints above the page background but **under** the controls;
+  page-edge anchor glyphs are nudged just inside the page so clipping doesn't
+  cut them. Pure decoration — `pointer-events: none`, rebuilt on render and
+  drag redraws. Reads `data-tb-fit-x/y` the renderer stamps on each wrapper.
+- **Drags re-anchor the shared layout**: canvas drags run the dragged rect
+  through `unlensObjectRect` and write the object's one `rect` — glued axes
+  re-anchor, free axes take the value. Center is rigid (the canvas clamps its
+  axis). No constraint ever "fights back" and there is nothing to release.
+
+### 4.1 Responsive glue (`fit`) — the lens model
+
+`PageObject.fit` (`x`, `y`) is a **non-destructive render lens** resolved at
+render/read time only by `resolveObjectRect` (`packages/format`): constrained
+axes derive from the one authored `rect` (left/top scale position, right/bottom
+scale the edge gap, center centers the middle, stretch scales position+size),
+free axes keep the authored coordinate. **The lens applies at every size,
+including the reference size** (there the page size equals the base, so
+Free/Left/Right/Top/Bottom/Stretch are identity and only Center moves) — this
+is what makes setting Center visibly center the object without writing
+anything; switching back to Free restores the authored layout exactly.
+Invariant: **fit never writes rects.** Deliberate geometry writes (panel
+fields, scripts, author bridge) fold through `unlensObjectRect` back onto the
+base rect; a typed position on a centered axis releases that axis. Canvas drags
+go through `applyRects`, which re-anchors top-level objects and rebases members
+to their group's rendered box.
 
 ## 5. Group invariants (`apps/editor/src/stores/book.ts`)
 
-1. **Tight union**: after any member move/resize/delete, `expandGroup` recomputes
-   the group's rect as the exact union of its members; if the union's origin
-   moves, **all** members shift by the origin delta so nothing jumps on
-   screen. Recurses through nested groups (grandparent unions recompute with
-   absolute origins, not local ones).
+1. **Tight union**: after any member move/resize/delete, `expandGroup` shifts
+   members so their union starts at the group's local origin and sets the
+   group's base rect to the union size (breakpoint-independent — members are
+   relative, one base layout covers every size). Member absolute positions are
+   preserved; recurses up for nested groups.
 2. **Same-parent rule**: grouping requires all selected objects to share a
    parent. Ungrouping splices children back at the group's index with their
-   rects unrebased per breakpoint; ungrouping a scripted group asks first
-   (the script is lost).
+   rects made absolute against the group's rendered box at the current
+   breakpoint (so it never jumps on screen); ungrouping a scripted group asks
+   first (the script is lost).
 3. **Duplication** (`duplicateSelected`): deep-clone with fresh ids and fresh
    names from a shared used-names set (nested group levels never collide),
    inserted after each original and nudged +24px down-right; group subtrees
@@ -396,15 +441,20 @@ match what will resolve at runtime:
    (not the TS lib if the name collides with a DOM global). Pages/backgrounds
    should also be excluded from `FUNCTION_RESERVED` in `monacoApiLib.ts` if
    they become callable user functions.
-4. Group handlers must be reached through the **owner-chain dispatch**, never
+4. **Fit is render-time only.** `resolveObjectRect` (the one authored `rect` +
+   glue) is the single source of rects at render and ControlApi reads. Never
+   write a fitted rect into `rect` — reads would freeze the glue. A deliberate
+   geometry write folds the rendered target back onto the base rect via
+   `unlensObjectRect`; a canvas drag does the same via `applyRects`.
+5. Group handlers must be reached through the **owner-chain dispatch**, never
    by attaching listeners to group wrappers (double-fire risk).
-5. `{{…}}` template grammar and `collectStoreKeys` must stay in sync about
+6. `{{…}}` template grammar and `collectStoreKeys` must stay in sync about
    what is a store key vs a self-binding; `collectStoreKeys` also harvests
    keys from `book.store` so design-time keys surface in the `{{` picker.
-6. The examples test (`examples/examples.test.ts`) runs every page of every
+7. The examples test (`examples/examples.test.ts`) runs every page of every
    example book and fails on any script error — new runtime features should be
    exercised by an example.
-7. Library imports: `rewriteLibImports` and `scanLibImports` must stay in sync
+8. Library imports: `rewriteLibImports` and `scanLibImports` must stay in sync
    (same bare-specifier regex); `__tbImport` is a reserved name
    (`NAME_RESERVED` + the author-mode lists) and must stay in every compile
    site's param list; `window.__TOOLBACK_LIBS__` must be set before user

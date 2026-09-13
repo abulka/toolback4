@@ -17,7 +17,7 @@ function twoPageBook(page2Script: string): Book {
         script: '',
         backgroundId: 'bg1',
         objects: [
-          { ...createObject('button', 'nav', { desktop: { x: 0, y: 0, w: 80, h: 30 } }), on: { click: `page.go('Two')` } },
+          { ...createObject('button', 'nav', { x: 0, y: 0, w: 80, h: 30 }), on: { click: `page.go('Two')` } },
         ],
       },
       {
@@ -26,7 +26,7 @@ function twoPageBook(page2Script: string): Book {
         script: page2Script,
         backgroundId: 'bg1',
         objects: [
-          { ...createObject('label', 'lbl', { desktop: { x: 0, y: 0, w: 80, h: 30 } }), props: { text: 'x' } },
+          { ...createObject('label', 'lbl', { x: 0, y: 0, w: 80, h: 30 }), props: { text: 'x' } },
         ],
       },
     ],

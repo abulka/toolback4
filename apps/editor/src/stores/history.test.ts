@@ -13,8 +13,8 @@ function twoObjectBook(): Book {
         id: 'p1',
         name: 'P',
         objects: [
-          { id: 'a', name: 'labelA', control: 'label', rects: { desktop: { x: 0, y: 0, w: 100, h: 50 } } },
-          { id: 'b', name: 'labelB', control: 'label', rects: { desktop: { x: 120, y: 40, w: 80, h: 60 } } },
+          { id: 'a', name: 'labelA', control: 'label', rect: { x: 0, y: 0, w: 100, h: 50 } },
+          { id: 'b', name: 'labelB', control: 'label', rect: { x: 120, y: 40, w: 80, h: 60 } },
         ],
       },
     ],
@@ -177,7 +177,7 @@ describe('book store — undo/redo history', () => {
     store.applyRect('a', { x: 16, y: 16, w: 40, h: 40 })
 
     store.undo()
-    expect(store.book.pages[0]!.objects[0]!.rects.desktop).toEqual({ x: 0, y: 0, w: 100, h: 50 })
+    expect(store.book.pages[0]!.objects[0]!.rect).toEqual({ x: 0, y: 0, w: 100, h: 50 })
   })
 
   it('a new edit after an undo clears the redo stack', () => {
@@ -197,10 +197,10 @@ describe('book store — undo/redo history', () => {
     store.applyRect('a', { x: 16, y: 16, w: 40, h: 40 }) // original {0,0,100,50}
     store.undo() // → original
     store.redo() // → {16,16,40,40}
-    expect(store.book.pages[0]!.objects[0]!.rects.desktop).toEqual({ x: 16, y: 16, w: 40, h: 40 })
+    expect(store.book.pages[0]!.objects[0]!.rect).toEqual({ x: 16, y: 16, w: 40, h: 40 })
 
     store.undo()
-    expect(store.book.pages[0]!.objects[0]!.rects.desktop).toEqual({ x: 0, y: 0, w: 100, h: 50 })
+    expect(store.book.pages[0]!.objects[0]!.rect).toEqual({ x: 0, y: 0, w: 100, h: 50 })
   })
 
   it('does not record anything while running', () => {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import type { Book, Rect } from '@toolback/format'
+import type { Book } from '@toolback/format'
 import { useBookStore } from './stores/book'
 import { executeAuthorOp } from './authorBridge'
 
@@ -17,8 +17,8 @@ function twoObjectBook(): Book {
         script: '',
         backgroundId: 'bg1',
         objects: [
-          { id: 'a', name: 'labelA', control: 'label', rects: { desktop: { x: 0, y: 0, w: 100, h: 50 } }, props: { text: 'A' }, on: {} },
-          { id: 'b', name: 'labelB', control: 'label', rects: { desktop: { x: 120, y: 40, w: 80, h: 60 } }, props: { text: 'B' }, on: {} },
+          { id: 'a', name: 'labelA', control: 'label', rect: { x: 0, y: 0, w: 100, h: 50 }, props: { text: 'A' }, on: {} },
+          { id: 'b', name: 'labelB', control: 'label', rect: { x: 120, y: 40, w: 80, h: 60 }, props: { text: 'B' }, on: {} },
         ],
       },
     ],
@@ -57,12 +57,12 @@ describe('author bridge ops', () => {
     expect(page.objects).toHaveLength(3)
     const card = page.objects[2]!
     // 8px-snapped from (213, 97)
-    expect(card.rects.desktop).toEqual({ x: 216, y: 96, w: 176, h: 48 })
+    expect(card.rect).toEqual({ x: 216, y: 96, w: 176, h: 48 })
     expect(card.props['title']).toBe('Stamped')
     // plugin can patch it afterwards (geometry through props too)
     executeAuthorOp(store, 'updateProps', [made.id, { title: 'Renamed', x: 33 }])
     expect((store.activePage.objects[2] as { props: Record<string, unknown> }).props['title']).toBe('Renamed')
-    expect((store.activePage.objects[2] as { rects: { desktop: Rect } }).rects.desktop.x).toBe(33)
+    expect(store.activePage.objects[2]!.rect.x).toBe(33)
     // getObject: flat snapshot for handle.get()
     const snap = executeAuthorOp(store, 'getObject', [made.id]) as Record<string, unknown>
     expect(snap).toMatchObject({ name: 'card1', control: 'card', x: 33, title: 'Renamed' })
@@ -77,8 +77,8 @@ describe('author bridge ops', () => {
     const [a, b] = store.activePage.objects
     expect(a!.props['color']).toBe('navy')
     expect(b!.props['color']).toBe('navy')
-    expect(a!.rects.desktop.x).toBe(5)
-    expect(b!.rects.desktop.x).toBe(5)
+    expect(a!.rect.x).toBe(5)
+    expect(b!.rect.x).toBe(5)
     // nothing selected → clear error
     store.setSelection([])
     expect(() => executeAuthorOp(store, 'updateProps', [{ color: 'red' }])).toThrow('nothing selected')
@@ -118,12 +118,12 @@ describe('author bridge ops', () => {
     executeAuthorOp(store, 'moveObject', [made.id, 20, 0])
     const g = store.activePage.objects[0]!
     expect(g.control).toBe('group')
-    expect(g.rects.desktop).toEqual({ x: 20, y: 0, w: 200, h: 100 })
+    expect(g.rect).toEqual({ x: 20, y: 0, w: 200, h: 100 })
     // children keep their relative offsets (they ride with the group)
-    expect(g.children![0]!.rects.desktop).toEqual({ x: 0, y: 0, w: 100, h: 50 })
+    expect(g.children![0]!.rect).toEqual({ x: 0, y: 0, w: 100, h: 50 })
     // one undo reverts the move (grouping itself is a second step)
     store.undo()
-    expect(store.activePage.objects[0]!.rects.desktop).toEqual({ x: 0, y: 0, w: 200, h: 100 })
+    expect(store.activePage.objects[0]!.rect).toEqual({ x: 0, y: 0, w: 200, h: 100 })
     store.undo()
     expect(store.activePage.objects).toHaveLength(2)
   })
@@ -133,7 +133,7 @@ describe('author bridge ops', () => {
     store.hydrate(twoObjectBook())
     executeAuthorOp(store, 'updateProps', ['a', { x: 33, y: 8, text: 'Moved' }])
     const a = store.activePage.objects[0]!
-    expect(a.rects.desktop).toEqual({ x: 33, y: 8, w: 100, h: 50 })
+    expect(a.rect).toEqual({ x: 33, y: 8, w: 100, h: 50 })
     expect(a.props['text']).toBe('Moved')
     const info = executeAuthorOp(store, 'pageInfo', []) as { breakpoint: string }
     expect(info.breakpoint).toBe('desktop')
