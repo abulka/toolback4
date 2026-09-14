@@ -28,6 +28,21 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
   setSyncSender(sendLoad)
   setDirectSender((msg) => iframe.contentWindow?.postMessage(msg, '*'))
 
+  // Dev-only stale-canvas guard (AGENTS.md "Stale canvas bundle"): a hot-reloaded
+  // editor can sit next to a canvas iframe still running an old runtime, which
+  // silently breaks features like design-time store seeding. When an HMR update
+  // touches the runtime/format packages or the canvas entry, reload the iframe so
+  // both sides run the same code without a manual hard refresh.
+  if (import.meta.hot) {
+    import.meta.hot.on('vite:afterUpdate', (payload: { updates?: Array<{ path?: string; acceptedPath?: string }> }) => {
+      const touched = (payload.updates ?? []).some((u) => {
+        const path = u.path ?? u.acceptedPath ?? ''
+        return /[\\/]packages[\\/](runtime|format)[\\/]/.test(path) || /[\\/]src[\\/]canvas\.ts$/.test(path)
+      })
+      if (touched) iframe.contentWindow?.location.reload()
+    })
+  }
+
   window.addEventListener('message', (e: MessageEvent) => {
     const msg = e.data as CanvasToEditorMessage | undefined
     if (!msg?.type?.startsWith('toolback:')) return

@@ -99,6 +99,12 @@ ones most easily broken:
 - **Stale canvas bundle:** the canvas iframe pre-bundles `@toolback/runtime` via
   Vite, so a long-running dev server can serve a stale runtime next to a fresh
   editor. Symptom: the editor side hot-reloaded but the canvas behaves like an
-  old build. Fix: restart `pnpm dev` (or run Vite with `--force`) and hard-refresh.
+  old build — e.g. design-time store values never resolve at design **or** run
+  time (while a runtime `store.set` still updates labels), or store edits don't
+  survive refresh. Fix: restart `pnpm dev` (or run Vite with `--force`) and
+  hard-refresh. `canvasClient` now reloads the iframe whenever an HMR update
+  touches `packages/runtime`/`packages/format`/`src/canvas.ts`, which prevents
+  the mixed editor+canvas case — but a fully stale tab still needs the manual
+  restart + hard refresh.
 - **Plain JS only** in the script editors (see conventions); the editor flags TS
   annotations with a squiggle but the runtime would throw at compile time.

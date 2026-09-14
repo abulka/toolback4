@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useBookStore } from '../stores/book'
+import { parseDesignValue } from '../storeValue'
 import { isStoreLabelSentinel } from '@toolback/runtime'
 
 const store = useBookStore()
@@ -41,23 +42,6 @@ const newValue = ref('')
 
 /** the literal template syntax, shown as prose (Vue would eat {{ ... }}) */
 const templateSample = '{{key}}'
-
-/**
- * Turn user text into a stored value: JSON literals (numbers, true/false,
- * null, and [ … ] / { … } / "…") parse; anything else is a plain string.
- */
-function parseDesignValue(s: string): unknown {
-  const t = s.trim()
-  if (!t) return s
-  if (/^[[{"-]/.test(t)) {
-    try {
-      return JSON.parse(t)
-    } catch {
-      /* not JSON — keep as a string */
-    }
-  }
-  return s
-}
 
 /** replace the design store: drop blank keys, last occurrence wins (matching
  *  the runtime Map), keep insertion order */
