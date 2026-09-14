@@ -24,6 +24,7 @@ import {
   type CanvasSize,
   type ControlKind,
   type FitHintMode,
+  type FitSpec,
   type PageObject,
   type Rect,
 } from '@toolback/format'
@@ -52,6 +53,10 @@ export function setSyncSender(fn: (msg: EditorToCanvasMessage) => void): void {
 export function setDirectSender(fn: (msg: EditorToCanvasMessage) => void): void {
   sendDirect = fn
 }
+
+/** freshly placed controls keep their left/top margin's share of the page,
+ *  so a page resizes sensibly out of the box (edge-anchored, not fixed px) */
+const NEW_OBJECT_FIT: FitSpec = { x: 'left', y: 'top' }
 
 export const useBookStore = defineStore('book', () => {
   const book = ref(sampleBook())
@@ -824,6 +829,7 @@ export const useBookStore = defineStore('book', () => {
   function addObject(control: ControlKind, rect: Rect): void {
     record('Add ' + control)
     const obj = createObject(control, uniqueName(control), rect, { ...DEFAULT_PROPS[control] })
+    obj.fit = { ...NEW_OBJECT_FIT }
     targetObjects.value.push(obj)
     selectionIds.value = [obj.id]
     sync()
@@ -1296,6 +1302,9 @@ export const useBookStore = defineStore('book', () => {
       return next
     })
     const group = createGroup(uniqueName('group'), groupRect, rebased)
+    // a top-level group is a top-level object like any other — give it the
+    // same responsive default; nested groups stay free (fit is top-level only)
+    if (parentId === null) group.fit = { ...NEW_OBJECT_FIT }
 
     for (const m of members) {
       const i = siblings.indexOf(m)

@@ -435,6 +435,10 @@ function onPaste(): void {
     <p v-if="canFit() && isGlued" class="hint responsive-hint">
       Edits here adjust the shared layout at every breakpoint.
     </p>
+    <p v-if="isMember()" class="hint responsive-hint">
+      Responsive glue lives on the group box — this member rides it, and scales
+      with it when the group is set to Stretch.
+    </p>
 
     <h2>Geometry</h2>
     <div class="geo">

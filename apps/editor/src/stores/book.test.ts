@@ -82,6 +82,21 @@ describe('book store — groups and arrange', () => {
     expect(store.selectionIds).toEqual([group.id])
   })
 
+  it('a top-level group defaults to left/top glue; a nested group stays free', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a', 'b'])
+    store.groupSelected()
+    const outer = store.activePage.objects[0]!
+    expect(outer.fit).toEqual({ x: 'left', y: 'top' })
+
+    // grouping members inside the group makes a nested group with no glue
+    store.setSelection(outer.children!.map((c) => c.id))
+    store.groupSelected()
+    const inner = outer.children!.find((c) => c.control === 'group')!
+    expect(inner.fit).toBeUndefined()
+  })
+
   it('ungroup promotes children with unrebased rects', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
