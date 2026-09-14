@@ -8,7 +8,7 @@ A modern **ToolBook** spiritual successor: *book → pages → objects*, authore
 visually, scripted in **plain JavaScript**. If you ever built something in
 ToolBook or HyperCard, you'll feel at home — everything else is 2026.
 
-![toolback — authoring a book in the browser](doco/screenshots/Screenshot-Toolback-1.png)
+![toolback — authoring a book in the browser](docs/screenshots/Screenshot-Toolback-1.png)
 
 Books are **open data** (a single `.toolbook.json`), editing is local-first
 (an autosave in IndexedDB keeps nothing hostage), and *publish* produces one
@@ -119,8 +119,9 @@ packages/
                                           runs scripts, editor↔canvas protocol
   libs/           @toolback/libs        — the "library shelf" for npm-in-books
 examples/         ready-made .toolbook.json books + a test that runs every page
-docs/             scripting-guide.md (author-facing) + runtime-internals.md
-doco/             screenshots
+docs/             scripting-guide.md (author-facing), runtime-internals.md,
+                  screenshots/
+plans/            internal design notes & the milestone/progress log
 ```
 
 The editor is the single source of truth for the book; the canvas runs the same
@@ -173,6 +174,7 @@ server of any kind.
 ## Status & history
 
 M0–M6c (core authoring, scripting, pages/popups/backgrounds, groups, store,
-npm-in-books, author plugins) are complete. The full plan, architecture and
-milestone log live in [PLAN.md](PLAN.md); the npm-library design write-up is in
-[PLAN-NPM-SUPPORT.md](PLAN-NPM-SUPPORT.md).
+npm-in-books, author plugins) are complete, along with copy/paste, responsive
+constraints ("glue") and npm library support. The full plan, architecture and
+milestone log live in [plans/PLAN.md](plans/PLAN.md); not-yet-built designs live
+alongside it in [plans/](plans/).

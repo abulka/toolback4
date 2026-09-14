@@ -3,6 +3,8 @@ dist/
 *.log
 .DS_Store
 .playwright-mcp/
+# browser/Playwright session output — not repo material
+playwright-screenshots/
 examples/vscode-sync/
 # generated bundles — rebuilt by build-player.mjs / build-libs.mjs
 apps/editor/public/libs/

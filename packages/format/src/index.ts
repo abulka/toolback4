@@ -31,7 +31,7 @@ export type Breakpoint = (typeof BREAKPOINTS)[number]
  *
  * `left`/`right`/`top`/`bottom`/`stretch` keep the VISUAL PROPORTION of the
  * anchored margin (it scales with the page). A constant-pixel margin from
- * right/bottom is a future "pin" mode (see PLAN-CONSTRAINTS.md Phase 4).
+ * right/bottom is a future "pin" mode (see the backlog in plans/PLAN.md).
  */
 export const FIT_H_MODES = ['free', 'left', 'center', 'right', 'stretch'] as const
 export const FIT_V_MODES = ['free', 'top', 'center', 'bottom', 'stretch'] as const

@@ -31,15 +31,22 @@ JSON document (`Book`). The editor owns it; the canvas is a renderer.
 ## 2. Data model (`packages/format`)
 
 ```ts
-Book    { id, title, canvas: { desktop: {w,h}, tablet?, mobile? }, store?: [key,value][], pages: Page[] }
-Page    { id, name, script, background, objects: PageObject[] }
+Book    { id, title, canvas: { desktop: {w,h}, tablet?, mobile? },
+          backgrounds: Background[], pages: Page[], store?: [key,value][] }
+Background {
+  id, name, color, script,        // script = shared fns + backgroundEnter() hook
+  size?: { desktop?, tablet?, mobile? },
+  objects: PageObject[],
+}
+Page    { id, name, script, backgroundId, author?, objects: PageObject[] }
 PageObject {
-  id, name,                       // name = unique per page; the `controls[name]` handle
+  id, name,                       // name = unique per page/background; the `controls[name]` handle
   control: 'button'|'label'|'input'|'image'|'card'|'container'|'switch'|'group',
-  rects: { desktop: Rect, tablet?: Rect, mobile?: Rect },
+  rect: Rect,                     // the ONE authored layout; `fit` adapts it per page size
   props: Record<string, unknown>, // control-specific, e.g. { text }
   on: Record<string, string>,     // eventName -> script source
   children?: PageObject[],        // groups only; members' rects are parent-relative
+  fit?: { x?: FitHMode; y?: FitVMode },  // responsive glue (see §4.1)
 }
 ```
 
@@ -271,7 +278,10 @@ and communicates with the editor only through messages (`toolback:selection`,
 render/read time only by `resolveObjectRect` (`packages/format`): constrained
 axes derive from the one authored `rect` (left/top scale position, right/bottom
 scale the edge gap, center centers the middle, stretch scales position+size),
-free axes keep the authored coordinate. **The lens applies at every size,
+free axes keep the authored coordinate. Internally this is `fit`; the
+author-facing name is the **Responsive** section of the properties panel (the
+Horizontal/Vertical dropdowns — `apps/editor/src/components/PropertiesPanel.vue`),
+described as "glue" or "springs" in the guide. **The lens applies at every size,
 including the reference size** (there the page size equals the base, so
 Free/Left/Right/Top/Bottom/Stretch are identity and only Center moves) — this
 is what makes setting Center visibly center the object without writing
@@ -281,6 +291,18 @@ fields, scripts, author bridge) fold through `unlensObjectRect` back onto the
 base rect; a typed position on a centered axis releases that axis. Canvas drags
 go through `applyRects`, which re-anchors top-level objects and rebases members
 to their group's rendered box.
+
+A missing `fit` resolves to **free** (the model default: the authored
+coordinate applies everywhere). The editor, however, seeds each newly-placed
+control — and each newly-created top-level group — with `{ x: 'left', y: 'top' }`
+so a fresh object adapts sensibly when the page resizes; only objects with no
+`fit` (e.g. legacy books) fall back to free.
+
+Known limitations: a Center axis is rigid (its position is fully determined, so
+the canvas clamps that axis and it must be changed from the dropdown); a
+top-level group carries the glue and resizing it scales its members onto the new
+box, while members and nested groups have **no independent fit** (they are
+relative to the group box and ride/scale with it).
 
 ## 5. Group invariants (`apps/editor/src/stores/book.ts`)
 
@@ -431,6 +453,14 @@ match what will resolve at runtime:
   player. No import map, no modulepreload — imports run through the same
   `new Function` bodies as every other script. Base64 payloads cannot contain
   `<`, so the `</script>` breakout escaping never applies to library code.
+- **Rejected alternatives** (kept for the record): `<script type="importmap">`
+  with inline data URLs (higher browser-support floor, no clean per-book CDN
+  story in preview); baking every shelf library into the player IIFE (every
+  hello-world carries every lib); esbuild-wasm / browser-side bundling
+  (reimplements npm resolution client-side); a Node CLI publish (forks the
+  all-browser publishing story — reserved for a possible later Electron/Tauri
+  rung). CDN-primary was chosen because hosted toolback users can never run
+  local npm installs; the shelf is the opt-in offline path, not the default.
 
 ## 10. Invariants to preserve when extending
 
