@@ -23,6 +23,13 @@ const effective = computed<CanvasSize>(() =>
 
 const usesDefault = computed<boolean>(() => !bg.value?.size?.[bp.value])
 
+const usesAuto = computed<boolean>(() => !!bg.value?.autoHeight)
+
+function setAuto(on: boolean): void {
+  if (!bg.value) return
+  store.setBackgroundAutoHeight(bg.value.id, on)
+}
+
 const PRESETS: CanvasSize[] = [
   { width: 1280, height: 800 },
   { width: 1024, height: 768 },
@@ -114,7 +121,7 @@ const previewW = computed(() => Math.max(8, Math.round(effective.value.width * v
 const previewH = computed(() => Math.max(8, Math.round(effective.value.height * viewScale.value)))
 
 function onHandleDown(e: PointerEvent): void {
-  if (!bg.value || dragging.value) return
+  if (!bg.value || dragging.value || usesAuto.value) return
   const scaleRef = viewScale.value || 1
   const startW = effective.value.width
   const startH = effective.value.height
@@ -231,6 +238,15 @@ function removeFromDialog(): void {
           {{ BP_LABEL[bp] || bp }})
         </label>
 
+        <label class="check use-auto">
+          <input
+            type="checkbox"
+            :checked="usesAuto"
+            @change="setAuto(($event.target as HTMLInputElement).checked)"
+          />
+          Height fits content (web page)
+        </label>
+
         <div v-if="!usesDefault" class="presets">
           <label v-for="p in PRESETS" :key="`${p.width}x${p.height}`" class="radio">
             <input
@@ -259,7 +275,9 @@ function removeFromDialog(): void {
                 @change="commitW"
               />
               <em>Height</em>
+              <span v-if="usesAuto" class="auto">auto</span>
               <input
+                v-else
                 v-model="hBuf"
                 class="num"
                 inputmode="numeric"
@@ -276,16 +294,17 @@ function removeFromDialog(): void {
           >
             <div
               class="handle"
+              :class="{ disabled: usesAuto }"
               title="Drag to resize the page"
               @pointerdown.prevent="onHandleDown"
             ></div>
           </div>
         </div>
-        <p class="dims">{{ effective.width }} × {{ effective.height }} page units — drag the corner of the preview</p>
+        <p class="dims">{{ effective.width }} × {{ usesAuto ? 'auto' : effective.height }} page units — drag the corner of the preview</p>
       </div>
 
       <p class="note">
-        Pages on this background show {{ effective.width }} × {{ effective.height }} at
+        Pages on this background show {{ effective.width }} × {{ usesAuto ? 'auto' : effective.height }} at
         {{ BP_LABEL[bp] || bp }}; other breakpoints follow the book size unless overridden.
       </p>
       <div class="foot">
@@ -422,6 +441,16 @@ function removeFromDialog(): void {
   accent-color: var(--ed-accent);
 }
 
+.use-auto {
+  margin-top: 8px;
+}
+
+.auto {
+  font: 12px ui-monospace, 'SF Mono', Menlo, monospace;
+  color: var(--ed-text-dim);
+  padding: 5px 8px;
+}
+
 .presets {
   display: flex;
   flex-direction: column;
@@ -518,6 +547,15 @@ function removeFromDialog(): void {
 
 .handle:hover {
   background: var(--ed-accent);
+}
+
+.handle.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.handle.disabled:hover {
+  background: #fff;
 }
 
 .dims {

@@ -135,13 +135,23 @@ export const useBookStore = defineStore('book', () => {
     const id = activeBackground.value?.id
     return id ? book.value.pages.filter((p) => p.backgroundId === id).length : 0
   })
+  /** the background that governs the current edit target (page or background) */
+  const targetBackground = computed<Background | undefined>(() =>
+    editing.value.kind === 'background'
+      ? (activeBackground.value ?? undefined)
+      : backgroundFor(book.value, activePage.value),
+  )
   /** canvas (iframe) size of the current edit target at the current breakpoint */
   const activeCanvasSize = computed<CanvasSize>(() => {
-    const bg =
-      editing.value.kind === 'background'
-        ? (activeBackground.value ?? undefined)
-        : backgroundFor(book.value, activePage.value)
-    return resolvePageSize(book.value, bg, breakpoint.value)
+    const bg = targetBackground.value
+    if (editing.value.kind === 'background') {
+      if (!bg) return resolvePageSize(book.value, undefined, breakpoint.value)
+      return resolvePageSize(book.value, bg, breakpoint.value, bg.objects)
+    }
+    return resolvePageSize(book.value, bg, breakpoint.value, [
+      ...(bg?.objects ?? []),
+      ...activePage.value.objects,
+    ])
   })
   const objectCount = computed(() => flattenObjects(targetObjects.value).length)
   const allObjects = computed(() => flattenObjects(targetObjects.value))
@@ -556,6 +566,15 @@ export const useBookStore = defineStore('book', () => {
     sync()
   }
 
+  /** toggle "height fits content" for a background (applies to all breakpoints) */
+  function setBackgroundAutoHeight(id: string, on: boolean): void {
+    const bg = book.value.backgrounds.find((b) => b.id === id)
+    if (!bg) return
+    record('Background auto height', `bgauto:${id}`)
+    bg.autoHeight = on ? true : undefined
+    sync()
+  }
+
   /** move a page onto another background */
   function movePageToBackground(pageIndex: number, backgroundId: string): void {
     const page = book.value.pages[pageIndex]
@@ -843,6 +862,13 @@ export const useBookStore = defineStore('book', () => {
     record('Add ' + control)
     const obj = createObject(control, uniqueName(control), rect, { ...DEFAULT_PROPS[control] })
     obj.fit = { ...NEW_OBJECT_FIT }
+    // the palette drop rect is in the current breakpoint's rendered space; fold
+    // it through the lens onto the shared layout so the object lands in the
+    // same spot at every size (identity at desktop)
+    const bg = targetBackground.value
+    const pageSize = resolvePageSize(book.value, bg, breakpoint.value)
+    const refSize = resolvePageSize(book.value, bg, 'desktop')
+    obj.rect = unlensObjectRect(rect, rect, obj.fit, pageSize, refSize)
     targetObjects.value.push(obj)
     selectionIds.value = [obj.id]
     sync()
@@ -1055,13 +1081,38 @@ export const useBookStore = defineStore('book', () => {
   function effectiveRectOf(id: string): Rect | null {
     const obj = locateObj(id)?.obj
     if (!obj) return null
-    const bg =
-      editing.value.kind === 'background'
-        ? (activeBackground.value ?? undefined)
-        : backgroundFor(book.value, activePage.value)
+    const bg = targetBackground.value
     const pageSize = resolvePageSize(book.value, bg, breakpoint.value)
     const refSize = resolvePageSize(book.value, bg, 'desktop')
     return resolveObjectRect(obj, pageSize, refSize)
+  }
+
+  /**
+   * Fill the current page (minus `margin` on every side) with a top-level
+   * object, switching both axes to Stretch. The target is the page as seen at
+   * the current breakpoint, folded back onto the shared layout, so it fills
+   * what's on screen and scales proportionally from there. The configured
+   * (base) page size is used, never the auto-height grown box — filling to the
+   * grown height would chase its own tail.
+   */
+  function fillObjectToPage(id: string, margin: number): void {
+    const found = locateObj(id)
+    if (!found || found.parent) return
+    const obj = found.obj
+    record('Fill page', `fill:${id}`)
+    const bg = targetBackground.value
+    const pageSize = resolvePageSize(book.value, bg, breakpoint.value)
+    const refSize = resolvePageSize(book.value, bg, 'desktop')
+    const m = Math.max(0, Math.round(margin))
+    const target: Rect = {
+      x: m,
+      y: m,
+      w: Math.max(1, pageSize.width - m * 2),
+      h: Math.max(1, pageSize.height - m * 2),
+    }
+    obj.fit = { ...(obj.fit ?? {}), x: 'stretch', y: 'stretch' }
+    obj.rect = unlensObjectRect(obj.rect, target, obj.fit, pageSize, refSize)
+    sync()
   }
 
   function removeSelected(): void {
@@ -1424,6 +1475,7 @@ export const useBookStore = defineStore('book', () => {
     setBackgroundProp,
     setBackgroundScript,
     setBackgroundSize,
+    setBackgroundAutoHeight,
     movePageToBackground,
     newBook,
     hydrate,
@@ -1442,6 +1494,7 @@ export const useBookStore = defineStore('book', () => {
     setObjectFit,
     setGeometry,
     effectiveRectOf,
+    fillObjectToPage,
     removeSelected,
     duplicateSelected,
     copySelected,

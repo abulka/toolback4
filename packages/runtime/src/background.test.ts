@@ -5,7 +5,11 @@ import { renderBackgroundView, renderBookPage } from './index'
 import { runBook, stopRun } from './player'
 import { listenForEditor } from './editorLink'
 
-function bgBook(opts?: { bgObjects?: ReturnType<typeof createObject>[]; bgSize?: Book['backgrounds'][number]['size'] }): Book {
+function bgBook(opts?: {
+  bgObjects?: ReturnType<typeof createObject>[]
+  bgSize?: Book['backgrounds'][number]['size']
+  autoHeight?: Book['backgrounds'][number]['autoHeight']
+}): Book {
   return {
     id: 'b',
     title: 'T',
@@ -17,6 +21,7 @@ function bgBook(opts?: { bgObjects?: ReturnType<typeof createObject>[]; bgSize?:
         color: '#ffeedd',
         script: '',
         ...(opts?.bgSize ? { size: opts.bgSize } : {}),
+        ...(opts?.autoHeight ? { autoHeight: opts.autoHeight } : {}),
         objects: opts?.bgObjects ?? [],
       },
     ],
@@ -112,6 +117,66 @@ describe('backgrounds (runtime)', () => {
     expect(wrappers[0]!.dataset.tbBg).toBeUndefined()
     expect(root.querySelector('[data-tb-name="pageLabel"]')).toBeNull()
     expect(pageRoot.querySelector('.tb-bg-badge')?.textContent).toContain('Background 1')
+  })
+
+  it('auto-height grows the page box to the lowest object plus a margin', () => {
+    const root = document.createElement('div')
+    const tall = createObject('card', 'tall', { x: 0, y: 1000, w: 200, h: 100 })
+    const book = bgBook({ bgObjects: [tall], autoHeight: true })
+    renderBookPage(book, 0, root, 'desktop')
+    const pageRoot = root.querySelector<HTMLElement>('.tb-page')!
+    expect(pageRoot.style.width).toBe('1280px')
+    expect(pageRoot.style.height).toBe(`${1100 + 24}px`)
+    const wrapper = root.querySelector<HTMLElement>('[data-tb-name="tall"]')!
+    expect(wrapper.style.top).toBe('1000px')
+  })
+
+  it('auto-height leaves the fit lens on the base size (bottom/stretch do not ride the growth)', () => {
+    const root = document.createElement('div')
+    // free object grows the page; bottom-glued object resolves against the BASE
+    const tall = createObject('card', 'tall', { x: 0, y: 1000, w: 200, h: 100 })
+    const pinned = createObject('card', 'pinned', { x: 0, y: 600, w: 100, h: 50 })
+    pinned.fit = { y: 'bottom' }
+    const book = bgBook({ bgObjects: [tall, pinned], autoHeight: true })
+    renderBookPage(book, 0, root, 'desktop')
+    const pageRoot = root.querySelector<HTMLElement>('.tb-page')!
+    expect(pageRoot.style.height).toBe(`${1100 + 24}px`)
+    const pinnedEl = root.querySelector<HTMLElement>('[data-tb-name="pinned"]')!
+    // base-relative (identity at desktop): (600+50)·1 − 50 = 600
+    expect(pinnedEl.style.top).toBe('600px')
+  })
+
+  it('auto-height is off unless the flag is set', () => {
+    const root = document.createElement('div')
+    const tall = createObject('card', 'tall', { x: 0, y: 1000, w: 200, h: 100 })
+    const book = bgBook({ bgObjects: [tall] })
+    renderBookPage(book, 0, root, 'desktop')
+    expect(root.querySelector<HTMLElement>('.tb-page')!.style.height).toBe('800px')
+  })
+
+  it('auto-height is global: a top-glued object that overflows mobile grows the mobile page', () => {
+    const root = document.createElement('div')
+    // the reported case: authored for desktop, top glue scales it down past
+    // the shorter mobile base → the page must grow so it is not clipped
+    const btn = createObject('button', 'button1', { x: 8, y: 696, w: 176, h: 208 })
+    btn.fit = { x: 'left', y: 'top' }
+    const book = bgBook({ bgObjects: [btn], autoHeight: true })
+    book.canvas.mobile = { width: 390, height: 844 }
+    renderBookPage(book, 0, root, 'mobile')
+    const pageRoot = root.querySelector<HTMLElement>('.tb-page')!
+    // y = round(696 · 844/800) = 734; bottom 942 → page 942 + 24
+    expect(pageRoot.style.width).toBe('390px')
+    expect(pageRoot.style.height).toBe(`${942 + 24}px`)
+    const el = root.querySelector<HTMLElement>('[data-tb-name="button1"]')!
+    expect(el.style.top).toBe('734px')
+  })
+
+  it('auto-height grows the background design view from its own objects', () => {
+    const root = document.createElement('div')
+    const tall = createObject('card', 'tall', { x: 0, y: 1400, w: 200, h: 100 })
+    const book = bgBook({ bgObjects: [tall], autoHeight: true })
+    renderBackgroundView(book, 'bg1', root, 'desktop')
+    expect(root.querySelector<HTMLElement>('.tb-page')!.style.height).toBe(`${1500 + 24}px`)
   })
 
   it('design load of a background view renders only bg objects; run resolves to its first page', () => {

@@ -208,6 +208,30 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
   store.setGeometry(sel.value.id, { [field]: n })
 }
 
+// ---- Fill page: size a top-level object to the page (minus a margin) ----
+function readFillMargin(): number {
+  try {
+    const raw = localStorage.getItem('toolback.fillMargin')
+    if (raw === null) return 8
+    const n = Number(raw)
+    return Number.isFinite(n) && n >= 0 ? n : 8
+  } catch {
+    return 8
+  }
+}
+const fillMargin = ref<number>(readFillMargin())
+function onFill(): void {
+  if (!sel.value) return
+  const m = Math.max(0, Math.round(fillMargin.value) || 0)
+  fillMargin.value = m
+  try {
+    localStorage.setItem('toolback.fillMargin', String(m))
+  } catch {
+    /* no localStorage — fine, the margin just isn't remembered */
+  }
+  store.fillObjectToPage(sel.value.id, m)
+}
+
 function isGroupSel(): boolean {
   return sel.value?.control === 'group'
 }
@@ -488,6 +512,14 @@ function onPaste(): void {
       </div>
     </div>
 
+    <div v-if="canFit()" class="fill-row">
+      <button class="fill" @click="onFill">Fill page</button>
+      <label class="fill-margin-label">
+        margin
+        <input class="fill-margin" type="number" min="0" step="4" v-model.number="fillMargin" />
+      </label>
+    </div>
+
     <button class="delete" @click="store.removeSelected()">Delete object</button>
   </div>
 </template>
@@ -699,6 +731,52 @@ function onPaste(): void {
   display: grid;
   grid-template-columns: 1fr 1fr;
   column-gap: 8px;
+}
+
+.fill-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.fill {
+  flex: 1;
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  color: var(--ed-text);
+  padding: 6px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.fill:hover {
+  border-color: var(--ed-accent);
+  color: #fff;
+}
+
+.fill-margin-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--ed-text-dim);
+}
+
+.fill-margin {
+  width: 52px;
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  color: var(--ed-text);
+  padding: 5px 6px;
+  font: 12px ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.fill-margin:focus {
+  outline: none;
+  border-color: var(--ed-accent);
 }
 
 .responsive-hint {

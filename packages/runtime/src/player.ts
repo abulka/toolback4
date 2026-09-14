@@ -731,7 +731,10 @@ function makePageApi(st: RunState, scope: Scope) {
       // size + position: the popup page's background decides the size (the
       // M6a override), placement defaults to centred over the base page
       const bg = backgroundFor(st.book, page)
-      const size = bg?.size?.[st.breakpoint] ?? st.book.canvas[st.breakpoint] ?? st.book.canvas.desktop!
+      const size = resolvePageSize(st.book, bg, st.breakpoint, [
+        ...(bg?.objects ?? []),
+        ...page.objects,
+      ])
       const holder = st.root
       const x = opts.x ?? Math.round((holder.offsetWidth - size.width) / 2)
       const y = opts.y ?? Math.round((holder.offsetHeight - size.height) / 2)

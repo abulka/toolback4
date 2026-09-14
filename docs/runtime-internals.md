@@ -271,9 +271,8 @@ and communicates with the editor only through messages (`toolback:selection`,
   and commit agree for every handle.
 - **Clip indicators**: after every render (and live during drags) the
   controller lays a dashed red `.tb-clip` box over any object that sticks out
-  of the page; the editor's status bar shows the same count as an
-  `N off-page` chip. The controller's `rects` map is always the source of
-  truth for these — it reads rendered DOM positions, so fit-aware rendering is
+  of the page. The controller's `rects` map is always the source of truth for
+  these — it reads rendered DOM positions, so fit-aware rendering is
   automatically reflected.
 - **Glue springs**: the `.tb-fithint` overlay draws a spring from every
   *constrained* object (fit with a non-Free axis) to the page edge(s) it's
@@ -328,6 +327,28 @@ the canvas clamps that axis and it must be changed from the dropdown); a
 top-level group carries the glue and resizing it scales its members onto the new
 box, while members and nested groups have **no independent fit** (they are
 relative to the group box and ride/scale with it).
+
+### 4.2 Auto-height "web page" pages
+
+A background can turn on **Height fits content** (a single
+`Background.autoHeight: boolean`, applying to every breakpoint; the
+properties-dialog checkbox). `resolvePageSize(book, bg, bp, objects?)` then
+derives the height from content — the bottom of the lowest top-level object
+(fit-aware, groups measured by their box), plus a 24px gap once that passes the
+minimum, floored at the authored height for that breakpoint
+(`contentHeightFor`, `packages/format`) — while the width stays fixed. The
+legacy per-breakpoint object form is collapsed to a boolean by
+`migrateBackgrounds`.
+
+Invariant: **auto-height changes the page box, never the fit lens.** The lens is
+resolved with the *base* sizes (the number in the size dialog), so vertical glue
+(Bottom/Center/Stretch) is measured against the base and can never depend on the
+grown height — otherwise bottom-glue would feed its own height back in. So
+`renderPage` takes the base `canvasSize` (the lens) plus an optional `boxHeight`
+(the CSS height); `renderBookPage`/`renderBackgroundView` compute the box from
+their object list but keep the lens on the base, and `runPage`'s ControlApi
+`apiSize` / `author.ts` reads also stay base. Only layout at render/navigation
+time drives growth; a script moving an object mid-run does not re-measure.
 
 ## 5. Group invariants (`apps/editor/src/stores/book.ts`)
 
@@ -532,3 +553,6 @@ match what will resolve at runtime:
    canvas sets it at boot from `public/libs/importmap.json`; shelf output must
    always be ESM — `build-libs.mjs` emits `/libs/<name>.js` and both publish
    and preview consume that layout.
+9. **Auto-height never feeds the lens.** `resolvePageSize(..., objects)` may
+   grow the page *box*; the fit lens stays on the base sizes (see §4.2). Never
+   pass the grown size as `resolveObjectRect`'s page size.

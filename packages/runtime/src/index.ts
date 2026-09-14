@@ -113,6 +113,7 @@ export function renderPage(
   canvasSize?: { width: number; height: number },
   background?: Background,
   refSize?: { width: number; height: number },
+  boxHeight?: number,
 ): HTMLElement {
   const doc = root.ownerDocument
   injectStyles(doc)
@@ -123,7 +124,7 @@ export function renderPage(
   pageRoot.style.background = background?.color ?? '#ffffff'
   if (canvasSize) {
     pageRoot.style.width = `${canvasSize.width}px`
-    pageRoot.style.height = `${canvasSize.height}px`
+    pageRoot.style.height = `${boxHeight ?? canvasSize.height}px`
   }
 
   // fit-aware render when both the target and the desktop reference sizes are
@@ -164,9 +165,15 @@ export function renderBookPage(
   }
   const page = book.pages[pageIndex] ?? book.pages[0]!
   const background = backgroundFor(book, page)
-  const canvasSize = resolvePageSize(book, background, breakpoint)
+  // the box can grow with content (auto-height) but the fit lens always uses
+  // the base sizes, so vertical glue never depends on the grown height
+  const baseSize = resolvePageSize(book, background, breakpoint)
   const refSize = resolvePageSize(book, background, 'desktop')
-  return renderPage(page, breakpoint, root, canvasSize, background, refSize)
+  const box = resolvePageSize(book, background, breakpoint, [
+    ...(background?.objects ?? []),
+    ...page.objects,
+  ])
+  return renderPage(page, breakpoint, root, baseSize, background, refSize, box.height)
 }
 
 /**
@@ -184,16 +191,18 @@ export function renderBackgroundView(
   }
   const background =
     book.backgrounds.find((b) => b.id === backgroundId) ?? book.backgrounds[0]!
-  const canvasSize = resolvePageSize(book, background, breakpoint)
+  const baseSize = resolvePageSize(book, background, breakpoint)
   const refSize = resolvePageSize(book, background, 'desktop')
-  const size = { page: canvasSize, ref: refSize }
+  const box = resolvePageSize(book, background, breakpoint, background.objects)
+  const size = { page: baseSize, ref: refSize }
   const pageRoot = renderPage(
     { id: `bgview:${background.id}`, name: background.name, script: '', backgroundId: background.id, objects: [] },
     breakpoint,
     root,
-    canvasSize,
+    baseSize,
     undefined,
     refSize,
+    box.height,
   )
   pageRoot.style.background = background.color
   pageRoot.dataset.tbBackgroundId = background.id

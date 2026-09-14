@@ -438,18 +438,6 @@ const canvasStyle = computed(() => {
   return { width: `${size.width}px`, height: `${size.height}px` }
 })
 
-/** objects rendered at least partly outside the current page box (the clip
- *  indicators on the canvas + this chip make the clipping visible) */
-const offPageCount = computed(() => {
-  if (store.isRunning || !store.canvasReady) return 0
-  const size = store.activeCanvasSize
-  let n = 0
-  for (const r of Object.values(store.rects)) {
-    if (r.x < -0.5 || r.y < -0.5 || r.x + r.w > size.width + 0.5 || r.y + r.h > size.height + 0.5) n++
-  }
-  return n
-})
-
 /** what the status bar calls the thing being edited */
 const targetLabel = computed(() =>
   store.editing.kind === 'background'
@@ -867,7 +855,6 @@ function startPaletteSplitDrag(e: PointerEvent): void {
         <span class="mode" :class="{ running: store.isRunning }">{{ store.isRunning ? 'RUNNING' : 'design' }}</span>
         <span>{{ targetLabel }} · {{ store.objectCount }} objects · "{{ store.book.title }}"</span>
         <span v-if="store.popupsOpen.length" class="popups">popup: {{ store.popupsOpen.join(', ') }}</span>
-        <span v-if="offPageCount" class="offpage" :title="'Objects sticking out of the ' + store.breakpoint + ' page — dashed red outline on the canvas. Use the Responsive glue (Right/Stretch/…) or drag them back in.'">{{ offPageCount }} off-page</span>
         <span v-if="store.authorActive" class="author-chip">⚡ plugin: {{ store.authorActive }}</span>
         <span v-if="store.savedAt" class="dim">saved {{ new Date(store.savedAt).toLocaleTimeString() }}</span>
         <span v-if="store.autosaveAt" class="dim">autosaved {{ new Date(store.autosaveAt).toLocaleTimeString() }}</span>
@@ -1495,15 +1482,6 @@ body.tb-palette-dragging * {
 .status .popups {
   color: var(--ed-ok);
   border: 1px solid var(--ed-ok);
-  border-radius: 999px;
-  padding: 1px 8px;
-  font-size: 10px;
-  letter-spacing: 0.4px;
-}
-
-.status .offpage {
-  color: var(--ed-err);
-  border: 1px solid var(--ed-err);
   border-radius: 999px;
   padding: 1px 8px;
   font-size: 10px;

@@ -243,14 +243,16 @@ Things to know:
 Every object can carry a **Responsive** setting — a horizontal and a vertical
 "glue" mode, edited in the Selection panel (the *Responsive* row). It answers
 the question *"how should this object adapt when the page is a different
-size?"* The two axes are independent: constraining one leaves the other free.
+size?"* The two axes are independent: constraining one leaves the other axis as
+it was.
 Each object has **one authored layout**; at every breakpoint the page size
 changes and the constrained axes re-derive from that layout.
 
 Modes (per axis):
 
-- **Free** *(default)* — no constraint on that axis: it keeps the authored
-  coordinate everywhere.
+- **Free** — no constraint on that axis: it keeps the authored coordinate
+  everywhere. Free is the fallback for an object with no Responsive setting at
+  all (a legacy file, for example).
 - **Left / Top** — the margin to that edge keeps its share of the page: the
   coordinate scales with the page size (proportional).
 - **Center** — the object's **middle** is centered on that axis.
@@ -266,11 +268,13 @@ every size.
 
 Things to know:
 
-- **Free is the default.** Every object starts **Free** — positioned by its
-  top/left coordinates, draggable anywhere. A constraint only exists on an
-  axis where you picked one; the two axes are fully independent. Setting
-  Horizontal to Center constrains *only* the horizontal axis — the object
-  stays free to move vertically.
+- **New objects start glued Left/Top.** A freshly placed control — and a new
+  group — gets Horizontal **Left** + Vertical **Top**, so it scales with the
+  page. **Free** is the fallback when an object carries no Responsive setting at
+  all (a legacy file, for example). A constraint only exists on an axis where
+  you set one, and the two axes are independent: setting Horizontal to Center
+  only constrains the horizontal axis, leaving the vertical axis at whatever it
+  already was (Top for a new object).
 - **Constraints never write the layout.** A constraint is a render *lens*: the
   canvas derives the constrained axis at each page size; switching the mode
   back to Free restores the authored layout exactly. Center always aligns the
@@ -287,6 +291,12 @@ Things to know:
   re-anchoring a glued axis — no prompt. A size write on a Center/Right/Bottom
   axis keeps the constraint (the position re-derives around the new size); on a
   Stretch axis the size is the constraint.
+- **Fill page.** The Geometry section's **Fill page** button (with a margin
+  box) sizes the selected object to the page minus that margin and sets both
+  axes to **Stretch**. The margin is proportional — it scales with the page like
+  any other glue, so it shrinks on smaller breakpoints (a fixed-pixel margin is
+  the future "pin" mode). Works on top-level objects; a group member rides its
+  group's box instead.
 
 
 - **A spring shows every constraint in the canvas**, with a distinct shape
@@ -299,13 +309,12 @@ Things to know:
   anchors. Muted colours reinforce the shapes (slate = edge, pale grey =
   center, amber = stretch; every spring sits on a faint white halo for dark
   pages). The springs are drawn **behind the controls**, so they never cover
-  what's on the page. Background objects show their springs too; Default Free
-  draws nothing. The **≋ All/Sel/Off** control in the top bar shows springs for
+  what's on the page. Background objects show their springs too; a **Free**
+  axis draws nothing. The **≋ All/Sel/Off** control in the top bar shows springs for
   every object, only the current selection, or none (the choice sticks) — hover
   it for a legend.
 - Objects that stick out of the current page get a **dashed red outline** on the
-  canvas and the status bar shows an **`N off-page`** chip — the clipping you'd
-  otherwise have to guess at is made visible. Use glue or drag them back in.
+  canvas, so the clipping you'd otherwise have to guess at is made visible.
 - Scripts read the *rendered* (lensed) rect: a Center-x button reports its
   centered x. Writing `x`/`y`/`width`/`height` releases the touched axis and
   applies the value.
@@ -792,8 +801,9 @@ pages nested underneath:
   A single click on the background does nothing — this is deliberate, so a stray
   click can't drop you onto an empty background. A click on any page always
   returns the canvas to that page.
-- **⚙** opens the background properties: name, colour, **page size**, and
-  **Delete…** (backgrounds with pages take them along — confirmed first)
+- **⚙** opens the background properties: name, colour, **page size** (including
+  *Height fits content*), and **Delete…** (backgrounds with pages take them
+  along — confirmed first)
 - **✎** renames it; ⧉ duplicates
 - **drag pages** to rearrange them, or drop them on another background to move
   them there
@@ -808,6 +818,24 @@ breakpoint — e.g. make a small **320 × 240** background; every page on it
 becomes a dialog-sized page. In the properties dialog, untick *"Use the book
 default page size"*, then pick a preset, type exact width/height, or **drag the
 corner of the preview** — the size follows your drag, snapped to the grid.
+
+**Height fits content (web page).** Tick the checkbox in the background
+properties to let a page grow downward like a web page: the width stays fixed
+and the height becomes *as tall as the lowest object, plus a 24px bottom gap* —
+never shorter than the configured page height. Add, move or enlarge an object
+past the old bottom and the page grows (on release while editing; on render at
+run time). The setting is a property of the background, so it applies at
+**every breakpoint**. Published books scroll when the grown page is taller than
+the window.
+
+One subtlety: vertical **glue** (Responsive → Vertical: Bottom / Center /
+Stretch) is resolved against the **configured** page height, not the grown one.
+That's what stops the page height and the glue from chasing each other. It means
+a glued object is positioned against the configured height, so it doesn't
+stretch down with a page grown by *other* content — though a Bottom or Stretch
+object placed past the bottom does grow the page itself, just like any other.
+And only the page *layout* drives growth: a script that moves an object below
+the fold at run time does not re-grow the page.
 
 ### Scripting backgrounds
 

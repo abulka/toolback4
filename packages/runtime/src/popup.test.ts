@@ -5,7 +5,7 @@ import { popupEscape, runBook, stopRun } from './player'
 import { listenForEditor } from './editorLink'
 
 function popupBook(opts?: {
-  dialogBg?: { size?: { width: number; height: number }; script?: string }
+  dialogBg?: { size?: { width: number; height: number }; script?: string; autoHeight?: boolean }
   modal?: boolean
   chrome?: 'auto' | 'none'
   openScript?: string
@@ -32,6 +32,7 @@ function popupBook(opts?: {
         color: '#f0f0ff',
         script: opts?.dialogBg?.script ?? '',
         ...(opts?.dialogBg?.size ? { size: { desktop: opts.dialogBg.size } } : {}),
+        ...(opts?.dialogBg?.autoHeight ? { autoHeight: true } : {}),
         objects: [],
       },
     ],
@@ -98,6 +99,24 @@ describe('popups', () => {
     expect(document.querySelector('.tb-popup')).toBeNull()
     expect(handle.controls['okBtn']).toBeUndefined()
     expect(handle.store.get('ok')).toBe(true)
+    stopRun()
+    root.remove()
+  })
+
+  it('a popup inherits auto-height from its background', async () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const book = popupBook({
+      dialogBg: { size: { width: 320, height: 240 }, autoHeight: true },
+    })
+    book.pages[1]!.objects.push(createObject('card', 'tall', { x: 0, y: 500, w: 100, h: 50 }))
+    runBook(book, root, 'desktop')
+    ;(root.querySelector('button.tb-button') as HTMLButtonElement).click()
+    await tick()
+
+    const page = document.querySelector<HTMLElement>('.tb-popup .tb-page')!
+    expect(page.style.width).toBe('320px')
+    expect(page.style.height).toBe(`${550 + 24}px`)
     stopRun()
     root.remove()
   })

@@ -3,7 +3,9 @@ import {
   CONTROL_KINDS,
   DEFAULT_SIZES,
   IMAGE_PROVIDERS,
+  AUTO_HEIGHT_MARGIN,
   backgroundFor,
+  contentHeightFor,
   createBook,
   createBackground,
   createGroup,
@@ -175,12 +177,68 @@ describe('format', () => {
       expect(resolvePageSize(book, undefined, 'desktop')).toEqual({ width: 1280, height: 800 })
     })
 
+    it('resolvePageSize auto-height grows to content and floors at the min height', () => {
+      const book = createBook('A')
+      const bg = backgroundFor(book, book.pages[0]!)
+      const base = { width: 1280, height: 800 }
+      // no flag → objects are ignored, behaviour unchanged
+      const tall = createObject('card', 'tall', { x: 0, y: 1000, w: 200, h: 100 })
+      expect(resolvePageSize(book, bg, 'desktop', [tall])).toEqual(base)
+      // flag on → height is content bottom + margin
+      bg.autoHeight = true
+      expect(resolvePageSize(book, bg, 'desktop', [tall])).toEqual({
+        width: 1280,
+        height: 1100 + AUTO_HEIGHT_MARGIN,
+      })
+      // content inside the base does not grow it
+      const short = createObject('card', 'short', { x: 0, y: 10, w: 200, h: 100 })
+      expect(resolvePageSize(book, bg, 'desktop', [short])).toEqual(base)
+      // empty objects → min height
+      expect(resolvePageSize(book, bg, 'desktop', [])).toEqual(base)
+      // the flag is global — tablet derives too (base 768×1024, content 1100)
+      expect(resolvePageSize(book, bg, 'tablet', [tall])).toEqual({
+        width: 768,
+        height: 1100 + AUTO_HEIGHT_MARGIN,
+      })
+    })
+
+    it('contentHeightFor measures top-level boxes and respects the margin floor', () => {
+      const base = { width: 1280, height: 800 }
+      const a = createObject('card', 'a', { x: 10, y: 900, w: 100, h: 50 })
+      const b = createObject('card', 'b', { x: 10, y: 700, w: 100, h: 50 })
+      expect(contentHeightFor([a, b], base, base, 800)).toBe(950 + AUTO_HEIGHT_MARGIN)
+      expect(contentHeightFor([], base, base, 800)).toBe(800)
+      // a group's box is its own rect; members are ignored for measurement
+      const child = createObject('label', 'inner', { x: 0, y: 0, w: 50, h: 50 })
+      const group = createGroup('g', { x: 0, y: 1200, w: 200, h: 200 }, [child])
+      expect(contentHeightFor([group], base, base, 800)).toBe(1400 + AUTO_HEIGHT_MARGIN)
+    })
+
     it('createPage links a backgroundId', () => {
       const bg = createBackground('Popup', '#f0f0f0')
       const page = createPage('Dialog', bg.id)
       expect(page.backgroundId).toBe(bg.id)
       expect(page.name).toBe('Dialog')
       expect(page.objects).toEqual([])
+    })
+
+    it('round-trips the autoHeight flag through parse', () => {
+      const book = createBook('AH')
+      const bg = backgroundFor(book, book.pages[0]!)
+      bg.autoHeight = true
+      const parsed = parseBook(JSON.parse(JSON.stringify(book)))
+      expect(parsed.backgrounds[0]!.autoHeight).toBe(true)
+    })
+
+    it('migrates the legacy per-breakpoint autoHeight object to a boolean', () => {
+      const book = createBook('AH')
+      const raw = JSON.parse(JSON.stringify(book)) as Record<string, unknown>
+      const bgs = raw['backgrounds'] as Array<Record<string, unknown>>
+      bgs[0]!['autoHeight'] = { desktop: true, mobile: false }
+      expect(parseBook(raw).backgrounds[0]!.autoHeight).toBe(true)
+      // all-off collapses to absent
+      bgs[0]!['autoHeight'] = { desktop: false, tablet: false }
+      expect(parseBook(raw).backgrounds[0]!.autoHeight).toBeUndefined()
     })
   })
 

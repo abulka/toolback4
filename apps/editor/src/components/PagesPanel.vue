@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import type { Background } from '@toolback/format'
+import type { Background, Breakpoint } from '@toolback/format'
 import { useBookStore } from '../stores/book'
 import HelpButton from './HelpButton.vue'
 
@@ -54,13 +54,19 @@ const activePageBgId = computed<string | null>(() => {
   return known ? page.backgroundId : (store.book.backgrounds[0]?.id ?? null)
 })
 
-/** label when the background overrides the page size at any breakpoint */
+/** label when the background overrides the page size / auto-heights */
 function sizeLabel(bg: Background): string {
-  if (!bg.size) return ''
   const parts: string[] = []
-  for (const [bp, size] of Object.entries(bg.size)) {
-    if (size) parts.push(`${bp[0]}:${size.width}×${size.height}`)
+  for (const breakpoint of ['desktop', 'tablet', 'mobile'] as Breakpoint[]) {
+    const size = bg.size?.[breakpoint]
+    if (!size) continue
+    parts.push(
+      bg.autoHeight
+        ? `${breakpoint[0]}:${size.width}×auto`
+        : `${breakpoint[0]}:${size.width}×${size.height}`,
+    )
   }
+  if (bg.autoHeight) parts.push('auto height')
   return parts.join(' ')
 }
 

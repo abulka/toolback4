@@ -520,6 +520,34 @@ describe('book store — backgrounds', () => {
     expect(names).toContain('button2')
   })
 
+  it('addObject folds a non-desktop drop rect onto the shared layout', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setBreakpoint('mobile') // book canvas upgrades to 390×844
+    store.addObject('button', { x: 100, y: 100, w: 120, h: 40 })
+    const obj = store.activePage.objects.at(-1)!
+    // desktop ref 800×600: Left/Top fold the margin ratio (800/390, 600/844)
+    expect(obj.rect).toEqual({ x: 205, y: 71, w: 120, h: 40 })
+  })
+
+  it('fillObjectToPage stretches the object to the page minus the margin', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    store.fillObjectToPage(id, 8)
+    const obj = store.book.pages[0]!.objects[0]!
+    // desktop base 800×600 is the reference → identity fold
+    expect(obj.fit).toEqual({ x: 'stretch', y: 'stretch' })
+    expect(obj.rect).toEqual({ x: 8, y: 8, w: 784, h: 584 })
+
+    // on mobile the target folds back to reference coordinates
+    store.setBreakpoint('mobile') // base 390×844
+    const id2 = store.book.pages[0]!.objects[1]!.id
+    store.fillObjectToPage(id2, 0)
+    const obj2 = store.book.pages[0]!.objects[1]!
+    expect(obj2.rect).toEqual({ x: 0, y: 0, w: 800, h: 600 })
+  })
+
   it('removeBackground refuses while pages reference it; deletePages removes both', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
@@ -550,6 +578,34 @@ describe('book store — backgrounds', () => {
     expect(store.activeCanvasSize).toEqual({ width: 768, height: 1024 })
     store.setBackgroundSize(bgId, 'desktop', null)
     expect(store.book.backgrounds[0]!.size).toBeUndefined()
+  })
+
+  it('setBackgroundAutoHeight derives the canvas height at every breakpoint', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const bgId = store.book.backgrounds[0]!.id
+    store.setBackgroundAutoHeight(bgId, true)
+    expect(store.book.backgrounds[0]!.autoHeight).toBe(true)
+    // existing content sits inside the 600px base → no growth
+    expect(store.activeCanvasSize).toEqual({ width: 800, height: 600 })
+    store.addObject('card', { x: 0, y: 1000, w: 100, h: 50 })
+    expect(store.activeCanvasSize).toEqual({ width: 800, height: 1050 + 24 })
+    // global: the mode applies at mobile too (no per-breakpoint opt-in)
+    store.setBreakpoint('mobile')
+    expect(store.book.backgrounds[0]!.autoHeight).toBe(true)
+    expect(store.activeCanvasSize.height).toBeGreaterThan(store.book.canvas.mobile!.height)
+    store.setBackgroundAutoHeight(bgId, false)
+    expect(store.book.backgrounds[0]!.autoHeight).toBeUndefined()
+  })
+
+  it('undo covers the auto-height flag', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const bgId = store.book.backgrounds[0]!.id
+    store.setBackgroundAutoHeight(bgId, true)
+    expect(store.book.backgrounds[0]!.autoHeight).toBe(true)
+    store.undo()
+    expect(store.book.backgrounds[0]!.autoHeight).toBeUndefined()
   })
 
   it('undo restores the editing target along with the book', () => {

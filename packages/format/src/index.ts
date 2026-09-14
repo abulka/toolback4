@@ -102,6 +102,12 @@ export interface Background {
   name: string
   color: string
   size?: Partial<Record<Breakpoint, CanvasSize>>
+  /**
+   * "Height fits content" (web page): the page's height derives from its
+   * objects (floored at `size`/book height) at every breakpoint instead of
+   * being fixed. Width is unaffected. The stored height is the minimum.
+   */
+  autoHeight?: boolean
   /** shared functions + backgroundEnter() hook, compiled like a page script */
   script: string
   objects: PageObject[]
@@ -119,6 +125,7 @@ const BackgroundSchema = z.object({
       mobile: CanvasSizeSchema.optional(),
     })
     .optional(),
+  autoHeight: z.boolean().optional(),
   objects: z.array(PageObjectSchema).default([]),
 })
 
@@ -203,6 +210,18 @@ function migrateBackgrounds(data: unknown): unknown {
         typeof page['backgroundId'] === 'string' &&
         backgrounds.some((b) => b.id === page['backgroundId'])
       if (!known) page['backgroundId'] = backgrounds[0]!.id
+    }
+  }
+  // auto-height used to be per breakpoint — collapse any object form to a
+  // single boolean (true if any breakpoint was on)
+  const bgs = Array.isArray(raw['backgrounds'])
+    ? (raw['backgrounds'] as Array<Record<string, unknown>>)
+    : []
+  for (const bg of bgs) {
+    const ah = bg['autoHeight']
+    if (ah && typeof ah === 'object') {
+      if (Object.values(ah as Record<string, unknown>).some(Boolean)) bg['autoHeight'] = true
+      else delete bg['autoHeight']
     }
   }
   return data
@@ -446,19 +465,58 @@ export function resolveStartPageIndex(book: Book): number {
 }
 
 /**
+ * Bottom breathing room left below the lowest object on an auto-height page.
+ */
+export const AUTO_HEIGHT_MARGIN = 24
+
+/**
+ * Content height for an auto-height page: the bottom of the lowest top-level
+ * object (fit-aware for the base page size), plus {@link AUTO_HEIGHT_MARGIN}
+ * when that content passes the minimum — never shorter than `minHeight`.
+ *
+ * Measured against the BASE page size, so vertical glue never depends on the
+ * grown height (no circularity): it is positioned relative to the configured
+ * page, not the grown box.
+ */
+export function contentHeightFor(
+  objects: PageObject[],
+  baseSize: CanvasSize,
+  refSize: CanvasSize,
+  minHeight: number,
+): number {
+  if (objects.length === 0) return minHeight
+  let bottom = 0
+  for (const obj of objects) {
+    const r = resolveObjectRect(obj, baseSize, refSize)
+    bottom = Math.max(bottom, r.y + r.h)
+  }
+  return bottom > minHeight ? bottom + AUTO_HEIGHT_MARGIN : minHeight
+}
+
+/**
  * Page size for a page in a breakpoint: the background's size override for
  * that breakpoint, else the book canvas, else the desktop book size.
+ *
+ * When `objects` is given and the background turns on "height fits content",
+ * only the height is derived (width stays the base width, and the setting
+ * applies to every breakpoint); every other call site keeps the fixed size.
  */
 export function resolvePageSize(
   book: Book,
   background: Background | undefined,
   breakpoint: Breakpoint,
+  objects?: PageObject[],
 ): CanvasSize {
-  return (
+  const base =
     background?.size?.[breakpoint] ??
     book.canvas[breakpoint] ??
     book.canvas.desktop
-  )
+  if (!objects || !background?.autoHeight) return base
+  const ref = background.size?.desktop ?? book.canvas.desktop
+  return {
+    width: base.width,
+    height: contentHeightFor(objects, base, ref, base.height),
+  }
 }
 
 export function createBook(title: string): Book {
