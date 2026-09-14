@@ -25,10 +25,50 @@ import type { PickerHandle } from './files'
  *   edits to be yanked out of the editor and reappear a second later)
  */
 
-const SCRIPT_MARKER = '// ============= toolback script ============='
-const HEADER_NOTE = `// toolback-linked script — edit me in VS Code (or in toolback) and save.
+/**
+ * Link "flavour": what kind of text lives in the linked file. Scripts are
+ * plain JavaScript (a `//` header); markdown/HTML viewer sources use an HTML
+ * comment header so the file still reads naturally in VS Code.
+ */
+export type LinkFlavor = 'script' | 'markdown' | 'html'
+
+interface FlavorConfig {
+  header: string
+  marker: string
+  suggestedExt: string
+  description: string
+  accept: Record<string, string[]>
+}
+
+const FLAVORS: Record<LinkFlavor, FlavorConfig> = {
+  script: {
+    header: `// toolback-linked script — edit me in VS Code (or in toolback) and save.
 // Changes sync both ways. Plain JavaScript: no type annotations.
-`
+`,
+    marker: '// ============= toolback script =============',
+    suggestedExt: 'js',
+    description: 'TypeScript / JavaScript',
+    accept: { 'text/typescript': ['.ts', '.js', '.tsx', '.jsx', '.mjs'] },
+  },
+  markdown: {
+    header: `<!-- toolback-linked markdown — edit me in VS Code (or in toolback) and save.
+     Changes sync both ways. -->
+`,
+    marker: '<!-- ============= toolback markdown ============= -->',
+    suggestedExt: 'md',
+    description: 'Markdown',
+    accept: { 'text/markdown': ['.md', '.markdown', '.txt'] },
+  },
+  html: {
+    header: `<!-- toolback-linked HTML — edit me in VS Code (or in toolback) and save.
+     Changes sync both ways. -->
+`,
+    marker: '<!-- ============= toolback HTML ============= -->',
+    suggestedExt: 'html',
+    description: 'HTML',
+    accept: { 'text/html': ['.html', '.htm'] },
+  },
+}
 
 /** grace period after our own write: the OS may still serve stale bytes */
 const POST_WRITE_GRACE_MS = 800
@@ -60,35 +100,39 @@ interface LinkState {
   poll: ReturnType<typeof setInterval> | undefined
 }
 
-function externalize(script: string): string {
-  return `${HEADER_NOTE}${SCRIPT_MARKER}\n${script}\n`
+function externalize(body: string, flavor: LinkFlavor): string {
+  const cfg = FLAVORS[flavor]
+  return `${cfg.header}${cfg.marker}\n${body}\n`
 }
 
-/** strip the generated header and trailing newlines — the script body is
- *  everything after the marker, normalized the same way on write and read so
- *  toolback edits are never mistaken for external ones */
-export function internalize(text: string): string {
-  const i = text.indexOf(SCRIPT_MARKER)
-  const body = i === -1 ? text : text.slice(i + SCRIPT_MARKER.length)
+/** strip the generated header and trailing newlines — the body is everything
+ *  after the marker, normalized the same way on write and read so toolback
+ *  edits are never mistaken for external ones */
+export function internalize(text: string, flavor: LinkFlavor = 'script'): string {
+  const marker = FLAVORS[flavor].marker
+  const i = text.indexOf(marker)
+  const body = i === -1 ? text : text.slice(i + marker.length)
   return body.replace(/^\s*\n?/, '').replace(/\s+$/, '')
 }
 
-const TS_TYPES = {
-  description: 'TypeScript / JavaScript',
-  accept: { 'text/typescript': ['.ts', '.js', '.tsx', '.jsx', '.mjs'] },
-} as const
-
-export async function pickLinkedFile(suggestedName: string): Promise<PickerHandle | null> {
+export async function pickLinkedFile(
+  suggestedName: string,
+  flavor: LinkFlavor = 'script',
+): Promise<PickerHandle | null> {
   if (typeof window.showSaveFilePicker !== 'function') {
     throw new Error(
-      'Linking scripts to a file needs the File System Access API (Chrome/Edge). This browser does not support it.',
+      'Linking to a file needs the File System Access API (Chrome/Edge). This browser does not support it.',
     )
   }
   try {
-    const name = suggestedName.endsWith('.ts') ? suggestedName.replace(/\.ts$/, '.js') : suggestedName
+    const cfg = FLAVORS[flavor]
+    let name = suggestedName
+    // the caller's key is extension-less; drop any stray .ts/.js and append
+    // the flavour's extension so the save dialog filters correctly
+    name = name.replace(/\.(ts|js|md|markdown|html|htm|txt)$/i, '')
     const handle = await window.showSaveFilePicker({
-      suggestedName: name.endsWith('.js') ? name : `${name}.js`,
-      types: [TS_TYPES as never],
+      suggestedName: `${name}.${cfg.suggestedExt}`,
+      types: [{ description: cfg.description, accept: cfg.accept } as never],
     })
     return handle as PickerHandle
   } catch (err) {
@@ -105,6 +149,7 @@ export function makeScriptLink(
   linkKey: string,
   onChange: (text: string) => void,
   onNotice?: (message: string) => void,
+  flavor: LinkFlavor = 'script',
 ): ScriptLinkHandle {
   const phase = ref<LinkPhase>('unlinked')
   const fileName = ref('')
@@ -128,7 +173,7 @@ export function makeScriptLink(
     await w.write(text)
     await w.close()
     // the file really contains `text` now
-    st.lastWritten = internalize(text)
+    st.lastWritten = internalize(text, flavor)
     st.dirty = false
     st.lastWriteAt = Date.now()
   }
@@ -143,7 +188,7 @@ export function makeScriptLink(
           st.dirty = false
           return
         }
-        return writeNow(externalize(target)).catch((err) => {
+        return writeNow(externalize(target, flavor)).catch((err) => {
           phase.value = 'error'
           console.error('[script-link] write failed', err)
           st.dirty = false
@@ -196,7 +241,7 @@ export function makeScriptLink(
     try {
       const file = await h.getFile()
       const text = await file.text()
-      const body = internalize(text)
+      const body = internalize(text, flavor)
       if (body === st.lastWritten) return // no external change
       st.lastWritten = body
       st.dirty = false
@@ -219,7 +264,7 @@ export function makeScriptLink(
       if (phase.value === 'linking') return
       phase.value = 'linking'
       try {
-        const handle = await pickLinkedFile(linkKey.replace(/[^A-Za-z0-9_-]+/g, '-'))
+        const handle = await pickLinkedFile(linkKey.replace(/[^A-Za-z0-9_-]+/g, '-'), flavor)
         if (!handle) {
           phase.value = 'unlinked'
           return
@@ -236,7 +281,7 @@ export function makeScriptLink(
         // is the source of truth (`push` seeds the file from it right after).
         // This is what keeps "⇄ file" from ever producing a blank editor or a
         // clobbered script when the target file starts empty.
-        const existing = internalize(await file.text())
+        const existing = internalize(await file.text(), flavor)
         if (existing.trim()) {
           st.lastWritten = existing
           onChange(existing)
@@ -270,7 +315,7 @@ export function makeScriptLink(
         const file = await saved.getFile()
         fileName.value = file.name
         const text = await file.text()
-        st.lastWritten = internalize(text)
+        st.lastWritten = internalize(text, flavor)
         st.dirty = false
         draft = st.lastWritten
         // only push an existing file's content into the editor when the file
@@ -302,7 +347,7 @@ export function makeScriptLink(
       if (!h || phase.value !== 'linked') return
       // normalize exactly like reads (`internalize`), so a trailing newline or
       // whitespace in the editor can never read back as "different from the file"
-      draft = internalize(text)
+      draft = internalize(text, flavor)
       if (draft === st.lastWritten && !st.dirty) return
       st.dirty = true
       if (st.timer) clearTimeout(st.timer)

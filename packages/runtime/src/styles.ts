@@ -140,6 +140,123 @@ body {
   border-radius: 12px;
 }
 
+/* markdown / HTML viewers: read-only rich content, scrollable inside the object */
+.tb-markdown,
+.tb-html {
+  font: 400 15px/1.55 var(--tb-font);
+  color: var(--tb-text);
+  overflow: auto;
+  overflow-wrap: break-word;
+  scrollbar-width: thin;
+}
+
+.tb-markdown > :first-child,
+.tb-html > :first-child {
+  margin-top: 0;
+}
+
+.tb-markdown > :last-child,
+.tb-html > :last-child {
+  margin-bottom: 0;
+}
+
+.tb-markdown h1,
+.tb-markdown h2,
+.tb-markdown h3,
+.tb-markdown h4,
+.tb-markdown h5,
+.tb-markdown h6 {
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 0.6em 0 0.35em;
+}
+
+.tb-markdown h1 { font-size: 1.7em; }
+.tb-markdown h2 { font-size: 1.4em; }
+.tb-markdown h3 { font-size: 1.2em; }
+.tb-markdown h4 { font-size: 1.05em; }
+
+.tb-markdown p {
+  margin: 0.5em 0;
+}
+
+.tb-markdown ul,
+.tb-markdown ol {
+  margin: 0.5em 0;
+  padding-left: 1.4em;
+}
+
+.tb-markdown li {
+  margin: 0.15em 0;
+}
+
+.tb-markdown a {
+  color: var(--tb-accent);
+}
+
+.tb-markdown code {
+  font: 0.9em ui-monospace, 'SF Mono', Menlo, 'Courier New', monospace;
+  background: rgba(17, 24, 39, 0.07);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+
+.tb-markdown pre {
+  background: #111827;
+  color: #f9fafb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 0.6em 0;
+}
+
+.tb-markdown pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.tb-markdown blockquote {
+  margin: 0.6em 0;
+  padding: 0.2em 0.9em;
+  border-left: 3px solid #d1d5db;
+  color: var(--tb-text-muted);
+}
+
+.tb-markdown table {
+  border-collapse: collapse;
+  margin: 0.6em 0;
+}
+
+.tb-markdown th,
+.tb-markdown td {
+  border: 1px solid #e5e7eb;
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.tb-markdown img {
+  max-width: 100%;
+  height: auto;
+}
+
+.tb-viewer-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  color: #9ca3af;
+  font-size: 13px;
+  background: #f9fafb;
+  border: 1px dashed #e5e7eb;
+  border-radius: 8px;
+}
+
+.tb-viewer-empty-icon {
+  font-weight: 600;
+}
+
 /* switch: pill toggle + label; the input is visually hidden but keeps focus */
 .tb-switch {
   display: flex;

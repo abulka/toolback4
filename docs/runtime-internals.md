@@ -13,7 +13,7 @@ document explains how it *works*. When you change the runtime, update both.
 toolback4/
 ├── packages/
 │   ├── format/    # zod schemas, factories, geometry/tree helpers (no runtime deps beyond zod)
-│   ├── controls/  # DOM renderers per control + design tokens
+│   ├── controls/  # DOM renderers per control + content registry + design tokens (bundles `marked`)
 │   └── runtime/   # player (scripts/store), design controller (canvas editing), editorLink (protocol)
 └── apps/
     └── editor/    # Vue 3 + Pinia + Monaco; the single source of truth for the book
@@ -202,9 +202,12 @@ Semantics (ToolBook-faithful):
 
 ### 3.5 Dynamic labels `{{…}}`
 
-`wireDynamicText` collects every object whose `props.text` contains `{{`
-(buttons and labels — the only text-bearing controls), and rewrites
-`textContent` live:
+`wireDynamicText` resolves `{{…}}` for every object with a **content prop** —
+`CONTENT_PROPS`/`contentKeyFor` in `@toolback/controls` map a control kind to
+the prop that carries its templatable content (`button`/`label`/`card`/`switch`
+→ `text`, `markdown` → `text`, `html` → `html`; inputs have none). The
+resolved source is fed through `applyContent(el, kind, source)`, which is the
+single place DOM content is written:
 
 - Regex: `/\{\{\s*([\w$]+(?:\.[\w$]+)*)\s*\}\}/g` — bare store keys **and**
   one-level dotted paths.
@@ -212,6 +215,12 @@ Semantics (ToolBook-faithful):
 - `{{self.name}}` / `{{this.name}}` → the object's own name. This is how a
   duplicated button displays its own fresh name automatically. Any other
   dotted member (`{{self.nme}}`) renders empty, like an unset key.
+- **Substitution runs on the source, before rendering.** Plain kinds get
+  `textContent`; `card` targets `.tb-card-body` and `switch` targets
+  `.tb-switch-text` (never the root, which would wipe the title / checkbox +
+  track); `markdown` re-parses the substituted source with `marked` and `html`
+  sets `innerHTML` (empty sources → a placeholder). This is why a store change
+  re-parses a viewer instead of replacing its rendered DOM with plain text.
 - Substitution runs once at render and again on **every** `store.set` (the
   store subscription is torn down with the listeners).
 - **Design mode** calls the same one-shot renderer (`renderDynamicText`,
@@ -230,6 +239,13 @@ and communicates with the editor only through messages (`toolback:selection`,
 - **Hit-testing**: `chainAt(x, y)` — the deepest `[data-tb-id]` whose rect
   contains the point (topmost-paint wins on overlap), then the ancestor walk
   gives the full chain `[outerGroup, …, innerGroup, object]`.
+- **Viewer wheel forwarding**: design mode gives page content
+  `pointer-events: none` (so the overlay can select), which would also stop a
+  markdown/HTML viewer from scrolling natively. The overlay's `wheel` handler
+  hit-tests the point (`chainAt`), finds the object's `.tb-markdown`/`.tb-html`,
+  and adds the delta to its `scrollTop`/`scrollLeft` (only when it actually
+  overflows). At run time the viewer scrolls natively — `overflow: auto` in
+  `styles.ts`.
 - **Drill path** (`drillPath: string[]`): the ancestors of the selected
   object. The "current level" is `chain[drillPath.length]`. Gentle clicks
   select at the current level and never descend; double-click descends exactly
@@ -414,11 +430,26 @@ match what will resolve at runtime:
   views, and the embedded editor neither registers a lib nor disposes the
   model (the owner does). Window z-order uses a module-level counter (a
   `<script setup>` top-level `let` would be per-instance and never stack).
+  **Markdown/HTML viewer fields reuse the same shell** (`ContentEditor.vue`):
+  ⤢ opens a plain `MonacoContent.vue` (markdown/html highlighting, no toolback
+  lib) in an `EditorWindow`, and the inline field stays the `{{`-aware
+  textarea. The two bind to the same `modelValue` and sync live, so no shared
+  Monaco model is involved.
+- `{{` completion in the viewer popout: `monacoApi.ts` registers one
+  completion provider for the `markdown` and `html` languages (independent of
+  the `javascript` provider's registration flag), reading a shared book-wide
+  key list set by `ContentEditor` (`setContentStoreKeys`). It inserts
+  `key}}` (or just `key` when the closing braces are already typed).
 - VS Code link: `scriptLink.ts` writes the script (plus a short comment
   header marking the marker boundary) to a `.ts` file via the File System
   Access API ("⇄ file" button). It deliberately does **not** dump the generated
   toolback API into the file — the export is the author's script, not a
   library reference; toolback-style autocomplete is a built-in-editor feature.
+  The link is **flavour-aware** (`script` / `markdown` / `html`): the picker
+  filters to `.js` / `.md` / `.html`, and viewer files use an HTML-comment
+  header + marker (`<!-- … -->`) so the file still reads naturally. Same
+  mechanics, separate persisted handles (`link:<key>`), so a viewer field and a
+  script never share a file.
   Linking to an **empty** file never clobbers the editor's content (the editor
   is the source of truth), and the current script is written out immediately so
   the file is never left blank. A poll re-reads the file; content differing

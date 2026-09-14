@@ -1402,3 +1402,64 @@ describe('glue-spring hint modes', () => {
     expect(root.querySelectorAll('.tb-fithint-arrow').length).toBe(0)
   })
 })
+
+describe('design mode — viewer scrolling', () => {
+  it('forwards a wheel over an overflowing markdown viewer to its own scroll', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const cleanup = listenForEditor(root, () => {})
+    patchRects()
+    try {
+      const book = sampleBook()
+      const obj = book.pages[0]!.objects[0]!
+      obj.control = 'markdown'
+      obj.props = { text: '# Hi' }
+      load(root, book, [])
+      const viewer = root.querySelector<HTMLElement>('.tb-page .tb-markdown')!
+      expect(viewer).not.toBeNull()
+      // happy-dom has no layout engine — fake a scrollable box
+      Object.defineProperty(viewer, 'scrollHeight', { value: 400, configurable: true })
+      Object.defineProperty(viewer, 'clientHeight', { value: 100, configurable: true })
+      Object.defineProperty(viewer, 'scrollWidth', { value: 100, configurable: true })
+      Object.defineProperty(viewer, 'clientWidth', { value: 100, configurable: true })
+
+      // happy-dom's WheelEvent drops client coords — pin them on the event
+      const ev = new WheelEvent('wheel', { deltaY: 50, bubbles: true, cancelable: true })
+      Object.defineProperty(ev, 'clientX', { value: 120 })
+      Object.defineProperty(ev, 'clientY', { value: 110 })
+      overlayOf(root).dispatchEvent(ev)
+      expect(viewer.scrollTop).toBe(50)
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('leaves the wheel alone when the viewer does not overflow', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const cleanup = listenForEditor(root, () => {})
+    patchRects()
+    try {
+      const book = sampleBook()
+      const obj = book.pages[0]!.objects[0]!
+      obj.control = 'markdown'
+      obj.props = { text: '# Hi' }
+      load(root, book, [])
+      const viewer = root.querySelector<HTMLElement>('.tb-page .tb-markdown')!
+      Object.defineProperty(viewer, 'scrollHeight', { value: 50, configurable: true })
+      Object.defineProperty(viewer, 'clientHeight', { value: 50, configurable: true })
+      const ev = new WheelEvent('wheel', { deltaY: 50, bubbles: true, cancelable: true })
+      Object.defineProperty(ev, 'clientX', { value: 120 })
+      Object.defineProperty(ev, 'clientY', { value: 110 })
+      overlayOf(root).dispatchEvent(ev)
+      // not cancelled → the canvas (or page) keeps the scroll
+      expect(ev.defaultPrevented).toBe(false)
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+})

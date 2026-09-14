@@ -54,9 +54,9 @@ toggle) — but the words you type are JavaScript.
 ## What you can do
 
 - **Author visually** — drag controls (button, label, input, image, card,
-  container, switch, group) onto a canvas with a 8px grid; resize, arrange,
-  group/ungroup, duplicate; per-breakpoint layouts for desktop / tablet /
-  mobile.
+  container, switch, group, markdown, html) onto a canvas with a 8px grid;
+  resize, arrange, group/ungroup, duplicate; per-breakpoint layouts for
+  desktop / tablet / mobile.
 - **Script in plain JS** — object event scripts, page scripts, background
   scripts, and full IntelliSense (Ctrl+Space) that only offers things that
   actually exist in your book. Red squiggles catch syntax errors before you
@@ -104,7 +104,8 @@ Debugging feels like the web, because it *is* the web:
   link the script to a real `.js` file on disk and edit it in VS Code (or
   anything). The sync is two-way and carefully race-proofed — type in the
   editor, save in VS Code, either way the book and the file stay in step.
-  ⤢ pops the editor out into a resizable floating window.
+  ⤢ pops the editor out into a resizable floating window. Markdown/HTML viewer
+  fields get the same ⇄ file / ⤢ pair (`.md` / `.html` files).
 
 ## Project layout
 

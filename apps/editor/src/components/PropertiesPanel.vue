@@ -8,6 +8,7 @@ import { copyText, objectsToJson } from '../copyJson'
 import ScriptEditor from './ScriptEditor.vue'
 import HelpButton from './HelpButton.vue'
 import DynamicTextEditor from './DynamicTextEditor.vue'
+import ContentEditor from './ContentEditor.vue'
 
 const store = useBookStore()
 // store keys plus the built-in self binding — {{self.name}} makes every copy
@@ -82,13 +83,24 @@ function onScript(code: string): void {
   if (sel.value) store.setEventScript(sel.value.id, currentEvent.value, code)
 }
 
-const textFields = computed(() => {
+interface TextField {
+  key: string
+  label: string
+  /** uses the {{key}}-aware editor instead of a plain input */
+  dynamic?: boolean
+  /** dynamic fields only: render a resizable textarea */
+  multiline?: boolean
+  /** viewer fields: the rich editor with popout + VS Code file link */
+  viewer?: 'markdown' | 'html'
+}
+
+const textFields = computed<TextField[]>(() => {
   if (!sel.value || isGroupSel()) return []
   switch (sel.value.control) {
     case 'button':
     case 'label':
     case 'switch':
-      return [{ key: 'text', label: 'Text' }]
+      return [{ key: 'text', label: 'Text', dynamic: true }]
     case 'input':
       return [{ key: 'placeholder', label: 'Placeholder' }]
     case 'image':
@@ -99,8 +111,12 @@ const textFields = computed(() => {
     case 'card':
       return [
         { key: 'title', label: 'Title' },
-        { key: 'text', label: 'Body' },
+        { key: 'text', label: 'Body', dynamic: true },
       ]
+    case 'markdown':
+      return [{ key: 'text', label: 'Markdown', dynamic: true, multiline: true, viewer: 'markdown' }]
+    case 'html':
+      return [{ key: 'html', label: 'HTML', dynamic: true, multiline: true, viewer: 'html' }]
     default:
       return []
   }
@@ -108,10 +124,12 @@ const textFields = computed(() => {
 
 // font + colour live on a compact shared row, not full-width fields
 const hasStyleRow = computed(() =>
-  ['button', 'label', 'switch', 'card', 'input'].includes(sel.value?.control ?? ''),
+  ['button', 'label', 'switch', 'card', 'input', 'markdown'].includes(sel.value?.control ?? ''),
 )
 const hasColor = computed(() =>
-  ['button', 'label', 'switch', 'card', 'container', 'input'].includes(sel.value?.control ?? ''),
+  ['button', 'label', 'switch', 'card', 'container', 'input', 'markdown'].includes(
+    sel.value?.control ?? '',
+  ),
 )
 const isButtonSel = computed(() => sel.value?.control === 'button')
 
@@ -297,12 +315,22 @@ function onPaste(): void {
     </div>
 
     <h2>Content</h2>
-    <div v-for="f in textFields" :key="f.key" class="field">
+    <div v-for="f in textFields" :key="`${sel?.id ?? 'none'}:${f.key}`" class="field">
       <label>{{ f.label }}</label>
+      <ContentEditor
+        v-if="f.viewer && !isGroupSel()"
+        :model-value="propValue(f.key)"
+        :flavor="f.viewer"
+        :store-keys="storeKeyList"
+        :title="sel ? `${f.label} · ${sel.name}` : f.label"
+        :link-key="sel ? `obj:${sel.id}:${f.key}` : ''"
+        @update:model-value="onPropValue(f.key, $event)"
+      />
       <DynamicTextEditor
-        v-if="f.key === 'text' && !isGroupSel()"
+        v-else-if="f.dynamic && !isGroupSel()"
         :model-value="propValue(f.key)"
         :store-keys="storeKeyList"
+        :multiline="f.multiline"
         @update:model-value="onPropValue(f.key, $event)"
       />
       <input

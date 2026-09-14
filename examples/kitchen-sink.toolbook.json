@@ -109,11 +109,22 @@
         }
 ,
         {
+          "id": "obj_ks_mnGo8",
+          "name": "mnGo8",
+          "control": "button",
+          "rects": {"desktop":{"x":96,"y":676,"w":380,"h":52}},
+          "props": {"text":"Markdown & HTML viewers"},
+          "on": {
+            "click": "page.go('Viewers')"
+          }
+        }
+,
+        {
           "id": "obj_ks_mnCard",
           "name": "mnCard",
           "control": "card",
           "rects": { "desktop": { "x": 560, "y": 200, "w": 420, "h": 392 } },
-          "props": { "title": "The tour", "text": "Everything here is one ordinary .toolbook.json book built from the same six palette controls. Open any object's Script panel while designing — scripted events are marked with a • in the event dropdown. While a run is active, the Store tab on the right shows every store.set live." },
+          "props": { "title": "The tour", "text": "Everything here is one ordinary .toolbook.json book built from the same palette controls. Open any object's Script panel while designing — scripted events are marked with a • in the event dropdown. While a run is active, the Store tab on the right shows every store.set live." },
           "on": {}
         }
 ,
@@ -989,6 +1000,82 @@
         {
           "id": "obj_ks_mnBack7",
           "name": "mnBack7",
+          "control": "button",
+          "rects": {"desktop":{"x":1080,"y":32,"w":152,"h":48}},
+          "props": {"text":"← Menu"},
+          "on": {
+            "click": "page.go('Home')"
+          }
+        }
+
+      ]
+    }
+,
+    {
+      "id": "page_ks_viewers",
+      "name": "Viewers",
+      "script": "function pageEnter() {\n  store.set('where', page.name)\n  if (store.get('demoScore') === undefined) store.set('demoScore', 0)\n}\n",
+      "background": "#f6f7fb",
+      "objects": [
+        {
+          "id": "obj_ks_vwTitle",
+          "name": "vwTitle",
+          "control": "label",
+          "rects": { "desktop": { "x": 48, "y": 32, "w": 980, "h": 48 } },
+          "props": { "text": "Markdown & HTML viewers — rich content from a prop", "fontSize": 22 },
+          "on": {}
+        }
+,
+        {
+          "id": "obj_ks_vwHint",
+          "name": "vwHint",
+          "control": "label",
+          "rects": { "desktop": { "x": 48, "y": 96, "w": 1180, "h": 64 } },
+          "props": { "text": "Two read-only viewer controls. The markdown viewer renders its Text property from Markdown; the HTML viewer injects its html property as raw markup. Both accept {{key}} bindings inside the source and re-render on every store.set. Press Run (F3) and hit +1 score.", "fontSize": 14 },
+          "on": {}
+        }
+,
+        {
+          "id": "obj_ks_vwMd",
+          "name": "vwMd",
+          "control": "markdown",
+          "rects": { "desktop": { "x": 48, "y": 184, "w": 560, "h": 320 } },
+          "props": { "text": "## Score: {{demoScore}}\n\nMarkdown is written in the **Text** property and rendered live.\n\n- the heading updates on every `store.set`\n- lists, **bold**, `code`, quotes, tables…\n\n> Both viewers are ordinary objects — move, resize and script them.", "fontSize": 15 },
+          "on": {}
+        }
+,
+        {
+          "id": "obj_ks_vwHtml",
+          "name": "vwHtml",
+          "control": "html",
+          "rects": { "desktop": { "x": 640, "y": 184, "w": 560, "h": 320 } },
+          "props": { "html": "<h2>Raw HTML</h2>\n<p>This markup comes from the <strong>html</strong> property.</p>\n<ul><li>Any tags work</li><li>Authors are trusted — no sanitiser</li></ul>" },
+          "on": {}
+        }
+,
+        {
+          "id": "obj_ks_vwInc",
+          "name": "vwInc",
+          "control": "button",
+          "rects": {"desktop":{"x":48,"y":524,"w":220,"h":52}},
+          "props": {"text":"+1 score"},
+          "on": {
+            "click": "store.set('demoScore', (store.get('demoScore') ?? 0) + 1)"
+          }
+        }
+,
+        {
+          "id": "obj_ks_vwTip",
+          "name": "vwTip",
+          "control": "label",
+          "rects": { "desktop": { "x": 48, "y": 596, "w": 1150, "h": 72 } },
+          "props": { "text": "Where it lives: vwMd's Text property is \"## Score: {{demoScore}}\" — {{key}} resolves in the source before the Markdown renders, so the heading tracks the store. vwHtml's html property is injected as-is (raw HTML, no sanitiser — books already run your own scripts).", "fontSize": 14 },
+          "on": {}
+        }
+,
+        {
+          "id": "obj_ks_vwBack",
+          "name": "vwBack",
           "control": "button",
           "rects": {"desktop":{"x":1080,"y":32,"w":152,"h":48}},
           "props": {"text":"← Menu"},

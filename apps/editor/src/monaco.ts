@@ -8,12 +8,15 @@ export function getMonaco(): Promise<typeof Monaco> {
       import('monaco-editor'),
       import('monaco-editor/esm/vs/editor/editor.worker?worker'),
       import('monaco-editor/esm/vs/language/typescript/ts.worker?worker'),
-    ]).then(([monaco, editorWorker, tsWorker]) => {
+      import('monaco-editor/esm/vs/language/html/html.worker?worker'),
+    ]).then(([monaco, editorWorker, tsWorker, htmlWorker]) => {
       ;(self as unknown as { MonacoEnvironment: Monaco.Environment }).MonacoEnvironment = {
         getWorker(_workerId, label) {
-          return label === 'typescript' || label === 'javascript'
-            ? new tsWorker.default()
-            : new editorWorker.default()
+          if (label === 'typescript' || label === 'javascript') return new tsWorker.default()
+          if (label === 'html' || label === 'handlebars' || label === 'razor') {
+            return new htmlWorker.default()
+          }
+          return new editorWorker.default()
         },
       }
       monaco.editor.defineTheme('toolback-dark', {

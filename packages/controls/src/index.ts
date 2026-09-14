@@ -1,3 +1,4 @@
+import { marked } from 'marked'
 import type { ControlKind, PageObject } from '@toolback/format'
 import { FONT_STACKS, resolveColor, type FontFamily } from '@toolback/format'
 
@@ -49,6 +50,80 @@ export function applyStyleProps(el: HTMLElement, obj: PageObject, kind: 'surface
   }
 }
 
+/**
+ * Which prop holds each control's templatable content — the one `{{key}}`
+ * bindings substitute into. `null`/absent = the control has no text content
+ * that templates resolve against. The runtime reads this so a store change
+ * re-renders the *source* (markdown/HTML) rather than overwriting the DOM.
+ */
+export const CONTENT_PROPS: Partial<Record<ControlKind, string>> = {
+  button: 'text',
+  label: 'text',
+  card: 'text',
+  switch: 'text',
+  markdown: 'text',
+  html: 'html',
+}
+
+export function contentKeyFor(kind: ControlKind): string | null {
+  return CONTENT_PROPS[kind] ?? null
+}
+
+function viewerEmpty(el: HTMLElement, icon: string, label: string): void {
+  el.classList.add('tb-viewer-empty')
+  el.innerHTML = ''
+  const wrap = el.ownerDocument.createElement('div')
+  const mark = el.ownerDocument.createElement('span')
+  mark.className = 'tb-viewer-empty-icon'
+  mark.textContent = icon
+  const text = el.ownerDocument.createElement('span')
+  text.textContent = label
+  wrap.appendChild(mark)
+  wrap.appendChild(text)
+  el.appendChild(wrap)
+}
+
+/**
+ * Apply a control's resolved content source. Plain text controls get
+ * `textContent` (card body and switch label are targeted, never the root — a
+ * root write would wipe the card title / switch structure). Markdown and HTML
+ * re-parse the source into the element; empty sources show a placeholder.
+ */
+export function applyContent(el: HTMLElement, kind: ControlKind, source: string): void {
+  switch (kind) {
+    case 'markdown': {
+      if (!source.trim()) {
+        viewerEmpty(el, '#', 'No markdown yet')
+        return
+      }
+      el.classList.remove('tb-viewer-empty')
+      el.innerHTML = marked.parse(source, { async: false }) as string
+      return
+    }
+    case 'html': {
+      if (!source.trim()) {
+        viewerEmpty(el, '</>', 'No HTML yet')
+        return
+      }
+      el.classList.remove('tb-viewer-empty')
+      el.innerHTML = source
+      return
+    }
+    case 'card': {
+      const body = el.querySelector('.tb-card-body')
+      if (body) body.textContent = source
+      return
+    }
+    case 'switch': {
+      const text = el.querySelector('.tb-switch-text')
+      if (text) text.textContent = source
+      return
+    }
+    default:
+      el.textContent = source
+  }
+}
+
 export function renderButton(obj: PageObject): HTMLElement {
   const el = document.createElement('button')
   el.type = 'button'
@@ -83,13 +158,10 @@ export function renderSwitch(obj: PageObject): HTMLElement {
   track.className = 'tb-switch-track'
   track.appendChild(document.createElement('span'))
   el.appendChild(track)
-  const text = textProp(obj, 'text')
-  if (text) {
-    const txt = document.createElement('span')
-    txt.className = 'tb-switch-text'
-    txt.textContent = text
-    el.appendChild(txt)
-  }
+  const txt = document.createElement('span')
+  txt.className = 'tb-switch-text'
+  el.appendChild(txt)
+  applyContent(el, 'switch', textProp(obj, 'text'))
   el.classList.toggle('tb-switch-on', obj.props['checked'] === true)
   box.checked = obj.props['checked'] === true
   const color = resolveColor(obj.props['color'])
@@ -146,15 +218,34 @@ export function renderCard(obj: PageObject): HTMLElement {
   title.textContent = textProp(obj, 'title', 'Card')
   const body = document.createElement('div')
   body.className = 'tb-card-body'
-  body.textContent = textProp(obj, 'text')
   el.appendChild(title)
   el.appendChild(body)
+  applyContent(el, 'card', textProp(obj, 'text'))
   const fs = numProp(obj, 'fontSize')
   if (fs) {
     body.style.fontSize = `${fs}px`
     title.style.fontSize = `${Math.round(fs * 1.15)}px`
   }
   applyStyleProps(el, obj, 'surface')
+  return el
+}
+
+/** markdown viewer: the `text` prop rendered from Markdown to styled HTML */
+export function renderMarkdown(obj: PageObject): HTMLElement {
+  const el = document.createElement('div')
+  el.className = 'tb-markdown'
+  applyStyleProps(el, obj, 'text')
+  const fs = numProp(obj, 'fontSize')
+  if (fs) el.style.fontSize = `${fs}px`
+  applyContent(el, 'markdown', textProp(obj, 'text'))
+  return el
+}
+
+/** html viewer: the `html` prop injected as raw markup (author-trusted) */
+export function renderHtml(obj: PageObject): HTMLElement {
+  const el = document.createElement('div')
+  el.className = 'tb-html'
+  applyContent(el, 'html', textProp(obj, 'html'))
   return el
 }
 
@@ -187,4 +278,6 @@ export function registerControls(): void {
   registerControl('container', renderContainer)
   registerControl('switch', renderSwitch)
   registerControl('group', renderGroup)
+  registerControl('markdown', renderMarkdown)
+  registerControl('html', renderHtml)
 }

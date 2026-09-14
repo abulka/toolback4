@@ -157,7 +157,32 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     overlay.addEventListener('pointermove', onPointerMove)
     overlay.addEventListener('pointerup', onPointerUp)
     overlay.addEventListener('dblclick', onDblClick)
+    // viewers stay click-through in design mode (so selection works), but the
+    // overlay forwards the wheel to an overflowing markdown/HTML viewer so its
+    // content can be scrolled without entering run mode
+    overlay.addEventListener('wheel', onWheel, { passive: false })
     wrapper.appendChild(overlay)
+  }
+
+  /**
+   * Forward a wheel over a viewer object to its own scroll offset. Design mode
+   * gives page content `pointer-events: none`, so the viewer can't scroll
+   * natively — the overlay (which *is* interactive) hit-tests and scrolls it.
+   */
+  function onWheel(e: WheelEvent): void {
+    if (!enabled || !overlay || !pageRoot) return
+    const base = overlay.getBoundingClientRect()
+    const chain = chainAt(e.clientX - base.left, e.clientY - base.top)
+    const id = chain[chain.length - 1]
+    if (!id) return
+    const viewer = objectEl(id)?.querySelector<HTMLElement>('.tb-markdown, .tb-html')
+    if (!viewer) return
+    const canY = viewer.scrollHeight > viewer.clientHeight
+    const canX = viewer.scrollWidth > viewer.clientWidth
+    if (!canY && !canX) return
+    if (canY) viewer.scrollTop += e.deltaY
+    if (canX) viewer.scrollLeft += e.deltaX
+    e.preventDefault()
   }
 
   function selBoxFor(id: string): HTMLElement {

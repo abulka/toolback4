@@ -44,6 +44,7 @@ a `•` in the event dropdown):
 | **Events** | `click` / `dblclick` / `mouseenter` / `mouseleave` on one button, `input` / `change` on a field — all writing to the store. |
 | **Editor** | Design-mode features with a practice group: undo/redo, duplicate (⧉ / ⌥D), group/ungroup (⌥G / ⌥U), Copy JSON, drill-in navigation. |
 | **Npm** | Dynamic `await import(...)` of npm packages: build & re-parse a two-note MIDI with `@tonejs/midi` (data path), play it through Tone.js (audio path), and download it as a `.mid` Blob (file path). |
+| **Viewers** | The **markdown** and **html** viewer controls: a Markdown `text` prop (`## Score: {{demoScore}}`) re-parsed on every `store.set`, and an `html` prop injected as raw markup. Both are scrollable objects with a `{{`-aware multiline editor plus ⤢ popout / ⇄ VS Code file link. |
 
 A runtime deep-dive of everything the demos touch lives in
 [../docs/runtime-internals.md](../docs/runtime-internals.md).

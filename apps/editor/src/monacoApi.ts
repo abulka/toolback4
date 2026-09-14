@@ -2,6 +2,7 @@ import type * as Monaco from 'monaco-editor'
 import type { EditorIntellisenseContext } from './monacoApiLib'
 
 let registered = false
+let contentProvidersRegistered = false
 let libDisposable: Monaco.IDisposable | null = null
 /** per-editor completion contexts, keyed by the editor's model URI. The
  *  completion provider looks up the context of the model it is providing for,
@@ -331,6 +332,46 @@ function buildProvider(monaco: typeof Monaco): Monaco.languages.CompletionItemPr
 }
 
 /**
+ * Store keys offered by the `{{` picker in markdown/HTML viewer editors.
+ * Book-wide, so a single shared list is enough — `ContentEditor` refreshes it.
+ */
+let contentStoreKeys: string[] = []
+export function setContentStoreKeys(keys: string[]): void {
+  contentStoreKeys = keys
+}
+
+function buildContentProvider(monaco: typeof Monaco): Monaco.languages.CompletionItemProvider {
+  return {
+    triggerCharacters: ['{'],
+    provideCompletionItems(model, position) {
+      const line = model.getLineContent(position.lineNumber)
+      const before = line.slice(0, position.column - 1)
+      const m = /\{\{([\w$]*)$/.exec(before)
+      if (!m) return { suggestions: [] }
+      const query = m[1]!
+      const after = line.slice(position.column - 1)
+      const hasClose = after.startsWith('}}')
+      const range: Monaco.IRange = {
+        startLineNumber: position.lineNumber,
+        startColumn: position.column - query.length,
+        endLineNumber: position.lineNumber,
+        endColumn: position.column,
+      }
+      const suggestions: Monaco.languages.CompletionItem[] = contentStoreKeys
+        .filter((key) => key.startsWith(query))
+        .map((key) => ({
+          label: key,
+          kind: monaco.languages.CompletionItemKind.Variable,
+          detail: `insert {{${key}}}`,
+          insertText: hasClose ? key : `${key}}}`,
+          range,
+        }))
+      return { suggestions }
+    },
+  }
+}
+
+/**
  * One-time setup for the shared Monaco instance:
  * - TypeScript-worker completions are DISABLED (they flood the list with
  *   thousands of DOM globals). All suggestions come from the curated
@@ -339,6 +380,14 @@ function buildProvider(monaco: typeof Monaco): Monaco.languages.CompletionItemPr
  *   per-page API lib (added via updateApiLib).
  */
 export function registerToolbackIntellisense(monaco: typeof Monaco): void {
+  // markdown/HTML `{{` completion is registered independently of the script
+  // IntelliSense: a script editor may already have claimed the first call
+  if (!contentProvidersRegistered) {
+    contentProvidersRegistered = true
+    const contentProvider = buildContentProvider(monaco)
+    monaco.languages.registerCompletionItemProvider('markdown', contentProvider)
+    monaco.languages.registerCompletionItemProvider('html', contentProvider)
+  }
   if (registered) return
   registered = true
 

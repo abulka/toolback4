@@ -7,13 +7,14 @@ const props = withDefaults(
     storeKeys?: string[]
     placeholder?: string
     disabled?: boolean
+    multiline?: boolean
   }>(),
-  { storeKeys: () => [], disabled: false },
+  { storeKeys: () => [], disabled: false, multiline: false },
 )
 
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 
-const inputEl = ref<HTMLInputElement | null>(null)
+const inputEl = ref<HTMLInputElement | HTMLTextAreaElement | null>(null)
 const open = ref(false)
 const query = ref('')
 const insertStart = ref(0)
@@ -93,7 +94,19 @@ function keyTemplate(key: string): string {
 
 <template>
   <div class="dyn-wrap" @keyup="refreshState" @click="refreshState">
+    <textarea
+      v-if="multiline"
+      ref="inputEl"
+      :value="modelValue"
+      :placeholder="placeholder"
+      :disabled="disabled"
+      rows="6"
+      @input="onInput"
+      @keydown="onKeydown"
+      @blur="open = false"
+    />
     <input
+      v-else
       ref="inputEl"
       :value="modelValue"
       :placeholder="placeholder"
@@ -125,7 +138,8 @@ function keyTemplate(key: string): string {
   position: relative;
 }
 
-input {
+input,
+textarea {
   background: var(--ed-bg);
   border: 1px solid var(--ed-border);
   border-radius: 6px;
@@ -135,7 +149,15 @@ input {
   width: 100%;
 }
 
-input:focus {
+textarea {
+  resize: vertical;
+  min-height: 96px;
+  font: 12px/1.5 ui-monospace, 'SF Mono', Menlo, monospace;
+  white-space: pre;
+}
+
+input:focus,
+textarea:focus {
   outline: 1px solid var(--ed-accent);
 }
 

@@ -43,6 +43,17 @@ describe('format', () => {
     expect(parsed).toEqual(book)
   })
 
+  it('supports markdown and html viewer kinds with defaults and JSON round-trip', () => {
+    for (const kind of ['markdown', 'html'] as const) {
+      expect(DEFAULT_SIZES[kind]).toEqual({ w: 420, h: 260 })
+      const book = createBook('viewers')
+      const obj = createObject(kind, kind, { x: 0, y: 0, ...DEFAULT_SIZES[kind] })
+      book.pages[0]!.objects.push(obj)
+      const parsed = parseBook(JSON.parse(JSON.stringify(book)))
+      expect(parsed.pages[0]!.objects[0]!.control).toBe(kind)
+    }
+  })
+
   it('design-time store: defaults empty, parses ordered [key, value] pairs, allows JSON values', () => {
     const book = parseBook({ id: 'b1', title: 'x', pages: [{ id: 'p1', name: 'P', objects: [] }] })
     expect(book.store).toEqual([])

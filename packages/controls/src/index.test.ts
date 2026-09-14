@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { createObject } from '@toolback/format'
 import {
+  applyContent,
+  contentKeyFor,
   registerControls,
   renderButton,
   renderCard,
   renderContainer,
+  renderHtml,
   renderImage,
   renderInput,
   renderLabel,
+  renderMarkdown,
   renderObject,
   renderSwitch,
 } from './index'
@@ -90,11 +94,68 @@ describe('controls', () => {
     expect(span.style.fontSize).toBe('18px')
   })
 
-  it('registry covers all seven kinds', () => {
-    for (const kind of ['button', 'label', 'input', 'image', 'card', 'container', 'switch'] as const) {
+  it('registry covers every control kind', () => {
+    for (const kind of [
+      'button',
+      'label',
+      'input',
+      'image',
+      'card',
+      'container',
+      'switch',
+      'markdown',
+      'html',
+    ] as const) {
       const obj = createObject(kind, 'x', { x: 0, y: 0, w: 100, h: 100 })
       expect(() => renderObject(obj)).not.toThrow()
       expect(renderObject(obj).className).not.toBe('tb-missing')
     }
+  })
+
+  it('renders markdown to styled HTML and an empty state', () => {
+    const obj = createObject('markdown', 'md1', { x: 0, y: 0, w: 300, h: 200 }, {
+      text: '# Title\n\n- one\n- two\n\n`code`',
+    })
+    const el = renderMarkdown(obj)
+    expect(el.className).toBe('tb-markdown')
+    expect(el.querySelector('h1')?.textContent).toBe('Title')
+    expect(el.querySelectorAll('li')).toHaveLength(2)
+    expect(el.querySelector('code')?.textContent).toBe('code')
+
+    const empty = renderMarkdown(createObject('markdown', 'md2', { x: 0, y: 0, w: 100, h: 100 }))
+    expect(empty.classList.contains('tb-viewer-empty')).toBe(true)
+  })
+
+  it('renders HTML as innerHTML and an empty state', () => {
+    const obj = createObject('html', 'h1', { x: 0, y: 0, w: 300, h: 200 }, {
+      html: '<p class="hi">Hello <strong>there</strong></p>',
+    })
+    const el = renderHtml(obj)
+    expect(el.className).toBe('tb-html')
+    expect(el.querySelector('strong')?.textContent).toBe('there')
+
+    const empty = renderHtml(createObject('html', 'h2', { x: 0, y: 0, w: 100, h: 100 }))
+    expect(empty.classList.contains('tb-viewer-empty')).toBe(true)
+  })
+
+  it('contentKeyFor maps templatable controls, applyContent targets the right node', () => {
+    expect(contentKeyFor('button')).toBe('text')
+    expect(contentKeyFor('card')).toBe('text')
+    expect(contentKeyFor('markdown')).toBe('text')
+    expect(contentKeyFor('html')).toBe('html')
+    expect(contentKeyFor('image')).toBeNull()
+
+    // card body updates without touching the title
+    const card = renderCard(createObject('card', 'c1', { x: 0, y: 0, w: 100, h: 100 }, { title: 'T', text: 'B' }))
+    applyContent(card, 'card', 'new body')
+    expect(card.querySelector('.tb-card-title')?.textContent).toBe('T')
+    expect(card.querySelector('.tb-card-body')?.textContent).toBe('new body')
+
+    // switch label updates without wiping its checkbox/track
+    const sw = renderSwitch(createObject('switch', 's1', { x: 0, y: 0, w: 160, h: 40 }, { text: 'Old' }))
+    applyContent(sw, 'switch', 'New')
+    expect(sw.querySelector('.tb-switch-text')?.textContent).toBe('New')
+    expect(sw.querySelector('input')).toBeTruthy()
+    expect(sw.querySelector('.tb-switch-track')).toBeTruthy()
   })
 })

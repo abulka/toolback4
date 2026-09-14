@@ -97,6 +97,88 @@ describe('design-time store', () => {
   })
 })
 
+describe('markdown & HTML viewers', () => {
+  it('markdown {{key}} re-parses the source on every store change', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const book = makeBook({
+      objects: [{ name: 'md', control: 'markdown', text: '# Score: {{score}}' }],
+    })
+    const handle = runBook(book, root, 'desktop')
+    expect(root.querySelector('.tb-markdown h1')?.textContent).toBe('Score:')
+    handle.store.set('score', 3)
+    expect(root.querySelector('.tb-markdown h1')?.textContent).toBe('Score: 3')
+    handle.stop()
+    root.remove()
+  })
+
+  it('html {{key}} substitutes into the source and injects markup', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const book = makeBook({
+      objects: [{ name: 'h', control: 'html', props: { html: '<p>Hi <strong>{{who}}</strong></p>' } }],
+    })
+    const handle = runBook(book, root, 'desktop')
+    handle.store.set('who', 'Andy')
+    expect(root.querySelector('.tb-html strong')?.textContent).toBe('Andy')
+    handle.stop()
+    root.remove()
+  })
+
+  it('ControlApi.text on a viewer reads/writes the source prop and re-renders', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const book = makeBook({
+      objects: [{ name: 'md', control: 'markdown', text: 'old' }],
+    })
+    const handle = runBook(book, root, 'desktop')
+    expect(handle.controls['md']!.text).toBe('old')
+    handle.controls['md']!.text = '## New'
+    expect(handle.controls['md']!.text).toBe('## New')
+    expect(root.querySelector('.tb-markdown h2')?.textContent).toBe('New')
+    handle.stop()
+    root.remove()
+  })
+
+  it('dynamic text never wipes switch structure or card title', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const book = makeBook({
+      objects: [
+        { name: 'sw', control: 'switch', text: 'Lights {{state}}' },
+        { name: 'c', control: 'card', props: { title: 'T', text: 'Body {{v}}' } },
+      ],
+    })
+    const handle = runBook(book, root, 'desktop')
+    handle.store.set('state', 'on')
+    handle.store.set('v', 1)
+    const sw = root.querySelector('.tb-switch')!
+    expect(sw.querySelector('input')).toBeTruthy()
+    expect(sw.querySelector('.tb-switch-track')).toBeTruthy()
+    expect(sw.querySelector('.tb-switch-text')?.textContent).toBe('Lights on')
+    expect(root.querySelector('.tb-card-title')?.textContent).toBe('T')
+    expect(root.querySelector('.tb-card-body')?.textContent).toBe('Body 1')
+    handle.stop()
+    root.remove()
+  })
+
+  it('design preview resolves viewer keys against the book store', () => {
+    const pageRoot = document.createElement('div')
+    document.body.appendChild(pageRoot)
+    const book = makeBook({
+      objects: [{ name: 'md', control: 'markdown', text: '## Hello {{name}}' }],
+    })
+    renderBookPage(book, 0, pageRoot, 'desktop')
+    renderDynamicText(
+      pageRoot.querySelector('.tb-page')!,
+      book.pages[0]!,
+      createStore([['name', 'Andy']]),
+    )
+    expect(pageRoot.querySelector('.tb-markdown h2')?.textContent).toBe('Hello Andy')
+    pageRoot.remove()
+  })
+})
+
 describe('groups', () => {
   function groupBook(opts?: { groupOn?: Record<string, string>; childOn?: Record<string, string> }): Book {
     const child = createObject(
@@ -351,7 +433,7 @@ describe('groups', () => {
 
 function makeBook(opts: {
   pageScript?: string
-  objects?: Array<{ name: string; control: 'button' | 'label' | 'switch' | 'card'; text?: string; props?: Record<string, unknown>; on?: Record<string, string> }>
+  objects?: Array<{ name: string; control: 'button' | 'label' | 'switch' | 'card' | 'markdown' | 'html'; text?: string; props?: Record<string, unknown>; on?: Record<string, string> }>
 }): Book {
   return {
     id: 'book1',

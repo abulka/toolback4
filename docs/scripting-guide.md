@@ -165,7 +165,8 @@ scripts and object scripts, and you can read too (`if (input1.value === '') …`
 Get/set properties:
 
 - `text` — the text of a button or label (for an input, this is its value; for
-  a switch, its label text)
+  a switch, its label text). On a **markdown** or **html** viewer it is the
+  raw source string — reading returns it, writing re-renders the viewer.
 - `value` — the value of an input; for a **switch**, the checked state
   (`true`/`false` — reading and writing both work)
 - `visible` — `true`/`false`, show or hide the object
@@ -190,6 +191,52 @@ Methods:
 - `on(event, fn)` — attach an extra handler in code,
   e.g. `controls.myButton.on('click', () => { ... })`
 - `el` — the raw DOM element, if you need something the API above doesn't cover
+
+### Markdown & HTML viewers
+
+Two palette controls display **rich, read-only content** as ordinary objects —
+position, resize, group and name them like anything else:
+
+- **markdown** — a `text` property written in Markdown, rendered to styled
+  HTML (headings, lists, `code`, quotes, tables, links, images).
+- **html** — an `html` property injected as raw markup.
+
+Both re-render **live**: `{{key}}` bindings work *inside the source*, resolved
+**before** the Markdown/HTML is parsed — so a viewer can show
+`## Score: {{demoScore}}` and update on every `store.set`.
+
+```js
+// a button that feeds a markdown viewer
+controls.inc.on('click', () => store.set('score', (store.get('score') ?? 0) + 1))
+```
+
+```md
+## Score: {{score}}
+```
+
+Scripting them: `viewer.text` reads/writes the source (`'# New heading'`) and
+re-renders immediately. Markdown viewers also honour the Font size / Font and
+Colour fields in the Selection panel.
+
+**Sizing and editing.** A viewer is a fixed box the size you give it; content
+that doesn't fit **scrolls inside it** — at run time and while designing (hover
+the viewer in design mode and scroll). The Text/HTML field is a multiline
+editor with the same `{{` key picker as other Text properties, and the same two
+editing affordances scripts have:
+
+- **⤢** opens the source in a resizable Monaco window (`markdown`/`html`
+  highlighting, `{{` key completion).
+- **⇄ file** links it to a real `.md` or `.html` file on disk for **VS Code**;
+  saves sync both ways, exactly like script files.
+
+Things to know:
+
+- **Empty sources show a placeholder** instead of an empty box.
+- **The canvas is a same-origin sandbox where authored scripts already run, so
+  viewer content is trusted.** HTML is injected with **no sanitizer**, and
+  Markdown passes raw HTML through — only open books you trust.
+- **Markdown is bundled with the player**, so published books render it
+  **offline** — no library-shelf or network involved.
 
 ### Responsive breakpoints (glue)
 
@@ -680,7 +727,9 @@ The script editors help as you type:
 
 ### Bigger editing: spacious script windows
 
-Every script editor has two small buttons above it:
+Every script editor has two small buttons above it. **Markdown and HTML viewer
+fields get the same pair** — ⤢ a Monaco window, ⇄ file a `.md`/`.html` link
+(see "Markdown & HTML viewers").
 
 - **⤢** opens the same script in a **resizable, draggable window** — drag by
   the title bar, resize from the bottom-right corner. Edits stay in sync with

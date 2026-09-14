@@ -9,6 +9,8 @@ export const CONTROL_KINDS = [
   'container',
   'switch',
   'group',
+  'markdown',
+  'html',
 ] as const
 export type ControlKind = (typeof CONTROL_KINDS)[number]
 
@@ -267,6 +269,8 @@ export const DEFAULT_SIZES: Record<ControlKind, { w: number; h: number }> = {
   container: { w: 400, h: 280 },
   switch: { w: 160, h: 40 },
   group: { w: 200, h: 200 },
+  markdown: { w: 420, h: 260 },
+  html: { w: 420, h: 260 },
 }
 
 /** simplified web-safe font families offered in the editor */
@@ -296,6 +300,8 @@ export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
   container: {},
   switch: { text: 'Switch', checked: false, fontSize: 15 },
   group: {},
+  markdown: { text: '# Heading\n\nBody…', fontSize: 15 },
+  html: { html: '<p>Hello</p>' },
 }
 
 /**

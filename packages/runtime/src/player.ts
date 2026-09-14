@@ -1,5 +1,6 @@
 import type { Background, Book, Breakpoint, PageObject, Rect } from '@toolback/format'
 import { backgroundFor, flattenObjects, FONT_STACKS, resolveColor, resolveObjectRect, unlensObjectRect, resolvePageSize } from '@toolback/format'
+import { applyContent, contentKeyFor } from '@toolback/controls'
 import { renderBookPage } from './index'
 import { rewriteLibImports, toolbackImport } from './libs'
 
@@ -79,6 +80,9 @@ export function makeControlApi(
   // groups have no content of their own — writing textContent would wipe
   // the member DOM, so text/value are inert for them
   const isGroup = obj.control === 'group'
+  // viewers read/write their SOURCE prop (markdown text / html) and re-render
+  const contentKey = contentKeyFor(obj.control)
+  const isViewer = obj.control === 'markdown' || obj.control === 'html'
 
   const rectNow = (): Rect =>
     size ? resolveObjectRect(obj, size.page, size.ref) : obj.rect
@@ -124,12 +128,29 @@ export function makeControlApi(
     el,
     name: obj.name,
     get text() {
-      return isGroup ? '' : input ? input.value : (el.textContent ?? '')
+      if (isGroup) return ''
+      if (input) return input.value
+      if (isViewer && contentKey) {
+        const src = obj.props[contentKey]
+        return typeof src === 'string' ? src : ''
+      }
+      return el.textContent ?? ''
     },
     set text(v: string) {
       if (isGroup) return
-      if (input) input.value = String(v)
-      else el.textContent = String(v)
+      const s = String(v)
+      if (input) {
+        input.value = s
+        return
+      }
+      if (isViewer && contentKey) {
+        obj.props = { ...obj.props, [contentKey]: s }
+        applyContent(el, obj.control, s)
+        return
+      }
+      // switch label lives in its own span — a root write would wipe the
+      // checkbox/track, so route every text-bearing control through applyContent
+      applyContent(el, obj.control, s)
     },
     get value() {
       return input ? input.value : checkbox ? checkbox.checked : ''
@@ -244,11 +265,16 @@ export function renderDynamicText(
     return '' // unsupported member — renders empty, like an unset store key
   }
   for (const obj of flattenObjects(page.objects)) {
-    const t = obj.props['text']
+    const key = contentKeyFor(obj.control)
+    if (!key) continue
+    const t = obj.props[key]
     if (typeof t !== 'string' || !t.includes('{{')) continue
     const el = controlElement(pageRoot, obj.name)
     if (!el) continue
-    el.textContent = t.replace(DYN_RE, (_, path: string) => resolveDyn(path, obj))
+    // resolve against the SOURCE, then render through the control's content
+    // applier — markdown/HTML re-parse the substituted markup instead of
+    // having their rendered DOM swapped for plain text
+    applyContent(el, obj.control, t.replace(DYN_RE, (_, path: string) => resolveDyn(path, obj)))
   }
 }
 
@@ -258,9 +284,12 @@ export function wireDynamicText(
   store: ToolbackStore,
   listeners: Array<() => void>,
 ): void {
-  const hasTemplates = flattenObjects(page.objects).some(
-    (o) => typeof o.props['text'] === 'string' && (o.props['text'] as string).includes('{{'),
-  )
+  const hasTemplates = flattenObjects(page.objects).some((o) => {
+    const key = contentKeyFor(o.control)
+    if (!key) return false
+    const v = o.props[key]
+    return typeof v === 'string' && v.includes('{{')
+  })
   if (!hasTemplates) return
   renderDynamicText(pageRoot, page, store)
   listeners.push(store.subscribe(() => renderDynamicText(pageRoot, page, store)))
