@@ -15,6 +15,7 @@ import {
   rebaseRect,
   resolveObjectRect,
   resolvePageSize,
+  resolveStartPageIndex,
   safeParseBook,
   scaleRect,
   treeRows,
@@ -449,6 +450,25 @@ describe('resolveObjectRect (responsive glue — lens)', () => {
       ],
     })
     expect(parsed.success).toBe(false)
+  })
+})
+
+describe('start page', () => {
+  it('round-trips startPageId through parseBook', () => {
+    const book = createBook('Start')
+    book.pages.push(createPage('Second', book.backgrounds[0]!.id))
+    book.startPageId = book.pages[1]!.id
+    expect(parseBook(JSON.parse(JSON.stringify(book))).startPageId).toBe(book.pages[1]!.id)
+  })
+
+  it('resolves the start page index, falling back to the first page', () => {
+    const book = createBook('Start')
+    book.pages.push(createPage('Second', book.backgrounds[0]!.id))
+    expect(resolveStartPageIndex(book)).toBe(0)
+    book.startPageId = book.pages[1]!.id
+    expect(resolveStartPageIndex(book)).toBe(1)
+    book.startPageId = 'page_missing'
+    expect(resolveStartPageIndex(book)).toBe(0)
   })
 })
 

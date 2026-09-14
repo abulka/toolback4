@@ -156,6 +156,9 @@ const BookSchema = z.object({
     .default({ desktop: { width: 1280, height: 800 } }),
   backgrounds: z.array(BackgroundSchema).default([]),
   pages: z.array(PageSchema).min(1),
+  /** page the app opens on (a spawned/published run, and the editor on load);
+   *  absent or dangling = the first page */
+  startPageId: z.string().optional(),
   store: StoreSchema,
 })
 export type Book = Omit<z.infer<typeof BookSchema>, 'store'> & {
@@ -429,6 +432,17 @@ export function backgroundFor(book: Book, page: Page): Background {
   return (
     book.backgrounds.find((b) => b.id === page.backgroundId) ?? book.backgrounds[0]!
   )
+}
+
+/**
+ * Index of the page a run starts on: the book's `startPageId` when set and
+ * still present, else the first page. The single source of the "app start"
+ * page for the published player and the editor on load.
+ */
+export function resolveStartPageIndex(book: Book): number {
+  if (!book.startPageId) return 0
+  const i = book.pages.findIndex((p) => p.id === book.startPageId)
+  return i === -1 ? 0 : i
 }
 
 /**

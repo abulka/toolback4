@@ -902,6 +902,19 @@ The **Backgrounds** panel (left sidebar) groups pages under their backgrounds:
 - ✕ deletes it (a book always keeps at least one page)
 - **+ Add page** appends a fresh page on the background in context
 
+### Start page
+
+By default a run begins on the first page. To choose a different entry point,
+tick **Start page (app opens here)** in the Page properties (right sidebar), or
+click the **⌂** button on a page row. The chosen page shows a highlighted **⌂**.
+
+The start page is the page the **published app** opens on, and the page the
+editor returns to when you reload. It is independent of **Run**, which always
+previews the page you're editing — so you can author anywhere and still ship an
+app that starts at the page you picked. Clearing the setting (click **⌂** again
+or untick the box) restores the first-page default. Deleting the start page
+clears the setting.
+
 ### The `page` API
 
 - `page.name` — current page name

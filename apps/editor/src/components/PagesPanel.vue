@@ -249,6 +249,13 @@ function bgDropClass(id: string): Record<string, boolean> {
           <template v-else>
             <span class="page-name">{{ entry.p.name }}</span>
             <span class="page-actions">
+              <button
+                class="start"
+                :class="{ on: store.book.startPageId === entry.p.id }"
+                :title="store.book.startPageId === entry.p.id ? 'Clear start page' : 'Set as start page (app opens here)'"
+                @click.stop="store.setStartPage(store.book.startPageId === entry.p.id ? null : entry.i)"
+                @dblclick.stop
+              >⌂</button>
               <button title="Rename page" @click.stop="startPageRename(entry.i)" @dblclick.stop>✎</button>
               <button title="Duplicate page" @click.stop="store.duplicatePage(entry.i)">⧉</button>
               <button
@@ -418,6 +425,11 @@ function bgDropClass(id: string): Record<string, boolean> {
 .page-actions button:hover {
   color: #fff;
   background: var(--ed-border);
+}
+
+.page-actions button.start.on {
+  color: var(--ed-accent);
+  font-weight: 700;
 }
 
 .rename {

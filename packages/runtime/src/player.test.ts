@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createGroup, createObject, type Book, type PageObject } from '@toolback/format'
+import { createGroup, createObject, resolveStartPageIndex, type Book, type PageObject } from '@toolback/format'
 import { renderBookPage, renderDynamicText } from './index'
 import { createStore, extractFunctionNames, runBook, stopRun } from './player'
 
@@ -885,6 +885,24 @@ describe('player', () => {
       const handle = runBook(makeTwoPageBook(), root, 'desktop', undefined, 1)
       expect(root.querySelector('.tb-label')).not.toBeNull()
       expect(root.querySelector('button.tb-button')).toBeNull()
+      expect(handle.store.get('entered2')).toBe(true)
+      handle.stop()
+      root.remove()
+    })
+
+    it('starts on the book start page', () => {
+      const root = document.createElement('div')
+      document.body.appendChild(root)
+      const book = makeTwoPageBook()
+      book.startPageId = 'p2'
+      const handle = runBook(
+        book,
+        root,
+        'desktop',
+        undefined,
+        resolveStartPageIndex(book),
+      )
+      expect(root.querySelector('.tb-label')).not.toBeNull()
       expect(handle.store.get('entered2')).toBe(true)
       handle.stop()
       root.remove()

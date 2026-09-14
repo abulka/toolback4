@@ -741,6 +741,14 @@ function startPaletteSplitDrag(e: PointerEvent): void {
             />
             Plugin page (runs in author mode with the author API)
           </label>
+          <label class="check-row" title="The published app and the editor on refresh open on this page. Unset: the first page.">
+            <input
+              type="checkbox"
+              :checked="store.book.startPageId === store.activePage.id"
+              @change="store.setStartPage(($event.target as HTMLInputElement).checked ? store.currentPageIndex : null)"
+            />
+            Start page (app opens here)
+          </label>
 
           <div class="row">
             <h2 class="tab-head">Page script</h2>

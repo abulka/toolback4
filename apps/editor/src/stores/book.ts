@@ -13,6 +13,7 @@ import {
   parseBook,
   rebaseRect,
   resolveObjectRect,
+  resolveStartPageIndex,
   unlensObjectRect,
   resolvePageSize,
   scaleRect,
@@ -429,7 +430,9 @@ export const useBookStore = defineStore('book', () => {
   function removePage(i: number): void {
     if (book.value.pages.length <= 1) return
     record('Delete page')
+    const removed = book.value.pages[i]
     book.value.pages.splice(i, 1)
+    if (removed && book.value.startPageId === removed.id) delete book.value.startPageId
     selectPage(Math.min(currentPageIndex.value, book.value.pages.length - 1))
   }
 
@@ -633,7 +636,7 @@ export const useBookStore = defineStore('book', () => {
   function newBook(): void {
     clearHistory()
     book.value = createBook('Untitled')
-    currentPageIndex.value = 0
+    currentPageIndex.value = resolveStartPageIndex(book.value)
     selectionIds.value = []
     editing.value = { kind: 'page' }
     isRunning.value = false
@@ -650,12 +653,12 @@ export const useBookStore = defineStore('book', () => {
       return false
     }
     clearHistory()
-    currentPageIndex.value = 0
     selectionIds.value = []
     editing.value = { kind: 'page' }
     isRunning.value = false
     popupsOpen.value = []
     savedAt.value = null
+    currentPageIndex.value = resolveStartPageIndex(book.value)
     sync()
     return true
   }
@@ -669,7 +672,7 @@ export const useBookStore = defineStore('book', () => {
       return false
     }
     clearHistory()
-    currentPageIndex.value = 0
+    currentPageIndex.value = resolveStartPageIndex(book.value)
     selectionIds.value = []
     editing.value = { kind: 'page' }
     autosaveAt.value = saved.at
@@ -786,6 +789,16 @@ export const useBookStore = defineStore('book', () => {
     record(author ? 'Mark plugin page' : 'Unmark plugin page')
     if (author) page.author = true
     else delete page.author
+    sync()
+  }
+
+  /** the page a run opens on (published app + editor load); null = first page */
+  function setStartPage(pageIndex: number | null): void {
+    const page = pageIndex === null ? null : book.value.pages[pageIndex]
+    if (pageIndex !== null && !page) return
+    record(page ? 'Set start page' : 'Clear start page')
+    if (page) book.value.startPageId = page.id
+    else delete book.value.startPageId
     sync()
   }
 
@@ -1383,6 +1396,7 @@ export const useBookStore = defineStore('book', () => {
     startAuthor,
     stopAuthor,
     setPageAuthorFlag,
+    setStartPage,
     setBreakpoint,
     setPropsWidth,
     savePropsWidth,

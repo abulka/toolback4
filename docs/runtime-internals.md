@@ -32,7 +32,8 @@ JSON document (`Book`). The editor owns it; the canvas is a renderer.
 
 ```ts
 Book    { id, title, canvas: { desktop: {w,h}, tablet?, mobile? },
-          backgrounds: Background[], pages: Page[], store?: [key,value][] }
+          backgrounds: Background[], pages: Page[],
+          startPageId?, store?: [key,value][] }
 Background {
   id, name, color, script,        // script = shared fns + backgroundEnter() hook
   size?: { desktop?, tablet?, mobile? },
@@ -53,6 +54,10 @@ PageObject {
 - Zod schemas with `.default()`s; `parseBook` normalizes on load. Factories
   (`createObject`, `createGroup`, `createPage`, `createBook`) return parsed
   plain objects, safe to JSON round-trip.
+- **Start page.** `book.startPageId` names the page a run opens on. It is
+  optional/dangling-safe: `resolveStartPageIndex(book)` returns the matching
+  index or `0`. The published entry (`player-entry.ts`) passes it to `runBook`,
+  and the editor opens it on load/refresh; it is not a per-run override.
 - Every object has **one authored layout** (`rect`) plus an optional `fit`
   (see §4.1); there are no per-breakpoint rects.
 - Groups are **parent objects**: a member's rect is relative to its group; a
@@ -86,6 +91,10 @@ the first (`stopRun` unwinds everything). `runPage`:
 
 `page.go(name)` finds the page by name (unknown names report an error and stay
 put) and re-enters `runPage`. The store survives navigation; scripts do not.
+
+`startPageIndex` defaults to `0`; the published player passes
+`resolveStartPageIndex(book)` (the book's `startPageId`), while the editor's
+Run previews the page being edited (`editorLink.ts`) rather than the start page.
 
 ### 3.2 The store
 
