@@ -218,40 +218,42 @@ function copyToDesign(k: string, v: unknown): void {
 .kv li {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 6px;
+  gap: 8px;
+  padding: 4px 6px;
   background: var(--ed-bg);
   border: 1px solid var(--ed-border);
   border-radius: 6px;
 }
 
-.row .k {
-  flex: 0 1 45%;
+.row .k,
+.add-row input.k {
+  flex: 4 1 0;
   min-width: 0;
 }
 
-.row .v {
-  flex: 1 1 auto;
+.row .v,
+.add-row input.v {
+  flex: 5 1 0;
   min-width: 0;
 }
 
 .row input.k,
 .row input.v {
-  background: transparent;
-  border: 1px solid transparent;
+  background: var(--ed-panel);
+  border: 1px solid var(--ed-border);
   border-radius: 4px;
   color: var(--ed-text);
   font: inherit;
-  padding: 2px 4px;
+  padding: 2px 6px;
 }
 
 .row input.k:hover,
 .row input.v:hover,
 .row input.k:focus,
 .row input.v:focus {
-  border-color: var(--ed-border-strong, var(--ed-border));
+  border-color: var(--ed-accent);
   outline: none;
-  background: var(--ed-bg-2, var(--ed-bg));
+  background: var(--ed-panel);
 }
 
 .row input.k {
@@ -292,7 +294,7 @@ function copyToDesign(k: string, v: unknown): void {
 .add-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin-top: 8px;
 }
 
@@ -303,16 +305,10 @@ function copyToDesign(k: string, v: unknown): void {
   color: var(--ed-text);
   font: inherit;
   padding: 4px 6px;
-  min-width: 0;
 }
 
 .add-row input.k {
-  flex: 0 1 45%;
   color: var(--ed-accent);
-}
-
-.add-row input.v {
-  flex: 1 1 auto;
 }
 
 .add-row .add {
