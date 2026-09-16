@@ -1078,3 +1078,134 @@ describe('book store — glue-spring hint mode', () => {
     expect(useBookStore().fitHintMode).toBe(expected)
   })
 })
+
+describe('book store — align / distribute / match / fill helpers', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {} })
+    setActivePinia(createPinia())
+  })
+
+  it('alignSelection left aligns top-level objects and keeps glue', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const page = store.activePage
+    page.objects[1]!.fit = { x: 'right', y: 'top' }
+    store.setSelection(['a', 'b'])
+    store.alignSelection('left')
+    expect(page.objects[0]!.rect.x).toBe(0)
+    expect(page.objects[1]!.rect.x).toBe(0)
+    // the responsive glue survives the write
+    expect(page.objects[1]!.fit).toEqual({ x: 'right', y: 'top' })
+  })
+
+  it('centerSelectionOnPage centers the block, not each object independently', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const page = store.activePage
+    store.setSelection(['a', 'b'])
+    store.centerSelectionOnPage()
+    // union was (0..200, 0..100) on an 800x600 page → shift +300,+250
+    expect(page.objects[0]!.rect).toEqual({ x: 300, y: 250, w: 100, h: 50 })
+    expect(page.objects[1]!.rect).toEqual({ x: 420, y: 290, w: 80, h: 60 })
+    // the two are still side by side (not stacked)
+    expect(page.objects[0]!.rect.x).not.toBe(page.objects[1]!.rect.x)
+  })
+
+  it('distributeSelection spaces top-level objects evenly', () => {
+    const store = useBookStore()
+    const book = twoObjectBook()
+    book.pages[0]!.objects.push(
+      createObject('label', 'labelC', { x: 700, y: 0, w: 40, h: 40 }),
+    )
+    store.hydrate(book)
+    const page = store.activePage
+    const cId = page.objects[2]!.id
+    // order by position: a(center 50), b(center 160), c(center 720)
+    store.setSelection(['a', 'b', cId])
+    store.distributeSelection('x')
+    const centers = page.objects.map((o) => o.rect.x + o.rect.w / 2)
+    expect(centers[1]! - centers[0]!).toBeCloseTo(centers[2]! - centers[1]!, 5)
+    expect(page.objects[0]!.rect.x).toBe(0) // a fixed
+    expect(page.objects[2]!.rect.x).toBe(700) // c fixed
+  })
+
+  it('distribute needs three objects', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const page = store.activePage
+    store.setSelection(['a', 'b'])
+    store.distributeSelection('x')
+    expect(page.objects[0]!.rect.x).toBe(0)
+    expect(page.objects[1]!.rect.x).toBe(120)
+  })
+
+  it('matchSizeSelection matches the largest width', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const page = store.activePage
+    store.setSelection(['a', 'b'])
+    store.matchSizeSelection('w')
+    expect(page.objects[0]!.rect.w).toBe(100)
+    expect(page.objects[1]!.rect.w).toBe(100)
+    expect(page.objects[1]!.rect.h).toBe(60) // height untouched for 'w'
+  })
+
+  it('aligns group members in the group local frame and re-tightens the box', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const kid1 = createObject('label', 'kid1', { x: 0, y: 0, w: 40, h: 20 })
+    const kid2 = createObject('label', 'kid2', { x: 60, y: 30, w: 40, h: 20 })
+    const group = createGroup('group1', { x: 100, y: 100, w: 100, h: 60 }, [kid1, kid2])
+    store.book.pages[0]!.objects.push(group)
+    const groupInBook = store.book.pages[0]!.objects[2]!
+    store.setSelection([kid1.id, kid2.id])
+    store.alignSelection('left')
+    expect(groupInBook.children![0]!.rect.x).toBe(0)
+    expect(groupInBook.children![1]!.rect.x).toBe(0)
+    // the group box still hugs its members
+    expect(groupInBook.rect).toEqual({ x: 100, y: 100, w: 40, h: 50 })
+  })
+
+  it('align is a single undoable step', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const page = store.activePage
+    store.setSelection(['a', 'b'])
+    store.alignSelection('left')
+    expect(page.objects[1]!.rect.x).toBe(0)
+    store.undo()
+    expect(useBookStore().activePage.objects[1]!.rect.x).toBe(120)
+  })
+
+  it('fillObjectWidth sets Stretch on x and folds the margin onto the layout', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const page = store.activePage
+    store.fillObjectWidth('a', 8)
+    expect(page.objects[0]!.fit).toEqual({ x: 'stretch' })
+    expect(page.objects[0]!.rect).toEqual({ x: 8, y: 0, w: 784, h: 50 })
+  })
+
+  it('fillObjectHeight sets Stretch on y and centerObjectInPage sets Center · Center', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const page = store.activePage
+    store.fillObjectHeight('a', 10)
+    expect(page.objects[0]!.fit).toEqual({ y: 'stretch' })
+    store.centerObjectInPage('b')
+    expect(page.objects[1]!.fit).toEqual({ x: 'center', y: 'center' })
+  })
+
+  it('align on a mixed-parent selection is a no-op', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const kid = createObject('label', 'kid', { x: 0, y: 0, w: 10, h: 10 })
+    store.book.pages[0]!.objects.push(
+      createGroup('group1', { x: 300, y: 300, w: 100, h: 100 }, [kid]),
+    )
+    const before = JSON.stringify(store.book.pages[0]!.objects)
+    store.setSelection(['a', kid.id])
+    store.alignSelection('left')
+    expect(JSON.stringify(useBookStore().activePage.objects)).toBe(before)
+  })
+})

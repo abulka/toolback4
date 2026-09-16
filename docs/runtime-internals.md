@@ -269,6 +269,12 @@ and communicates with the editor only through messages (`toolback:selection`,
   corner (the layout box is untouched mid-drag); the commit sends the group
   rect plus every descendant scaled around the same fixed corner — preview
   and commit agree for every handle.
+- **Aspect lock (Shift-drag)**: holding Shift on a **corner** handle resizes
+  with the object's start aspect ratio held (`resizeRectAspect`,
+  `packages/runtime/src/design.ts`) — the driver axis is whichever the pointer
+  moved further along, and the fixed-opposite-corner math is preserved.
+  Single-axis edge handles resize normally. No schema field: the lock is a
+  gesture, captured at drag start.
 - **Clip indicators**: after every render (and live during drags) the
   controller lays a dashed red `.tb-clip` box over any object that sticks out
   of the page. The controller's `rects` map is always the source of truth for
@@ -276,21 +282,22 @@ and communicates with the editor only through messages (`toolback:selection`,
   automatically reflected.
 - **Glue springs**: the `.tb-fithint` overlay draws a spring from every
   *constrained* object (fit with a non-Free axis) to the page edge(s) it's
-  glued to. Shape encodes the kind: **edge** (left/top/right/bottom) is a
-  solid zigzag with a square anchor and an arrowhead at the object pointing
-  back at it; **center** is a plain straight dashed line with circle anchors;
-  **stretch** is a dashed *circular coil* (a real helix projection) with
-  triangle anchors pointing outward. Muted colour is a redundant accent
-  (slate / pale grey / amber), and every spring is drawn over a translucent
-  white halo so it reads on dark pages. Drawn for all objects — background
-  objects included (`bgRects` fallback) — whenever the `≋` All/Sel/Off control
-  says so (the load message carries `fitHints` as a `FitHintMode`), with a
-  hover legend in the toolbar. `'selected'` draws only the current selection;
-  `'off'` draws nothing. Free renders nothing. The hint is the page's first
-  child, so it paints above the page background but **under** the controls;
-  page-edge anchor glyphs are nudged just inside the page so clipping doesn't
-  cut them. Pure decoration — `pointer-events: none`, rebuilt on render and
-  drag redraws. Reads `data-tb-fit-x/y` the renderer stamps on each wrapper.
+  glued to. **Shape encodes the anchor**: an **edge** anchor
+  (left/top/right/bottom, and both sides) is a zigzag with a square anchor and
+  an arrowhead at the object pointing back at it; **center** is a plain straight
+  connector with circle anchors and the page centerline. **Line style encodes the
+  margin behaviour**: `fixed` is solid, `scaled` is dashed. Edges are slate,
+  center is pale grey, and every spring is drawn over a translucent white halo so
+  it reads on dark pages. Drawn for all objects —
+  background objects included (`bgRects` fallback) — whenever the `≋`
+  All/Sel/Off control says so (the load message carries `fitHints` as a
+  `FitHintMode`), with a hover legend in the toolbar. `'selected'` draws only
+  the current selection; `'off'` draws nothing. Free renders nothing. The hint
+  is the page's first child, so it paints above the page background but
+  **under** the controls; page-edge anchor glyphs are nudged just inside the
+  page so clipping doesn't cut them. Pure decoration — `pointer-events: none`,
+  rebuilt on render and drag redraws. Reads `data-tb-fit-x/y` the renderer
+  stamps on each wrapper.
 - **Drags re-anchor the shared layout**: canvas drags run the dragged rect
   through `unlensObjectRect` and write the object's one `rect` — glued axes
   re-anchor, free axes take the value. Center is rigid (the canvas clamps its
@@ -301,14 +308,21 @@ and communicates with the editor only through messages (`toolback:selection`,
 `PageObject.fit` (`x`, `y`) is a **non-destructive render lens** resolved at
 render/read time only by `resolveObjectRect` (`packages/format`): constrained
 axes derive from the one authored `rect` (left/top scale position, right/bottom
-scale the edge gap, center centers the middle, stretch scales position+size),
-free axes keep the authored coordinate. Internally this is `fit`; the
-author-facing name is the **Responsive** section of the properties panel (the
-Horizontal/Vertical dropdowns — `apps/editor/src/components/PropertiesPanel.vue`),
-described as "glue" or "springs" in the guide. **The lens applies at every size,
-including the reference size** (there the page size equals the base, so
-Free/Left/Right/Top/Bottom/Stretch are identity and only Center moves) — this
-is what makes setting Center visibly center the object without writing
+scale the edge gap, center centers the middle, stretch scales position+size,
+**pin-right/pin-bottom** keep the far-edge gap a constant px, **fill** keeps
+both margins constant while the size grows), free axes keep the authored
+coordinate. Internally this is `fit`; the author-facing surface is the
+**Responsive** section of the properties panel
+(`apps/editor/src/components/PropertiesPanel.vue`), described as "glue" or
+"springs" in the guide. The panel presents each axis as an **anchor** — Free ·
+Left/Top · Center · Right/Bottom · **Both sides** — plus a **Fixed** toggle for
+Right/Bottom/Both; `apps/editor/src/fitModes.ts` is the single mapping between
+that pair and the tokens (Both + Fixed = `fill`, Both + scaled = `stretch`,
+Right + Fixed = `pin-right`, …), so the internal names never surface. **The lens
+applies at every size, including the reference size** (there the page size
+equals the base, so
+Free/Left/Right/Top/Bottom/Pin/Stretch/Fill are identity and only Center moves)
+— this is what makes setting Center visibly center the object without writing
 anything; switching back to Free restores the authored layout exactly.
 Invariant: **fit never writes rects.** Deliberate geometry writes (panel
 fields, scripts, author bridge) fold through `unlensObjectRect` back onto the
@@ -342,7 +356,7 @@ legacy per-breakpoint object form is collapsed to a boolean by
 
 Invariant: **auto-height changes the page box, never the fit lens.** The lens is
 resolved with the *base* sizes (the number in the size dialog), so vertical glue
-(Bottom/Center/Stretch) is measured against the base and can never depend on the
+(Bottom/Center/Both sides) is measured against the base and can never depend on the
 grown height — otherwise bottom-glue would feed its own height back in. So
 `renderPage` takes the base `canvasSize` (the lens) plus an optional `boxHeight`
 (the CSS height); `renderBookPage`/`renderBackgroundView` compute the box from
@@ -420,6 +434,17 @@ IndexedDB autosave. Components never touch `book` directly.
   edits are undoable/redoable like any book edit (coalesced under
   `designstore`); still applied while running (record no-ops, matching every
   run-mode edit), which is how the ⇓ "copy to design" action works.
+- **Align / distribute / match** (`alignSelection`, `distributeSelection`,
+  `matchSizeSelection`, `centerSelectionOnPage`): five pure helpers in
+  `@toolback/format` (`alignRects`, `centerBlockRects`, `distributeRects`,
+  `matchSizeRects`) applied to the selection's **rendered** page-absolute rects
+  (`renderedPageRectOf` mirrors `renderObjectInto`, including a stretched/filled
+  top-level group's member scale), then written back through
+  `writeRenderedRects`: top-level objects fold through `unlensObjectRect` (glue
+  preserved, centered axes released), members rebase into the group's local
+  base frame after un-scaling. All four are one `record` step each and no-op on
+  a mixed-parent selection. `fillObjectWidth`/`fillObjectHeight`/
+  `centerObjectInPage` are the single-object companions to `fillObjectToPage`.
 
 ## 8. IntelliSense generation (`apps/editor/src/monacoApiLib.ts`)
 

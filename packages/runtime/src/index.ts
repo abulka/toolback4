@@ -75,13 +75,13 @@ export function renderObjectInto(
 
   if (obj.control === 'group' && obj.children?.length) {
     // members render inside the group wrapper; their rects are relative to it.
-    // Members scale with the box ONLY for a real scale — a stretch lens, or a
-    // parent scaling a nested group; an interactive resize already scaled the
-    // members in the store, so it is not applied twice.
+    // Members scale with the box ONLY for a real size change — a stretch/fill
+    // lens, or a parent scaling a nested group; an interactive resize already
+    // scaled the members in the store, so it is not applied twice.
     const desktop = rectFor(obj)
     const parentScaled = Boolean(opts?.overrideRect)
-    const stretchX = parentScaled || obj.fit?.x === 'stretch'
-    const stretchY = parentScaled || obj.fit?.y === 'stretch'
+    const stretchX = parentScaled || obj.fit?.x === 'stretch' || obj.fit?.x === 'fill'
+    const stretchY = parentScaled || obj.fit?.y === 'stretch' || obj.fit?.y === 'fill'
     const fx = stretchX && desktop.w !== 0 ? rect.w / desktop.w : 1
     const fy = stretchY && desktop.h !== 0 ? rect.h / desktop.h : 1
     wrapper.appendChild(renderObject(obj))

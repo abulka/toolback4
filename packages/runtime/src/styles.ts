@@ -468,6 +468,10 @@ body {
   z-index: 20;
   touch-action: none;
   user-select: none;
+  /* keep design chrome (selection, handles, size badge) inside the page box:
+     an object dragged past the edge is clipped by .tb-page, and its off-page
+     chrome must not grow the iframe's scrollable area into phantom space */
+  overflow: hidden;
 }
 
 .tb-sel {
@@ -511,8 +515,14 @@ body {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45);
 }
 
-.tb-fithint-line--stretch {
-  background: rgba(217, 119, 6, 0.72);
+.tb-fithint-line--center {
+  background: rgba(148, 163, 184, 0.9);
+}
+
+/* scaled margins render dashed; fixed margins stay solid */
+.tb-fithint-spring--scaled .tb-fithint-halo,
+.tb-fithint-spring--scaled .tb-fithint-spring-path {
+  stroke-dasharray: 5 4;
 }
 
 .tb-fithint-spring--edge {
@@ -521,17 +531,6 @@ body {
 
 .tb-fithint-spring--center {
   color: rgba(148, 163, 184, 0.95);
-}
-
-.tb-fithint-spring--center .tb-fithint-halo,
-.tb-fithint-spring--center .tb-fithint-spring-path,
-.tb-fithint-spring--stretch .tb-fithint-halo,
-.tb-fithint-spring--stretch .tb-fithint-spring-path {
-  stroke-dasharray: 5 4;
-}
-
-.tb-fithint-spring--stretch {
-  color: rgba(217, 119, 6, 0.72);
 }
 
 .tb-fithint-anchor {
@@ -544,25 +543,6 @@ body {
 .tb-fithint-anchor--center {
   background: rgba(148, 163, 184, 0.95);
   border-radius: 50%;
-}
-
-.tb-fithint-anchor--stretch {
-  width: 7px;
-  height: 7px;
-  background: rgba(217, 119, 6, 0.85);
-  clip-path: polygon(50% 0, 100% 100%, 0 100%);
-}
-
-.tb-fithint-anchor--stretch.tb-fithint-anchor--down {
-  transform: rotate(180deg);
-}
-
-.tb-fithint-anchor--stretch.tb-fithint-anchor--left {
-  transform: rotate(-90deg);
-}
-
-.tb-fithint-anchor--stretch.tb-fithint-anchor--right {
-  transform: rotate(90deg);
 }
 
 .tb-fithint-arrow {

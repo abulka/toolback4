@@ -289,8 +289,8 @@ describe('runtime', () => {
 
   describe('responsive glue at render time', () => {
     /** a mini book: one page on a default book → 1280x800 desktop */
-    type FMX = 'free' | 'left' | 'center' | 'right' | 'stretch'
-    type FMY = 'free' | 'top' | 'center' | 'bottom' | 'stretch'
+    type FMX = 'free' | 'left' | 'center' | 'right' | 'stretch' | 'pin-right' | 'fill'
+    type FMY = 'free' | 'top' | 'center' | 'bottom' | 'stretch' | 'pin-bottom' | 'fill'
     function fitBook(fit?: { x?: FMX; y?: FMY }) {
       const book = createBook('fit')
       const menu = createObject(
@@ -338,6 +338,38 @@ describe('runtime', () => {
     it('center centers horizontally on mobile', () => {
       const style = firstObjectStyle(fitBook({ x: 'center' }), 'mobile')
       expect(style.left).toBe((390 - 176) / 2)
+    })
+
+    it('pin-right keeps the gap a fixed px on mobile (size fixed)', () => {
+      const style = firstObjectStyle(fitBook({ x: 'pin-right' }), 'mobile')
+      expect(style.left).toBe(1080 + (390 - 1280))
+      expect(style.width).toBe(176)
+      expect(390 - (style.left + style.width)).toBe(24)
+    })
+
+    it('fill keeps both margins fixed and grows the width', () => {
+      const book = fitBook({ x: 'fill' })
+      book.canvas.tablet = { width: 1920, height: 1024 }
+      const style = firstObjectStyle(book, 'tablet')
+      expect(style.left).toBe(1080)
+      expect(style.width).toBe(176 + (1920 - 1280))
+      expect(1920 - (style.left + style.width)).toBe(24)
+    })
+
+    it('filling a group scales its members', () => {
+      const book = createBook('fit')
+      const member = createObject('button', 'm', { x: 10, y: 10, w: 100, h: 40 })
+      const group = createObject('group', 'g1', { x: 100, y: 0, w: 200, h: 60 })
+      group.fit = { x: 'fill' }
+      group.children = [member]
+      book.pages[0]!.objects.push(group)
+      book.canvas.tablet = { width: 1920, height: 1024 }
+      const root = document.createElement('div')
+      renderBookPage(book, 0, root, 'tablet')
+      const memberEl = root.querySelector<HTMLElement>('.tb-group [data-tb-id]')!
+      const fx = (200 + (1920 - 1280)) / 200
+      expect(parseInt(memberEl.style.left)).toBe(Math.round(10 * fx))
+      expect(parseInt(memberEl.style.width)).toBe(Math.max(1, Math.round(100 * fx)))
     })
 
     it('stretch grows width with the page on a wider canvas', () => {

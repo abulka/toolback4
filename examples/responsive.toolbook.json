@@ -1,0 +1,134 @@
+{
+  "id": "book_responsive",
+  "title": "Responsive HUD",
+  "canvas": {
+    "desktop": { "width": 1280, "height": 800 },
+    "tablet": { "width": 768, "height": 1024 },
+    "mobile": { "width": 390, "height": 844 }
+  },
+  "backgrounds": [
+    {
+      "id": "bg_app",
+      "name": "App",
+      "color": "#0f172a",
+      "script": "",
+      "objects": [
+        {
+          "id": "obj_nav",
+          "name": "navBar",
+          "control": "container",
+          "rect": { "x": 0, "y": 0, "w": 1280, "h": 64 },
+          "props": { "color": "#1e293b" },
+          "fit": { "x": "fill", "y": "top" }
+        },
+        {
+          "id": "obj_brand",
+          "name": "brand",
+          "control": "label",
+          "rect": { "x": 32, "y": 16, "w": 320, "h": 32 },
+          "props": { "text": "Toolback HUD", "fontSize": 18, "color": "#e2e8f0" }
+        },
+        {
+          "id": "obj_menu",
+          "name": "menuBtn",
+          "control": "button",
+          "rect": { "x": 1080, "y": 12, "w": 168, "h": 40 },
+          "props": { "text": "Menu" },
+          "fit": { "x": "pin-right", "y": "top" }
+        }
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "id": "page_home",
+      "name": "Home",
+      "script": "",
+      "backgroundId": "bg_app",
+      "objects": [
+        {
+          "id": "obj_title",
+          "name": "title",
+          "control": "label",
+          "rect": { "x": 96, "y": 96, "w": 800, "h": 44 },
+          "props": { "text": "A layout that adapts", "fontSize": 26, "color": "#f1f5f9" },
+          "fit": { "x": "left", "y": "top" }
+        },
+        {
+          "id": "obj_content",
+          "name": "content",
+          "control": "card",
+          "rect": { "x": 80, "y": 168, "w": 1120, "h": 480 },
+          "props": {
+            "title": "Content panel — fixed 80px gutters",
+            "text": "This card is set to Fill: both side margins stay 80px at every page size while the box grows or shrinks. The nav bar above spans full width, and the Menu button stays pinned 24px from the right edge."
+          },
+          "fit": { "x": "fill", "y": "fill" }
+        },
+        {
+          "id": "obj_bump",
+          "name": "bump",
+          "control": "button",
+          "rect": { "x": 96, "y": 712, "w": 168, "h": 44 },
+          "props": { "text": "Bump" },
+          "on": { "click": "store.set('hits', (store.get('hits') ?? 0) + 1)" },
+          "fit": { "x": "left", "y": "pin-bottom" }
+        },
+        {
+          "id": "obj_hits",
+          "name": "hits",
+          "control": "label",
+          "rect": { "x": 288, "y": 718, "w": 220, "h": 32 },
+          "props": { "text": "Hits: {{hits}}", "fontSize": 16, "color": "#cbd5e1" },
+          "fit": { "x": "left", "y": "pin-bottom" }
+        }
+      ]
+    },
+    {
+      "id": "page_dialog",
+      "name": "Dialog",
+      "script": "",
+      "backgroundId": "bg_app",
+      "objects": [
+        {
+          "id": "obj_dialog",
+          "name": "dialogGroup",
+          "control": "group",
+          "rect": { "x": 480, "y": 300, "w": 320, "h": 220 },
+          "props": {},
+          "fit": { "x": "center", "y": "center" },
+          "children": [
+            {
+              "id": "obj_dlg_title",
+              "name": "dlgTitle",
+              "control": "label",
+              "rect": { "x": 20, "y": 24, "w": 280, "h": 32 },
+              "props": { "text": "Confirm", "fontSize": 18 }
+            },
+            {
+              "id": "obj_dlg_body",
+              "name": "dlgBody",
+              "control": "label",
+              "rect": { "x": 20, "y": 64, "w": 280, "h": 80 },
+              "props": { "text": "Are you sure you want to continue?", "fontSize": 14 }
+            },
+            {
+              "id": "obj_dlg_cancel",
+              "name": "dlgCancel",
+              "control": "button",
+              "rect": { "x": 80, "y": 160, "w": 100, "h": 40 },
+              "props": { "text": "Cancel" }
+            },
+            {
+              "id": "obj_dlg_ok",
+              "name": "dlgOk",
+              "control": "button",
+              "rect": { "x": 200, "y": 160, "w": 100, "h": 40 },
+              "props": { "text": "OK" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

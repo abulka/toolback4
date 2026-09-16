@@ -52,6 +52,29 @@ subtree together in the order.
 - Groups: clicking a member selects the **group**; alt-click or double-click
   selects the member itself
 
+## Align & distribute
+
+Select two or more objects under the same parent and the Selection panel grows
+an **Align** section. These are design-time geometry commands — they write the
+one authored layout (undoable in a single step), so existing Responsive glue is
+preserved and re-derives at every breakpoint.
+
+- **Align** (6 buttons) — left / right / top / bottom / horizontal-center /
+  vertical-center, aligned to the selection's bounding box. Great for form
+  columns, card rows and toolbars.
+- **Distribute H / V** (3+ objects) — spaces the centers evenly, keeping the
+  outer two where they are.
+- **Match W / H / both** — resizes every selected object to the largest in the
+  selection (equal-width buttons, equal cards).
+- **Center on page** — moves the whole selection as a **block** so its bounding
+  box is centered. This is the OK/Cancel case: aligning each button's own
+  center to the page would stack them, so Center moves the pair together.
+
+Alignment measures each object's **rendered** position at the current
+breakpoint, then folds the result back onto the shared layout. Aligning a
+**Center**-glued object releases that axis (a centered coordinate has nothing to
+edit), exactly like typing a position.
+
 ## Duplicate
 
 Duplicating the selection creates a copy right next to the original — nudged
@@ -248,23 +271,38 @@ it was.
 Each object has **one authored layout**; at every breakpoint the page size
 changes and the constrained axes re-derive from that layout.
 
-Modes (per axis):
+The Responsive row asks **two questions per axis**:
+
+1. **What does the object stick to?** the left/top edge, the right/bottom edge,
+   **both** edges, the center, or nothing (Free).
+2. **Do the margins stay a fixed pixel value, or scale with the page?**
+
+The dropdown offers **Free · Left/Top · Center · Right/Bottom · Both sides**, and
+a **Fixed** checkbox appears for **Right/Bottom** and **Both sides**:
 
 - **Free** — no constraint on that axis: it keeps the authored coordinate
   everywhere. Free is the fallback for an object with no Responsive setting at
   all (a legacy file, for example).
-- **Left / Top** — the margin to that edge keeps its share of the page: the
-  coordinate scales with the page size (proportional).
+- **Left / Top** — the margin to that edge keeps its share of the page (it
+  scales). There is no **Fixed** choice here because a *fixed* left/top margin
+  is exactly **Free**.
 - **Center** — the object's **middle** is centered on that axis.
-- **Right / Bottom** — the gap to that edge keeps its share of the page.
-- **Stretch** — a true scale: both margins keep their share, so position *and*
-  size scale with the page (a full-width nav bar, a footer).
+- **Right / Bottom** — the gap to that edge keeps its share of the page. Tick
+  **Fixed** and the gap stays a constant number of pixels instead, so the object
+  moves with the edge (a corner button that stays 24px from the right at every
+  page size).
+- **Both sides** — the object sticks to *both* edges, so its size follows the
+  page. With **Fixed** off this is **Stretch**: both margins scale, so the whole
+  object zooms with the page (a full-width nav bar, a footer). With **Fixed** on
+  it is **Fill**: both margins stay the same number of pixels and the size
+  absorbs the page's extra width (a content panel with fixed 24px gutters).
 
 Example: a hamburger button designed 24px from the right edge of a 1280px
-desktop page. Set Horizontal: **Right** and on the 640px mobile page its right
-gap scales down with the page, keeping the same visual proportion. Set
-Horizontal: **Center** and its middle stays on the page's horizontal axis at
-every size.
+desktop page. Horizontal **Right** keeps that gap's share — on a 640px page the
+gap scales down with the page. Tick **Fixed** and the gap stays exactly 24px.
+**Both sides** without Fixed is **Stretch** (everything scales); with Fixed it
+is **Fill** (the gutters stay, the size grows). **Center** keeps its middle on
+the page's horizontal axis at every size.
 
 Things to know:
 
@@ -286,6 +324,8 @@ Things to know:
   dragging edits the one layout, and glued axes re-anchor around the drag, so
   the change is visible at every size. Center is rigid — dragging along a
   centered axis does nothing (change the mode to move it).
+- **Shift-drag a corner** to resize with the object's current aspect ratio held
+  — useful for images and cards. Single-axis edge handles resize normally.
 - **Deliberate writes win silently.** Typing X in the Geometry panel (or a
   script writing `button.x`, or the author bridge) edits the shared layout,
   re-anchoring a glued axis — no prompt. A size write on a Center/Right/Bottom
@@ -293,26 +333,27 @@ Things to know:
   Stretch axis the size is the constraint.
 - **Fill page.** The Geometry section's **Fill page** button (with a margin
   box) sizes the selected object to the page minus that margin and sets both
-  axes to **Stretch**. The margin is proportional — it scales with the page like
-  any other glue, so it shrinks on smaller breakpoints (a fixed-pixel margin is
-  the future "pin" mode). Works on top-level objects; a group member rides its
-  group's box instead.
+  axes to **Both sides** with **Fixed** off (**Stretch**) — so the margin
+  scales with the page. **Fill width** / **Fill height** do a single axis. To
+  keep the margin a constant pixel value, tick **Fixed** on that axis (that is
+  **Fill** / **Pin**). **Center** glues the object to both page center lines.
+  Works on top-level objects; a group member rides its group's box instead.
 
 
-- **A spring shows every constraint in the canvas**, with a distinct shape
-  per kind. **Left/Top/Right/Bottom** draw one solid zigzag from the object to
+- **A spring shows every constraint in the canvas.** Its **shape is the
+  anchor**: **Left/Top/Right/Bottom** draw one solid zigzag from the object to
   the glued page edge — a square anchor sits on the edge and a small arrowhead
-  at the object points back at it, so you can tell which side is glued without
-  hunting for the edge. **Center** draws a **plain dashed pale-grey line** from
-  each page edge to the object's two sides, marked with circle anchors.
-  **Stretch** draws a **dashed circular coil** from both edges with triangle
-  anchors. Muted colours reinforce the shapes (slate = edge, pale grey =
-  center, amber = stretch; every spring sits on a faint white halo for dark
-  pages). The springs are drawn **behind the controls**, so they never cover
-  what's on the page. Background objects show their springs too; a **Free**
-  axis draws nothing. The **≋ All/Sel/Off** control in the top bar shows springs for
-  every object, only the current selection, or none (the choice sticks) — hover
-  it for a legend.
+  at the object points back at it — and **Both sides** draws that zigzag from
+  *both* edges. **Center** draws a plain straight line from each page edge to
+  the object's two sides, with circle anchors and the page centerline through
+  the object. Its **line style is the margin behaviour**: **Fixed** margins are
+  **solid**, **scaled** margins are **dashed**. Edges are slate and center is
+  pale grey, and every spring sits on a faint white halo for dark pages. The
+  springs are drawn **behind the controls**, so they never cover what's on the
+  page. Background objects show their springs too; a **Free** axis draws
+  nothing. The **≋ All/Sel/Off** control in the top bar shows springs for every
+  object, only the current selection, or none (the choice sticks) — hover it for
+  a legend.
 - Objects that stick out of the current page get a **dashed red outline** on the
   canvas, so the clipping you'd otherwise have to guess at is made visible.
 - Scripts read the *rendered* (lensed) rect: a Center-x button reports its
@@ -829,11 +870,11 @@ run time). The setting is a property of the background, so it applies at
 the window.
 
 One subtlety: vertical **glue** (Responsive → Vertical: Bottom / Center /
-Stretch) is resolved against the **configured** page height, not the grown one.
+Both sides) is resolved against the **configured** page height, not the grown one.
 That's what stops the page height and the glue from chasing each other. It means
 a glued object is positioned against the configured height, so it doesn't
-stretch down with a page grown by *other* content — though a Bottom or Stretch
-object placed past the bottom does grow the page itself, just like any other.
+stretch down with a page grown by *other* content — though a Bottom or Both
+sides object placed past the bottom does grow the page itself, just like any other.
 And only the page *layout* drives growth: a script that moves an object below
 the fold at run time does not re-grow the page.
 

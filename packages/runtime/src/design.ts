@@ -42,6 +42,44 @@ export function resizeRect(start: Rect, dir: HandleDir, dx: number, dy: number, 
   return { x, y, w, h }
 }
 
+/**
+ * Corner resize with the start aspect ratio held (Shift-drag). Drives the
+ * dominant axis so the pointer stays near the corner, then derives the other
+ * dimension from the ratio, keeping the fixed opposite corner in place.
+ */
+export function resizeRectAspect(
+  start: Rect,
+  dir: HandleDir,
+  dx: number,
+  dy: number,
+  min = MIN_SIZE,
+): Rect {
+  if (start.w === 0 || start.h === 0) return resizeRect(start, dir, dx, dy, min)
+  const ratio = start.w / start.h
+  const ddx = snap(dx)
+  const ddy = snap(dy)
+  const driveByWidth = Math.abs(ddx) * start.h >= Math.abs(ddy) * start.w
+  let w: number
+  let h: number
+  if (driveByWidth) {
+    w = start.w + (dir.includes('e') ? ddx : -ddx)
+    h = w / ratio
+  } else {
+    h = start.h + (dir.includes('s') ? ddy : -ddy)
+    w = h * ratio
+  }
+  w = Math.max(min, Math.round(w))
+  h = Math.max(min, Math.round(h))
+  const x = dir.includes('w') ? start.x + start.w - w : start.x
+  const y = dir.includes('n') ? start.y + start.h - h : start.y
+  return { x, y, w, h }
+}
+
+/** corner handles carry both a horizontal and a vertical direction */
+export function isCornerHandle(dir: HandleDir): boolean {
+  return dir.length === 2
+}
+
 /** transform-origin that keeps the resize-opposite corner fixed while scaling */
 function scaleOriginFor(dir: HandleDir): string {
   return `${dir.includes('w') ? '100' : '0'}% ${dir.includes('n') ? '100' : '0'}%`
@@ -285,20 +323,19 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   }
 
   /**
-   * A spring between two points. `edge` glue is a solid zigzag; `center` is a
-   * plain straight (dashed) line; `stretch` is a circular coil (a real spring)
-   * dashed. Every spring is drawn twice — a translucent white halo under the
-   * coloured stroke — so it stays legible on dark pages. Short edge/stretch
-   * spans fall back to a plain stub.
+   * A glue spring's shape is its ANCHOR: `edge` (one far/near edge or both) is
+   * a zigzag, `center` is a straight connector with a centerline. Its line
+   * style is the MARGIN behaviour: `fixed` is solid, `scaled` is dashed. Every
+   * spring is drawn twice — a translucent white halo under the coloured stroke
+   * — so it stays legible on dark pages. Short edge spans fall back to a stub.
    */
-  type SpringKind = 'edge' | 'center' | 'stretch'
+  type SpringKind = 'edge' | 'center'
+  type SpringStyle = 'fixed' | 'scaled'
   type SpringDir = 'left' | 'right' | 'top' | 'bottom' | 'up' | 'down'
 
   const SVG_NS = 'http://www.w3.org/2000/svg'
   const SPRING_AMP = 3
   const SPRING_COIL = 9
-  const COIL_RADIUS = 3.5
-  const COIL_PITCH = 10
 
   /** triangular-wave path touching both ends */
   function zigzagD(
@@ -323,39 +360,6 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       d += ` L ${(x1 + ux * t + px * side * SPRING_AMP - minx).toFixed(1)} ${(y1 + uy * t + py * side * SPRING_AMP - miny).toFixed(1)}`
     }
     d += ` L ${x2 - minx} ${y2 - miny}`
-    return d
-  }
-
-  /**
-   * A helix projected onto the page (prolate cycloid) — loops when the loop
-   * radius beats L/(2πN), which is what makes it read as a coiled spring
-   * rather than a wave. `perp` is 0 at both ends so it touches each terminus.
-   */
-  function coilD(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    minx: number,
-    miny: number,
-    len: number,
-    n: number,
-  ): string {
-    const loopRadius = (len / n) * 0.35
-    const ux = (x2 - x1) / len
-    const uy = (y2 - y1) / len
-    const px = -uy
-    const py = ux
-    const steps = n * 18
-    let d = ''
-    for (let i = 0; i <= steps; i++) {
-      const th = (2 * Math.PI * n * i) / steps
-      const along = len * (i / steps) + loopRadius * Math.sin(th)
-      const perp = COIL_RADIUS * Math.sin(th)
-      const x = x1 + ux * along + px * perp
-      const y = y1 + uy * along + py * perp
-      d += `${i === 0 ? 'M' : ' L'} ${(x - minx).toFixed(1)} ${(y - miny).toFixed(1)}`
-    }
     return d
   }
 
@@ -384,11 +388,12 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     x2: number,
     y2: number,
     kind: SpringKind,
+    style: SpringStyle,
   ): void {
     const len = Math.hypot(x2 - x1, y2 - y1)
-    if (kind !== 'center' && len < (kind === 'edge' ? 12 : 16)) {
+    if (kind !== 'center' && len < 12) {
       const e = doc.createElement('div')
-      e.className = `tb-fithint-line tb-fithint-line--${kind}`
+      e.className = `tb-fithint-line tb-fithint-line--${kind} tb-fithint-line--${style}`
       e.style.left = `${Math.min(x1, x2)}px`
       e.style.top = `${Math.min(y1, y2) - 1}px`
       e.style.width = `${Math.max(2, Math.abs(x2 - x1))}px`
@@ -397,32 +402,26 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       return
     }
     if (kind === 'center' && len < 1) return
-    const n = Math.max(2, Math.round(len / COIL_PITCH))
-    const reach = kind === 'edge' ? SPRING_AMP : kind === 'center' ? 2 : Math.max(COIL_RADIUS, (len / n) * 0.35)
+    const reach = kind === 'edge' ? SPRING_AMP : 2
     const pad = reach + 2
     const minx = Math.min(x1, x2) - pad
     const miny = Math.min(y1, y2) - pad
     const w = Math.abs(x2 - x1) + pad * 2
     const h = Math.abs(y2 - y1) + pad * 2
     const svg = doc.createElementNS(SVG_NS, 'svg')
-    svg.setAttribute('class', `tb-fithint-spring tb-fithint-spring--${kind}`)
+    svg.setAttribute('class', `tb-fithint-spring tb-fithint-spring--${kind} tb-fithint-spring--${style}`)
     svg.style.left = `${minx}px`
     svg.style.top = `${miny}px`
     svg.style.width = `${w}px`
     svg.style.height = `${h}px`
     svg.style.overflow = 'visible'
-    const d =
-      kind === 'edge'
-        ? zigzagD(x1, y1, x2, y2, minx, miny, len)
-        : kind === 'center'
-          ? lineD(x1, y1, x2, y2, minx, miny)
-          : coilD(x1, y1, x2, y2, minx, miny, len, n)
+    const d = kind === 'edge' ? zigzagD(x1, y1, x2, y2, minx, miny, len) : lineD(x1, y1, x2, y2, minx, miny)
     addPath(svg, doc, d, 'tb-fithint-halo', 'rgba(255, 255, 255, 0.55)', 4)
     addPath(svg, doc, d, 'tb-fithint-spring-path', 'currentColor', 1.5)
     hint.appendChild(svg)
   }
 
-  /** anchor glyph at a page edge: square (edge), circle (center), triangle (stretch) */
+  /** anchor glyph at a page edge: square (edge glue), circle (center) */
   function drawAnchor(
     hint: HTMLElement,
     doc: Document,
@@ -456,7 +455,7 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     hint.appendChild(e)
   }
 
-  /** horizontal glue spring for one object */
+  /** horizontal glue spring for one object (shape = anchor, style = fixed/scaled) */
   function drawAxisH(
     hint: HTMLElement,
     doc: Document,
@@ -469,28 +468,43 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       case undefined:
       case 'free':
         return // Free = no constraint, nothing to show
+      case 'left':
+        drawSpring(hint, doc, 0, cy, r.x, cy, 'edge', 'scaled')
+        drawAnchor(hint, doc, 0, cy, 'edge', 'left')
+        drawArrow(hint, doc, r.x, cy, 'right')
+        break
       case 'right':
-        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'edge')
+        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'edge', 'scaled')
+        drawAnchor(hint, doc, bounds.w, cy, 'edge', 'right')
+        drawArrow(hint, doc, r.x + r.w, cy, 'left')
+        break
+      case 'pin-right':
+        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'edge', 'fixed')
+        drawAnchor(hint, doc, bounds.w, cy, 'edge', 'right')
+        drawArrow(hint, doc, r.x + r.w, cy, 'left')
+        break
+      case 'stretch':
+        drawSpring(hint, doc, 0, cy, r.x, cy, 'edge', 'scaled')
+        drawAnchor(hint, doc, 0, cy, 'edge', 'left')
+        drawArrow(hint, doc, r.x, cy, 'right')
+        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'edge', 'scaled')
+        drawAnchor(hint, doc, bounds.w, cy, 'edge', 'right')
+        drawArrow(hint, doc, r.x + r.w, cy, 'left')
+        break
+      case 'fill':
+        drawSpring(hint, doc, 0, cy, r.x, cy, 'edge', 'fixed')
+        drawAnchor(hint, doc, 0, cy, 'edge', 'left')
+        drawArrow(hint, doc, r.x, cy, 'right')
+        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'edge', 'fixed')
         drawAnchor(hint, doc, bounds.w, cy, 'edge', 'right')
         drawArrow(hint, doc, r.x + r.w, cy, 'left')
         break
       case 'center':
-        // two coils pushing from either side onto the object's two sides
-        drawSpring(hint, doc, 0, cy, r.x, cy, 'center')
-        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'center')
+        // two straight connectors + the page centerline through the object
+        drawSpring(hint, doc, 0, cy, r.x, cy, 'center', 'fixed')
+        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'center', 'fixed')
         drawAnchor(hint, doc, 0, cy, 'center', 'left')
         drawAnchor(hint, doc, bounds.w, cy, 'center', 'right')
-        break
-      case 'stretch':
-        drawSpring(hint, doc, 0, cy, r.x, cy, 'stretch')
-        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'stretch')
-        drawAnchor(hint, doc, 0, cy, 'stretch', 'left')
-        drawAnchor(hint, doc, bounds.w, cy, 'stretch', 'right')
-        break
-      case 'left':
-        drawSpring(hint, doc, 0, cy, r.x, cy, 'edge')
-        drawAnchor(hint, doc, 0, cy, 'edge', 'left')
-        drawArrow(hint, doc, r.x, cy, 'right')
         break
     }
   }
@@ -508,27 +522,42 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       case undefined:
       case 'free':
         return // Free = no constraint, nothing to show
+      case 'top':
+        drawSpring(hint, doc, cx, 0, cx, r.y, 'edge', 'scaled')
+        drawAnchor(hint, doc, cx, 0, 'edge', 'top')
+        drawArrow(hint, doc, cx, r.y, 'down')
+        break
       case 'bottom':
-        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'edge')
+        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'edge', 'scaled')
+        drawAnchor(hint, doc, cx, bounds.h, 'edge', 'bottom')
+        drawArrow(hint, doc, cx, r.y + r.h, 'up')
+        break
+      case 'pin-bottom':
+        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'edge', 'fixed')
+        drawAnchor(hint, doc, cx, bounds.h, 'edge', 'bottom')
+        drawArrow(hint, doc, cx, r.y + r.h, 'up')
+        break
+      case 'stretch':
+        drawSpring(hint, doc, cx, 0, cx, r.y, 'edge', 'scaled')
+        drawAnchor(hint, doc, cx, 0, 'edge', 'top')
+        drawArrow(hint, doc, cx, r.y, 'down')
+        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'edge', 'scaled')
+        drawAnchor(hint, doc, cx, bounds.h, 'edge', 'bottom')
+        drawArrow(hint, doc, cx, r.y + r.h, 'up')
+        break
+      case 'fill':
+        drawSpring(hint, doc, cx, 0, cx, r.y, 'edge', 'fixed')
+        drawAnchor(hint, doc, cx, 0, 'edge', 'top')
+        drawArrow(hint, doc, cx, r.y, 'down')
+        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'edge', 'fixed')
         drawAnchor(hint, doc, cx, bounds.h, 'edge', 'bottom')
         drawArrow(hint, doc, cx, r.y + r.h, 'up')
         break
       case 'center':
-        drawSpring(hint, doc, cx, 0, cx, r.y, 'center')
-        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'center')
+        drawSpring(hint, doc, cx, 0, cx, r.y, 'center', 'fixed')
+        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'center', 'fixed')
         drawAnchor(hint, doc, cx, 0, 'center', 'top')
         drawAnchor(hint, doc, cx, bounds.h, 'center', 'bottom')
-        break
-      case 'stretch':
-        drawSpring(hint, doc, cx, 0, cx, r.y, 'stretch')
-        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'stretch')
-        drawAnchor(hint, doc, cx, 0, 'stretch', 'top')
-        drawAnchor(hint, doc, cx, bounds.h, 'stretch', 'bottom')
-        break
-      case 'top':
-        drawSpring(hint, doc, cx, 0, cx, r.y, 'edge')
-        drawAnchor(hint, doc, cx, 0, 'edge', 'top')
-        drawArrow(hint, doc, cx, r.y, 'down')
         break
     }
   }
@@ -880,7 +909,11 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       redrawSelection()
       drawClipIndicators()
     } else {
-      drag.ghost = resizeRect(drag.rect, drag.dir, rawDx, rawDy)
+      // Shift on a corner handle keeps the start aspect ratio (images/cards)
+      drag.ghost =
+        e.shiftKey && isCornerHandle(drag.dir)
+          ? resizeRectAspect(drag.rect, drag.dir, rawDx, rawDy)
+          : resizeRect(drag.rect, drag.dir, rawDx, rawDy)
       rects.set(drag.id, drag.ghost) // clip indicator tracks the ghost live
       if (isGroupEl(drag.id)) {
         // live feedback: CSS-scale the subtree from the fixed corner only —

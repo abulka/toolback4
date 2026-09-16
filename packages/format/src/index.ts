@@ -28,15 +28,19 @@ export type Breakpoint = (typeof BREAKPOINTS)[number]
  *   center   x = (W − w)/2
  *   right    the gap to the right edge scales: x = (r.x+r.w)·(W/W₀) − w
  *   stretch  both margins scale: x = r.x·(W/W₀), w = r.w·(W/W₀) — a true scale
+ *   pin-right the right-margin gap stays a constant px: x = r.x + (W − W₀)
+ *   fill     both margins stay constant px (the size grows): x = r.x,
+ *            w = r.w + (W − W₀) — the fixed-gutter content panel / Dock-Fill
  *
- * Vertical mirrors with free / top / center / bottom / stretch on y/h.
+ * Vertical mirrors with free / top / center / bottom / stretch / pin-bottom /
+ * fill on y/h.
  *
  * `left`/`right`/`top`/`bottom`/`stretch` keep the VISUAL PROPORTION of the
- * anchored margin (it scales with the page). A constant-pixel margin from
- * right/bottom is a future "pin" mode (see the backlog in plans/PLAN.md).
+ * anchored margin (it scales with the page); `pin-*` and `fill` keep a
+ * CONSTANT-pixel margin.
  */
-export const FIT_H_MODES = ['free', 'left', 'center', 'right', 'stretch'] as const
-export const FIT_V_MODES = ['free', 'top', 'center', 'bottom', 'stretch'] as const
+export const FIT_H_MODES = ['free', 'left', 'center', 'right', 'stretch', 'pin-right', 'fill'] as const
+export const FIT_V_MODES = ['free', 'top', 'center', 'bottom', 'stretch', 'pin-bottom', 'fill'] as const
 export type FitHMode = (typeof FIT_H_MODES)[number]
 export type FitVMode = (typeof FIT_V_MODES)[number]
 export interface FitSpec {
@@ -635,6 +639,100 @@ export function scaleRect(
   }
 }
 
+/** selection-alignment guides: the selection's bounding box edges/centers */
+export type AlignMode = 'left' | 'right' | 'top' | 'bottom' | 'centerX' | 'centerY'
+
+/** match dimension for {@link matchSizeRects} */
+export type MatchDim = 'w' | 'h' | 'both'
+
+function moveRect(r: Rect, dx: number, dy: number): Rect {
+  return { x: r.x + dx, y: r.y + dy, w: r.w, h: r.h }
+}
+
+/**
+ * Align every rect to the selection's bounding box (Figma semantics): `left`
+ * moves each rect's left edge to the box's left edge, `right` its right edge
+ * to the box's right edge, `centerX` its horizontal center to the box center,
+ * and so on. Returns new rects in input order (rounded).
+ */
+export function alignRects(rects: Rect[], mode: AlignMode): Rect[] {
+  if (rects.length < 2) return rects.map((r) => ({ ...r }))
+  const box = unionRects(rects)
+  return rects.map((r) => {
+    const out = { ...r }
+    switch (mode) {
+      case 'left':
+        out.x = box.x
+        break
+      case 'right':
+        out.x = box.x + box.w - r.w
+        break
+      case 'centerX':
+        out.x = box.x + (box.w - r.w) / 2
+        break
+      case 'top':
+        out.y = box.y
+        break
+      case 'bottom':
+        out.y = box.y + box.h - r.h
+        break
+      case 'centerY':
+        out.y = box.y + (box.h - r.h) / 2
+        break
+    }
+    out.x = Math.round(out.x)
+    out.y = Math.round(out.y)
+    return out
+  })
+}
+
+/**
+ * Center the selection as a BLOCK on the page: translate every rect by the
+ * same offset so the bounding box center sits on the page center. This is the
+ * "center this OK/Cancel pair" command — aligning each object's own center
+ * to the page would stack them on top of each other.
+ */
+export function centerBlockRects(rects: Rect[], pageSize: CanvasSize): Rect[] {
+  if (rects.length === 0) return []
+  const box = unionRects(rects)
+  const dx = Math.round(pageSize.width / 2 - (box.x + box.w / 2))
+  const dy = Math.round(pageSize.height / 2 - (box.y + box.h / 2))
+  return rects.map((r) => moveRect(r, dx, dy))
+}
+
+/**
+ * Distribute rects evenly along an axis by their centers, keeping the two
+ * outermost rects fixed (first and last in the sorted-by-center order).
+ */
+export function distributeRects(rects: Rect[], axis: 'x' | 'y'): Rect[] {
+  const out = rects.map((r) => ({ ...r }))
+  if (rects.length < 3) return out
+  const center = (r: Rect): number => (axis === 'x' ? r.x + r.w / 2 : r.y + r.h / 2)
+  const order = rects.map((r, i) => ({ i, c: center(r) })).sort((a, b) => a.c - b.c)
+  const first = order[0]!.c
+  const last = order[order.length - 1]!.c
+  const step = (last - first) / (order.length - 1)
+  order.forEach((entry, k) => {
+    const target = first + step * k
+    const r = out[entry.i]!
+    if (axis === 'x') r.x = Math.round(target - r.w / 2)
+    else r.y = Math.round(target - r.h / 2)
+  })
+  return out
+}
+
+/** Match every rect's size to the largest in the selection. */
+export function matchSizeRects(rects: Rect[], dim: MatchDim): Rect[] {
+  if (rects.length < 2) return rects.map((r) => ({ ...r }))
+  const w = Math.round(Math.max(...rects.map((r) => r.w)))
+  const h = Math.round(Math.max(...rects.map((r) => r.h)))
+  return rects.map((r) => ({
+    ...r,
+    w: dim === 'h' ? r.w : w,
+    h: dim === 'w' ? r.h : h,
+  }))
+}
+
 const DEFAULT_FIT: FitSpec = { x: 'free', y: 'free' }
 
 /**
@@ -661,9 +759,20 @@ export function resolveObjectRect(
   const ratioY = H0 === 0 ? 1 : H / H0
   const round = (n: number): number => Math.max(1, Math.round(n))
   // stretch keeps BOTH margins proportional, so the size scales by the same
-  // ratio as the page (and the position rides with the left/top margin)
-  const w = fit.x === 'stretch' ? round(r.w * ratioX) : r.w
-  const h = fit.y === 'stretch' ? round(r.h * ratioY) : r.h
+  // ratio as the page (and the position rides with the left/top margin);
+  // fill keeps BOTH margins fixed, so the size grows by the page delta
+  const w =
+    fit.x === 'stretch'
+      ? round(r.w * ratioX)
+      : fit.x === 'fill'
+        ? Math.max(1, Math.round(r.w + (W - W0)))
+        : r.w
+  const h =
+    fit.y === 'stretch'
+      ? round(r.h * ratioY)
+      : fit.y === 'fill'
+        ? Math.max(1, Math.round(r.h + (H - H0)))
+        : r.h
   const x =
     fit.x === 'center'
       ? (W - w) / 2
@@ -671,7 +780,9 @@ export function resolveObjectRect(
         ? r.x * ratioX
         : fit.x === 'right'
           ? (r.x + r.w) * ratioX - w
-          : r.x // free
+          : fit.x === 'pin-right'
+            ? r.x + (W - W0)
+            : r.x // free / fill
   const y =
     fit.y === 'center'
       ? (H - h) / 2
@@ -679,7 +790,9 @@ export function resolveObjectRect(
         ? r.y * ratioY
         : fit.y === 'bottom'
           ? (r.y + r.h) * ratioY - h
-          : r.y // free
+          : fit.y === 'pin-bottom'
+            ? r.y + (H - H0)
+            : r.y // free / fill
   return { x: Math.round(x), y: Math.round(y), w, h }
 }
 
@@ -709,24 +822,38 @@ export function unlensObjectRect(
   const round = (n: number): number => Math.max(1, Math.round(n))
   const fx = fit?.x
   const fy = fit?.y
-  const w = fx === 'stretch' ? round(dragged.w * ratioX) : dragged.w
-  const h = fy === 'stretch' ? round(dragged.h * ratioY) : dragged.h
+  const w =
+    fx === 'stretch'
+      ? round(dragged.w * ratioX)
+      : fx === 'fill'
+        ? round(dragged.w - (W - W0))
+        : dragged.w
+  const h =
+    fy === 'stretch'
+      ? round(dragged.h * ratioY)
+      : fy === 'fill'
+        ? round(dragged.h - (H - H0))
+        : dragged.h
   const x =
     fx === 'left' || fx === 'stretch'
       ? dragged.x * ratioX
       : fx === 'right'
         ? (dragged.x + dragged.w) * ratioX - dragged.w
-        : fx === 'center'
-          ? ref.x // rigid: centered is fully determined
-          : dragged.x // free
+        : fx === 'pin-right'
+          ? dragged.x + (W0 - W)
+          : fx === 'center'
+            ? ref.x // rigid: centered is fully determined
+            : dragged.x // free / fill
   const y =
     fy === 'top' || fy === 'stretch'
       ? dragged.y * ratioY
       : fy === 'bottom'
         ? (dragged.y + dragged.h) * ratioY - dragged.h
-        : fy === 'center'
-          ? ref.y
-          : dragged.y // free
+        : fy === 'pin-bottom'
+          ? dragged.y + (H0 - H)
+          : fy === 'center'
+            ? ref.y
+            : dragged.y // free / fill
   return { x: Math.round(x), y: Math.round(y), w, h }
 }
 

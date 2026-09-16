@@ -1,14 +1,18 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import {
+  alignRects,
   backgroundFor,
+  centerBlockRects,
   createBackground,
   createBook,
   createGroup,
   createObject,
   createPage,
   DEFAULT_PROPS,
+  distributeRects,
   flattenObjects,
+  matchSizeRects,
   newId,
   parseBook,
   rebaseRect,
@@ -19,6 +23,7 @@ import {
   scaleRect,
   unionRects,
   unrebaseRect,
+  type AlignMode,
   type Background,
   type Book,
   type Breakpoint,
@@ -26,6 +31,7 @@ import {
   type ControlKind,
   type FitHintMode,
   type FitSpec,
+  type MatchDim,
   type PageObject,
   type Rect,
 } from '@toolback/format'
@@ -956,19 +962,6 @@ export const useBookStore = defineStore('book', () => {
     sync()
   }
 
-  /** human label for the declared constraints, e.g. "Center · Middle" —
-   *  Free axes are omitted ("Free" when nothing is constrained) */
-  function fitLabelOf(obj: PageObject): string {
-    const parts: string[] = []
-    const H: Record<string, string> = { left: 'Left', center: 'Center', right: 'Right', stretch: 'Stretch' }
-    const V: Record<string, string> = { top: 'Top', center: 'Center', bottom: 'Bottom', stretch: 'Stretch' }
-    const hm = obj.fit?.x
-    const vm = obj.fit?.y
-    if (hm && hm !== 'free') parts.push(H[hm] ?? hm)
-    if (vm && vm !== 'free') parts.push(V[vm] ?? vm)
-    return parts.join(' · ') || 'Free'
-  }
-
   /** drop one fit axis (used when a write can't be expressed through it) */
   function clearFitAxis(obj: PageObject, axis: 'x' | 'y'): void {
     if (!obj.fit) return
@@ -1113,6 +1106,172 @@ export const useBookStore = defineStore('book', () => {
     obj.fit = { ...(obj.fit ?? {}), x: 'stretch', y: 'stretch' }
     obj.rect = unlensObjectRect(obj.rect, target, obj.fit, pageSize, refSize)
     sync()
+  }
+
+  /**
+   * Fill the page's width (minus `margin` on each side) with a top-level
+   * object, leaving its vertical placement/size untouched. The horizontal axis
+   * becomes Stretch so the margins keep their share of the page. Folds the
+   * target back onto the shared layout.
+   */
+  function fillObjectWidth(id: string, margin: number): void {
+    const found = locateObj(id)
+    if (!found || found.parent) return
+    const obj = found.obj
+    record('Fill width', `fill:${id}`)
+    const bg = targetBackground.value
+    const pageSize = resolvePageSize(book.value, bg, breakpoint.value)
+    const refSize = resolvePageSize(book.value, bg, 'desktop')
+    const m = Math.max(0, Math.round(margin))
+    const rendered = resolveObjectRect(obj, pageSize, refSize)
+    const target: Rect = {
+      x: m,
+      y: rendered.y,
+      w: Math.max(1, pageSize.width - m * 2),
+      h: rendered.h,
+    }
+    obj.fit = { ...(obj.fit ?? {}), x: 'stretch' }
+    obj.rect = unlensObjectRect(obj.rect, target, obj.fit, pageSize, refSize)
+    sync()
+  }
+
+  /** Fill the page's height (minus `margin` top/bottom), leaving width as-is. */
+  function fillObjectHeight(id: string, margin: number): void {
+    const found = locateObj(id)
+    if (!found || found.parent) return
+    const obj = found.obj
+    record('Fill height', `fill:${id}`)
+    const bg = targetBackground.value
+    const pageSize = resolvePageSize(book.value, bg, breakpoint.value)
+    const refSize = resolvePageSize(book.value, bg, 'desktop')
+    const m = Math.max(0, Math.round(margin))
+    const rendered = resolveObjectRect(obj, pageSize, refSize)
+    const target: Rect = {
+      x: rendered.x,
+      y: m,
+      w: rendered.w,
+      h: Math.max(1, pageSize.height - m * 2),
+    }
+    obj.fit = { ...(obj.fit ?? {}), y: 'stretch' }
+    obj.rect = unlensObjectRect(obj.rect, target, obj.fit, pageSize, refSize)
+    sync()
+  }
+
+  /** Glue a top-level object to both page center lines (Center · Center). */
+  function centerObjectInPage(id: string): void {
+    const found = locateObj(id)
+    if (!found || found.parent) return
+    record('Center on page', `fit:${id}`)
+    found.obj.fit = { ...(found.obj.fit ?? {}), x: 'center', y: 'center' }
+    sync()
+  }
+
+  /**
+   * The page-absolute rect an object RENDERS at in the active breakpoint,
+   * including the scale a stretched/filled top-level group applies to its
+   * members (mirrors renderObjectInto). Align/distribute measure in this space
+   * so the commands line up what is actually on screen.
+   */
+  function renderedPageRectOf(id: string): Rect | null {
+    const chain = locateChain(id)
+    if (!chain || chain.length === 0) return null
+    const bg = targetBackground.value
+    const pageSize = resolvePageSize(book.value, bg, breakpoint.value)
+    const refSize = resolvePageSize(book.value, bg, 'desktop')
+    const top = chain[0]!
+    const topRect = resolveObjectRect(top, pageSize, refSize)
+    if (chain.length === 1) return topRect
+    // members are relative to the group's rendered box; a size-changing lens
+    // on the top-level group scales every descendant by the same factor
+    const s = top.rect.w === 0 ? 1 : topRect.w / top.rect.w
+    let x = topRect.x
+    let y = topRect.y
+    for (let i = 1; i < chain.length; i++) {
+      x += chain[i]!.rect.x * s
+      y += chain[i]!.rect.y * s
+    }
+    const obj = chain[chain.length - 1]!
+    return { x, y, w: obj.rect.w * s, h: obj.rect.h * s }
+  }
+
+  /**
+   * Write page-absolute rendered rects back onto the one authored layout — the
+   * seam align/distribute/match share. Top-level objects fold through the lens
+   * (glue preserved; a centered axis is released, as with typed writes);
+   * members rebase into their group's local base frame, un-scaling first so a
+   * member of a stretched group lands correctly. One undo step.
+   */
+  function writeRenderedRects(entries: Array<{ id: string; rect: Rect }>, label: string): void {
+    if (!entries.length) return
+    record(label, 'align:' + entries.map((e) => e.id).sort().join(','))
+    const bg = targetBackground.value
+    const pageSize = resolvePageSize(book.value, bg, breakpoint.value)
+    const refSize = resolvePageSize(book.value, bg, 'desktop')
+    const affectedParents = new Set<PageObject>()
+    for (const { id, rect } of entries) {
+      const found = locateObj(id)
+      if (!found) continue
+      if (found.parent) {
+        const pr = renderedPageRectOf(found.parent.id)
+        if (!pr) continue
+        const s = found.parent.rect.w === 0 ? 1 : pr.w / found.parent.rect.w
+        found.obj.rect = {
+          x: Math.round((rect.x - pr.x) / s),
+          y: Math.round((rect.y - pr.y) / s),
+          w: Math.max(1, Math.round(rect.w / s)),
+          h: Math.max(1, Math.round(rect.h / s)),
+        }
+        affectedParents.add(found.parent)
+      } else {
+        if (found.obj.fit?.x === 'center') clearFitAxis(found.obj, 'x')
+        if (found.obj.fit?.y === 'center') clearFitAxis(found.obj, 'y')
+        found.obj.rect = unlensObjectRect(found.obj.rect, rect, found.obj.fit, pageSize, refSize)
+      }
+    }
+    for (const parent of affectedParents) expandGroup(parent)
+    sync()
+  }
+
+  /** align the selection to its own bounding box (Figma semantics) */
+  function alignSelection(mode: AlignMode): void {
+    const ids = selectionIds.value
+    if (ids.length < 2 || selectionParentId.value === 'mixed') return
+    const rects = ids.map(renderedPageRectOf)
+    if (rects.some((r) => !r)) return
+    const next = alignRects(rects as Rect[], mode)
+    writeRenderedRects(ids.map((id, i) => ({ id, rect: next[i]! })), 'Align')
+  }
+
+  /** center the selection as a block on the page (the OK/Cancel case) */
+  function centerSelectionOnPage(): void {
+    const ids = selectionIds.value
+    if (!ids.length || selectionParentId.value === 'mixed') return
+    const rects = ids.map(renderedPageRectOf)
+    if (rects.some((r) => !r)) return
+    const bg = targetBackground.value
+    const pageSize = resolvePageSize(book.value, bg, breakpoint.value)
+    const next = centerBlockRects(rects as Rect[], pageSize)
+    writeRenderedRects(ids.map((id, i) => ({ id, rect: next[i]! })), 'Center on page')
+  }
+
+  /** space the selection evenly along an axis (outer two fixed) */
+  function distributeSelection(axis: 'x' | 'y'): void {
+    const ids = selectionIds.value
+    if (ids.length < 3 || selectionParentId.value === 'mixed') return
+    const rects = ids.map(renderedPageRectOf)
+    if (rects.some((r) => !r)) return
+    const next = distributeRects(rects as Rect[], axis)
+    writeRenderedRects(ids.map((id, i) => ({ id, rect: next[i]! })), 'Distribute')
+  }
+
+  /** match the selection's width/height to the largest in the selection */
+  function matchSizeSelection(dim: MatchDim): void {
+    const ids = selectionIds.value
+    if (ids.length < 2 || selectionParentId.value === 'mixed') return
+    const rects = ids.map(renderedPageRectOf)
+    if (rects.some((r) => !r)) return
+    const next = matchSizeRects(rects as Rect[], dim)
+    writeRenderedRects(ids.map((id, i) => ({ id, rect: next[i]! })), 'Match size')
   }
 
   function removeSelected(): void {
@@ -1495,6 +1654,13 @@ export const useBookStore = defineStore('book', () => {
     setGeometry,
     effectiveRectOf,
     fillObjectToPage,
+    fillObjectWidth,
+    fillObjectHeight,
+    centerObjectInPage,
+    alignSelection,
+    centerSelectionOnPage,
+    distributeSelection,
+    matchSizeSelection,
     removeSelected,
     duplicateSelected,
     copySelected,

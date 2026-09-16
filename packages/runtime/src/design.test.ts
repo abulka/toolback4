@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createGroup, createObject, type Book, type Rect } from '@toolback/format'
 import { sampleBook } from '@toolback/format/src/sample'
-import { createDesignController, resizeRect, snap } from './design'
+import { createDesignController, isCornerHandle, resizeRect, resizeRectAspect, snap } from './design'
 import { listenForEditor } from './editorLink'
 
 const BG = { id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', objects: [] }
@@ -27,6 +27,29 @@ describe('design geometry helpers', () => {
     const start = { x: 100, y: 100, w: 200, h: 100 }
     expect(resizeRect(start, 'nw', 500, 500)).toEqual({ x: 276, y: 176, w: 24, h: 24 })
     expect(resizeRect(start, 'se', -500, -500)).toEqual({ x: 100, y: 100, w: 24, h: 24 })
+  })
+
+  it('aspect resize holds the start ratio from a corner, fixing the opposite corner', () => {
+    const start = { x: 100, y: 100, w: 200, h: 100 } // ratio 2:1
+    // drive by width (se): w 200→248, h follows 124
+    const se = resizeRectAspect(start, 'se', 48, 0)
+    expect(se).toEqual({ x: 100, y: 100, w: 248, h: 124 })
+    // drive by height (se): h 100→140, w follows 280
+    const seH = resizeRectAspect(start, 'se', 0, 40)
+    expect(seH.w).toBe(280)
+    expect(seH.h).toBe(140)
+    // nw keeps the bottom-right corner fixed
+    const nw = resizeRectAspect(start, 'nw', -48, 0)
+    expect(nw.x + nw.w).toBe(300)
+    expect(nw.y + nw.h).toBe(200)
+    expect(nw.w / nw.h).toBeCloseTo(2, 5)
+  })
+
+  it('isCornerHandle separates corners from edges', () => {
+    expect(isCornerHandle('nw')).toBe(true)
+    expect(isCornerHandle('se')).toBe(true)
+    expect(isCornerHandle('n')).toBe(false)
+    expect(isCornerHandle('e')).toBe(false)
   })
 })
 
@@ -59,6 +82,26 @@ describe('design mode (structural)', () => {
       )
       const overlay = root.querySelector<HTMLElement>('.tb-design-overlay')!
       expect(overlay.style.display).toBe('none')
+    } finally {
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('clips the design overlay to the page so off-page chrome cannot grow the iframe scroll area', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const cleanup = listenForEditor(root, () => {})
+    try {
+      const book = sampleBook()
+      window.dispatchEvent(
+        new MessageEvent('message', { data: { type: 'toolback:load', book, design: true } }),
+      )
+      const overlay = root.querySelector<HTMLElement>('.tb-design-overlay')!
+      // an object dragged past the page edge is clipped by .tb-page; the
+      // selection outline/handles/size badge must be clipped with it, or their
+      // overflow makes the iframe document scrollable into phantom space
+      expect(getComputedStyle(overlay).overflow).toBe('hidden')
     } finally {
       cleanup()
       root.remove()
@@ -1384,22 +1427,38 @@ describe('glue-spring hint modes', () => {
     expect(root.querySelector('.tb-fithint-arrow--up')).not.toBeNull()
   })
 
-  it('center draws plain dashed connector lines with circle anchors and no arrows', () => {
+  it('center draws plain straight connector lines with circle anchors and no arrows', () => {
     loadBook({ x: 'center', y: 'center' })
     const springs = root.querySelectorAll('svg.tb-fithint-spring--center')
     expect(springs.length).toBe(4) // two per axis
     expect(root.querySelectorAll('.tb-fithint-anchor--center').length).toBe(4)
     expect(root.querySelectorAll('.tb-fithint-arrow').length).toBe(0)
-    // the connector is a straight segment, not a zigzag/coil
+    // the connector is a straight segment, not a zigzag
     const d = springs[0]!.querySelector('path')!.getAttribute('d')!
     expect((d.match(/ L /g) ?? []).length).toBe(1)
   })
 
-  it('stretch draws dashed circular coils with triangle anchors', () => {
+  it('stretch draws dashed edge springs from both sides (scaled)', () => {
     loadBook({ x: 'stretch', y: 'stretch' })
-    expect(root.querySelectorAll('svg.tb-fithint-spring--stretch').length).toBe(4)
-    expect(root.querySelectorAll('.tb-fithint-anchor--stretch').length).toBe(4)
-    expect(root.querySelectorAll('.tb-fithint-arrow').length).toBe(0)
+    expect(root.querySelectorAll('svg.tb-fithint-spring--edge').length).toBe(4)
+    expect(root.querySelectorAll('svg.tb-fithint-spring--scaled').length).toBe(4)
+    expect(root.querySelectorAll('svg.tb-fithint-spring--fixed').length).toBe(0)
+    expect(root.querySelectorAll('.tb-fithint-anchor--edge').length).toBe(4)
+    expect(root.querySelectorAll('.tb-fithint-arrow').length).toBeGreaterThan(0)
+  })
+
+  it('fill draws solid edge springs from both sides (fixed)', () => {
+    loadBook({ x: 'fill', y: 'fill' })
+    expect(root.querySelectorAll('svg.tb-fithint-spring--edge').length).toBe(4)
+    expect(root.querySelectorAll('svg.tb-fithint-spring--fixed').length).toBe(4)
+    expect(root.querySelectorAll('svg.tb-fithint-spring--scaled').length).toBe(0)
+  })
+
+  it('pin-right draws a solid edge spring with an end anchor', () => {
+    loadBook({ x: 'pin-right' })
+    expect(root.querySelectorAll('svg.tb-fithint-spring--edge').length).toBe(1)
+    expect(root.querySelectorAll('svg.tb-fithint-spring--fixed').length).toBe(1)
+    expect(root.querySelectorAll('.tb-fithint-anchor--edge').length).toBe(1)
   })
 })
 

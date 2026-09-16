@@ -4,14 +4,18 @@ import {
   DEFAULT_SIZES,
   IMAGE_PROVIDERS,
   AUTO_HEIGHT_MARGIN,
+  alignRects,
   backgroundFor,
+  centerBlockRects,
   contentHeightFor,
   createBook,
   createBackground,
   createGroup,
   createObject,
   createPage,
+  distributeRects,
   flattenObjects,
+  matchSizeRects,
   parseBook,
   randomImageUrl,
   rebaseRect,
@@ -390,6 +394,40 @@ describe('resolveObjectRect (responsive glue — lens)', () => {
     expect(r.y).toBe(Math.round((200 + 48) * (844 / 800)) - 48)
   })
 
+  it('pin-right keeps a constant right-margin gap (size fixed)', () => {
+    // authored right gap = 1280 - (1080 + 176) = 24
+    const r = rect({ x: 'pin-right' })
+    expect(r.w).toBe(176)
+    expect(390 - (r.x + r.w)).toBe(24)
+    // wide page: same constant gap
+    const w = resolveObjectRect(obj({ x: 'pin-right' }), { width: 1920, height: 800 }, ref)
+    expect(1920 - (w.x + w.w)).toBe(24)
+  })
+
+  it('pin-bottom keeps a constant bottom-margin gap', () => {
+    const r = rect({ y: 'pin-bottom' })
+    expect(r.h).toBe(48)
+    expect(844 - (r.y + r.h)).toBe(Math.round(800 - (200 + 48)))
+  })
+
+  it('fill keeps both margins constant and lets the size grow', () => {
+    // authored left gap 1080, right gap 24
+    const wide = resolveObjectRect(obj({ x: 'fill' }), { width: 1920, height: 800 }, ref)
+    expect(wide.x).toBe(1080)
+    expect(1920 - (wide.x + wide.w)).toBe(24)
+    expect(wide.w).toBe(176 + (1920 - 1280))
+    // a narrower page shrinks the size but keeps both margins
+    const narrow = resolveObjectRect(obj({ x: 'fill' }), { width: 1200, height: 800 }, ref)
+    expect(narrow.x).toBe(1080)
+    expect(1200 - (narrow.x + narrow.w)).toBe(24)
+    expect(narrow.w).toBe(176 + (1200 - 1280))
+  })
+
+  it('pin/fill are identity at the base size', () => {
+    expect(resolveObjectRect(obj({ x: 'pin-right', y: 'pin-bottom' }), ref, ref)).toEqual({ ...base })
+    expect(resolveObjectRect(obj({ x: 'fill', y: 'fill' }), ref, ref)).toEqual({ ...base })
+  })
+
   it('at the base size the constrained axes are identity; only Center moves', () => {
     expect(resolveObjectRect(obj(), ref, ref)).toEqual({ ...base })
     expect(resolveObjectRect(obj({ x: 'right', y: 'bottom' }), ref, ref)).toEqual({ ...base })
@@ -424,6 +462,22 @@ describe('resolveObjectRect (responsive glue — lens)', () => {
     const dragged = { x: 40, y: 60, w: 200, h: 60 }
     expect(unlensObjectRect(refRect, dragged, { x: 'right', y: 'bottom' }, ref, ref)).toEqual(dragged)
     expect(unlensObjectRect(refRect, dragged, { x: 'stretch', y: 'stretch' }, ref, ref)).toEqual(dragged)
+    expect(unlensObjectRect(refRect, dragged, { x: 'pin-right', y: 'pin-bottom' }, ref, ref)).toEqual(dragged)
+    expect(unlensObjectRect(refRect, dragged, { x: 'fill', y: 'fill' }, ref, ref)).toEqual(dragged)
+  })
+
+  it('unlensObjectRect inverts pin-right / fill back onto the base rect', () => {
+    const cases = [
+      { x: 'pin-right', y: 'pin-bottom' },
+      { x: 'fill', y: 'fill' },
+    ] as const
+    for (const fit of cases) {
+      const refRect = { ...base }
+      const dragged = { x: 40, y: 60, w: 200, h: 60 }
+      const nextRef = unlensObjectRect(refRect, dragged, fit, page, ref)
+      const round = resolveObjectRect({ ...obj(fit), rect: nextRef }, page, ref)
+      expect(round).toEqual(dragged)
+    }
   })
 
   it('unlensObjectRect leaves a Center axis rigid on its base', () => {
@@ -508,6 +562,59 @@ describe('resolveObjectRect (responsive glue — lens)', () => {
       ],
     })
     expect(parsed.success).toBe(false)
+  })
+})
+
+describe('selection align / distribute / match', () => {
+  const a = { x: 0, y: 0, w: 100, h: 50 }
+  const b = { x: 120, y: 40, w: 80, h: 60 }
+  const c = { x: 60, y: 200, w: 40, h: 20 }
+  const rects = [a, b, c]
+
+  it('aligns to the selection bounding box per edge/center', () => {
+    expect(alignRects(rects, 'left').map((r) => r.x)).toEqual([0, 0, 0])
+    expect(alignRects(rects, 'right').map((r) => r.x)).toEqual([100, 120, 160])
+    expect(alignRects(rects, 'centerX').map((r) => r.x)).toEqual([50, 60, 80])
+    expect(alignRects(rects, 'top').map((r) => r.y)).toEqual([0, 0, 0])
+    expect(alignRects(rects, 'bottom').map((r) => r.y)).toEqual([170, 160, 200])
+    expect(alignRects(rects, 'centerY').map((r) => r.y)).toEqual([85, 80, 100])
+  })
+
+  it('centerBlockRects translates the whole block onto the page center', () => {
+    const out = centerBlockRects(rects, { width: 400, height: 400 })
+    expect(out).toEqual([
+      { x: 100, y: 90, w: 100, h: 50 },
+      { x: 220, y: 130, w: 80, h: 60 },
+      { x: 160, y: 290, w: 40, h: 20 },
+    ])
+    // the block's own center lands on the page center
+    const box = unionRects(out)
+    expect(box.x + box.w / 2).toBe(200)
+    expect(box.y + box.h / 2).toBe(200)
+  })
+
+  it('distributeRects spaces centers evenly, keeping the outer two fixed', () => {
+    const out = distributeRects(rects, 'x')
+    expect(out.map((r) => r.x)).toEqual([0, 120, 85])
+    expect(out[0]).toEqual(a)
+    expect(out[1]).toEqual(b)
+    const centers = out.map((r) => r.x + r.w / 2).sort((p, q) => p - q)
+    expect(centers[1]! - centers[0]!).toBeCloseTo(centers[2]! - centers[1]!, 5)
+    const vy = distributeRects(rects, 'y')
+    expect(vy[0]!.y).toBe(0)
+    expect(vy[2]!.y).toBe(200)
+    expect(vy[1]!.y).toBe(88)
+  })
+
+  it('distribute is a no-op below three rects', () => {
+    expect(distributeRects([a, b], 'x')).toEqual([a, b])
+  })
+
+  it('matchSizeRects targets the largest dimension', () => {
+    expect(matchSizeRects(rects, 'w').map((r) => r.w)).toEqual([100, 100, 100])
+    expect(matchSizeRects(rects, 'h').map((r) => r.h)).toEqual([60, 60, 60])
+    const both = matchSizeRects(rects, 'both')
+    expect(both.map((r) => [r.w, r.h])).toEqual([[100, 60], [100, 60], [100, 60]])
   })
 })
 

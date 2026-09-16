@@ -1,6 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { Rect } from '@toolback/format'
+import type { AlignMode, MatchDim, Rect } from '@toolback/format'
+import {
+  anchorOf,
+  ANCHORS_H,
+  ANCHORS_V,
+  canFix,
+  describeFit,
+  fitBadge,
+  isFixed,
+  modeFor,
+  type FitAnchor,
+} from '../fitModes'
 import { useBookStore } from '../stores/book'
 import { collectStoreKeys } from '../storeKeys'
 import { FONT_FAMILIES, IMAGE_PROVIDERS, randomImageUrl, type ImageProvider } from '@toolback/format'
@@ -23,52 +34,34 @@ const rect = computed<Rect | null>(() =>
 )
 
 // ---- responsive glue ----
-// 'free' = no constraint (the authored coordinate applies everywhere)
-const FIT_H: Array<{ id: string; label: string }> = [
-  { id: 'free', label: 'Free' },
-  { id: 'left', label: 'Left' },
-  { id: 'center', label: 'Center' },
-  { id: 'right', label: 'Right' },
-  { id: 'stretch', label: 'Stretch' },
-]
-const FIT_V: Array<{ id: string; label: string }> = [
-  { id: 'free', label: 'Free' },
-  { id: 'top', label: 'Top' },
-  { id: 'center', label: 'Center' },
-  { id: 'bottom', label: 'Bottom' },
-  { id: 'stretch', label: 'Stretch' },
-]
-/** one-line "what does this do" for the active pair of modes */
-const FIT_DESC: Record<string, string> = {
-  free: 'position fixed at its authored spot',
-  left: 'left margin keeps its share of the page',
-  top: 'top margin keeps its share of the page',
-  right: 'right margin keeps its share of the page',
-  bottom: 'bottom margin keeps its share of the page',
-  center: 'always centered on the page',
-  stretch: 'size and margins scale with the page',
-}
+// Two questions per axis: which edge(s) the object glues to (anchor) and
+// whether the margins stay a fixed px or scale with the page. fitModes.ts maps
+// that pair onto the stored lens tokens so the panel never shows pin/fill.
 const fitH = computed(() => sel.value?.fit?.x ?? 'free')
 const fitV = computed(() => sel.value?.fit?.y ?? 'free')
-/** only real constraints show in the badge — Free axes are omitted */
-const fitLabel = computed<string>(() => {
-  const parts: string[] = []
-  if (fitH.value !== 'free') parts.push(FIT_H.find((f) => f.id === fitH.value)?.label ?? fitH.value)
-  if (fitV.value !== 'free') parts.push(FIT_V.find((f) => f.id === fitV.value)?.label ?? fitV.value)
-  return parts.join(' · ')
-})
-const fitHint = computed<string>(() => {
-  if (!isGlued.value) return 'Free — the layout stays exactly where you put it.'
-  const h = fitH.value !== 'free' ? `H: ${FIT_DESC[fitH.value] ?? fitH.value}` : ''
-  const v = fitV.value !== 'free' ? `V: ${FIT_DESC[fitV.value] ?? fitV.value}` : ''
-  return [h, v].filter(Boolean).join(' · ')
-})
+const anchorH = computed(() => anchorOf(fitH.value, 'x'))
+const anchorV = computed(() => anchorOf(fitV.value, 'y'))
+const fixedH = computed(() => isFixed(fitH.value))
+const fixedV = computed(() => isFixed(fitV.value))
+const canFixH = computed(() => canFix(anchorH.value))
+const canFixV = computed(() => canFix(anchorV.value))
+const fitLabel = computed(() => fitBadge(fitH.value, fitV.value))
 const isGlued = computed(() => fitLabel.value !== '')
+const fitHint = computed(() => describeFit(fitH.value, fitV.value))
 function onFitH(e: Event): void {
-  if (sel.value) store.setObjectFit(sel.value.id, 'x', (e.target as HTMLSelectElement).value)
+  if (!sel.value) return
+  const anchor = (e.target as HTMLSelectElement).value as FitAnchor
+  store.setObjectFit(sel.value.id, 'x', modeFor(anchor, fixedH.value, 'x'))
 }
 function onFitV(e: Event): void {
-  if (sel.value) store.setObjectFit(sel.value.id, 'y', (e.target as HTMLSelectElement).value)
+  if (!sel.value) return
+  const anchor = (e.target as HTMLSelectElement).value as FitAnchor
+  store.setObjectFit(sel.value.id, 'y', modeFor(anchor, fixedV.value, 'y'))
+}
+function setFixed(axis: 'x' | 'y', on: boolean): void {
+  if (!sel.value) return
+  const anchor = axis === 'x' ? anchorH.value : anchorV.value
+  store.setObjectFit(sel.value.id, axis, modeFor(anchor, on, axis))
 }
 
 const EVENTS = ['click', 'dblclick', 'change', 'input', 'mouseenter', 'mouseleave'] as const
@@ -220,8 +213,8 @@ function readFillMargin(): number {
   }
 }
 const fillMargin = ref<number>(readFillMargin())
-function onFill(): void {
-  if (!sel.value) return
+/** clamp + remember the margin field, returning the value to apply */
+function commitFillMargin(): number {
   const m = Math.max(0, Math.round(fillMargin.value) || 0)
   fillMargin.value = m
   try {
@@ -229,7 +222,36 @@ function onFill(): void {
   } catch {
     /* no localStorage — fine, the margin just isn't remembered */
   }
-  store.fillObjectToPage(sel.value.id, m)
+  return m
+}
+function onFill(): void {
+  if (!sel.value) return
+  store.fillObjectToPage(sel.value.id, commitFillMargin())
+}
+function onFillWidth(): void {
+  if (!sel.value) return
+  store.fillObjectWidth(sel.value.id, commitFillMargin())
+}
+function onFillHeight(): void {
+  if (!sel.value) return
+  store.fillObjectHeight(sel.value.id, commitFillMargin())
+}
+function onCenterInPage(): void {
+  if (sel.value) store.centerObjectInPage(sel.value.id)
+}
+
+// ---- multi-selection align / distribute / match ----
+function onAlign(mode: AlignMode): void {
+  store.alignSelection(mode)
+}
+function onCenterBlock(): void {
+  store.centerSelectionOnPage()
+}
+function onDistribute(axis: 'x' | 'y'): void {
+  store.distributeSelection(axis)
+}
+function onMatch(dim: MatchDim): void {
+  store.matchSizeSelection(dim)
 }
 
 function isGroupSel(): boolean {
@@ -318,6 +340,28 @@ function onPaste(): void {
     <p v-if="store.selectionIds.length >= 2 && !store.groupEligible" class="hint warn">
       Grouping needs all selected objects under the same parent.
     </p>
+    <template v-if="store.groupEligible">
+      <h2>Align</h2>
+      <div class="align-grid">
+        <button class="align-btn" title="Align left edges" @click="onAlign('left')">⇤</button>
+        <button class="align-btn" title="Align horizontal centers" @click="onAlign('centerX')">↔</button>
+        <button class="align-btn" title="Align right edges" @click="onAlign('right')">⇥</button>
+        <button class="align-btn" title="Align top edges" @click="onAlign('top')">⤒</button>
+        <button class="align-btn" title="Align vertical centers" @click="onAlign('centerY')">↕</button>
+        <button class="align-btn" title="Align bottom edges" @click="onAlign('bottom')">⤓</button>
+      </div>
+      <p class="hint">Aligns to the selection's bounding box · Center on page moves them as a block.</p>
+      <div class="actions">
+        <button class="action" :disabled="store.selectionIds.length < 3" @click="onDistribute('x')">Distribute H</button>
+        <button class="action" :disabled="store.selectionIds.length < 3" @click="onDistribute('y')">Distribute V</button>
+        <button class="action" @click="onCenterBlock">Center on page</button>
+      </div>
+      <div class="actions">
+        <button class="action" @click="onMatch('w')">Match W</button>
+        <button class="action" @click="onMatch('h')">Match H</button>
+        <button class="action" @click="onMatch('both')">Match both</button>
+      </div>
+    </template>
   </div>
   <div v-else class="panel">
     <div class="head">
@@ -472,15 +516,43 @@ function onPaste(): void {
     <div v-if="canFit()" class="fit-row">
       <div class="fit-axis">
         <label>Horizontal</label>
-        <select :value="fitH" @change="onFitH">
-          <option v-for="f in FIT_H" :key="f.id" :value="f.id">{{ f.label }}</option>
-        </select>
+        <div class="fit-control">
+          <select :value="anchorH" @change="onFitH">
+            <option v-for="f in ANCHORS_H" :key="f.id" :value="f.id">{{ f.label }}</option>
+          </select>
+          <label
+            v-if="canFixH"
+            class="fixed-toggle"
+            title="Keep the margin a fixed number of px instead of scaling it with the page"
+          >
+            <input
+              type="checkbox"
+              :checked="fixedH"
+              @change="setFixed('x', ($event.target as HTMLInputElement).checked)"
+            />
+            Fixed
+          </label>
+        </div>
       </div>
       <div class="fit-axis">
         <label>Vertical</label>
-        <select :value="fitV" @change="onFitV">
-          <option v-for="f in FIT_V" :key="f.id" :value="f.id">{{ f.label }}</option>
-        </select>
+        <div class="fit-control">
+          <select :value="anchorV" @change="onFitV">
+            <option v-for="f in ANCHORS_V" :key="f.id" :value="f.id">{{ f.label }}</option>
+          </select>
+          <label
+            v-if="canFixV"
+            class="fixed-toggle"
+            title="Keep the margin a fixed number of px instead of scaling it with the page"
+          >
+            <input
+              type="checkbox"
+              :checked="fixedV"
+              @change="setFixed('y', ($event.target as HTMLInputElement).checked)"
+            />
+            Fixed
+          </label>
+        </div>
       </div>
     </div>
     <p v-if="canFit()" class="hint fit-desc">{{ fitHint }}</p>
@@ -514,6 +586,9 @@ function onPaste(): void {
 
     <div v-if="canFit()" class="fill-row">
       <button class="fill" @click="onFill">Fill page</button>
+      <button class="fill" @click="onFillWidth">Fill width</button>
+      <button class="fill" @click="onFillHeight">Fill height</button>
+      <button class="fill" @click="onCenterInPage">Center</button>
       <label class="fill-margin-label">
         margin
         <input class="fill-margin" type="number" min="0" step="4" v-model.number="fillMargin" />
@@ -735,13 +810,14 @@ function onPaste(): void {
 
 .fill-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin: 10px 0 14px;
 }
 
 .fill {
-  flex: 1;
+  flex: 1 1 auto;
   background: var(--ed-bg);
   border: 1px solid var(--ed-border);
   border-radius: 6px;
@@ -790,6 +866,7 @@ function onPaste(): void {
 
 .fit-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 12px;
 }
@@ -798,7 +875,8 @@ function onPaste(): void {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  flex: 1;
+  flex: 1 1 140px;
+  min-width: 0;
 }
 
 .fit-axis label {
@@ -814,6 +892,59 @@ function onPaste(): void {
   color: var(--ed-text);
   padding: 6px;
   font: inherit;
+}
+
+.fit-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fit-control select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fixed-toggle {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--ed-text-dim);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.fixed-toggle input {
+  margin: 0;
+}
+
+.fixed-toggle:has(input:checked) {
+  color: var(--ed-accent);
+}
+
+.align-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.align-btn {
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  color: var(--ed-text);
+  padding: 7px 0;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.align-btn:hover {
+  border-color: var(--ed-accent);
+  color: #fff;
 }
 
 .bp-dots {

@@ -564,7 +564,7 @@ function startPaletteSplitDrag(e: PointerEvent): void {
                   <rect class="la-edge" x="0" y="3" width="4" height="6" />
                   <path class="lz-edge" d="M29 2 L34 6 L29 10" />
                 </svg>
-                <span><b>Edge</b> Left / Top / Right / Bottom — solid zigzag, square anchor, arrow points at the object</span>
+                <span><b>Edge</b> — Left / Top / Right / Bottom and <b>Both sides</b>: a zigzag from the glued page edge(s), square anchor, arrow at the object</span>
               </div>
               <div class="legend-row">
                 <svg class="legend-swatch" width="34" height="12" viewBox="0 0 34 12" aria-hidden="true">
@@ -572,17 +572,15 @@ function startPaletteSplitDrag(e: PointerEvent): void {
                   <circle class="la-center" cx="3" cy="6" r="2.5" />
                   <circle class="la-center" cx="31" cy="6" r="2.5" />
                 </svg>
-                <span><b>Center</b> — plain dashed line, circle anchor</span>
+                <span><b>Center</b> — straight connector to each side, circle anchors, centerline through the object</span>
               </div>
               <div class="legend-row">
                 <svg class="legend-swatch" width="34" height="12" viewBox="0 0 34 12" aria-hidden="true">
-                  <path class="lz-stretch" d="M2 6 C4 1 7 1 9 6 S14 11 16 6 S21 1 23 6 S28 11 30 6" />
-                  <polygon class="la-stretch" points="2,2 0,6 2,10" />
-                  <polygon class="la-stretch" points="32,2 34,6 32,10" />
+                  <path class="lz-edge" d="M3 6 L14 6" />
+                  <path class="lz-scaled" d="M20 6 L31 6" />
                 </svg>
-                <span><b>Stretch</b> — dashed circular coil, triangle anchor</span>
+                <span><b>Fixed</b> margins are <b>solid</b> · <b>scaled</b> margins are <b>dashed</b></span>
               </div>
-              <p class="legend-note">Muted colours: slate = edge, pale grey = center, amber = stretch.</p>
             </div>
           </div>
         </div>
@@ -1188,26 +1186,15 @@ body.tb-palette-dragging * {
 
 .lz-center {
   stroke: rgba(148, 163, 184, 0.95);
+}
+
+.lz-scaled {
+  stroke: rgba(100, 116, 139, 0.9);
   stroke-dasharray: 4 3;
 }
 
 .la-center {
   fill: rgba(148, 163, 184, 0.95);
-}
-
-.lz-stretch {
-  stroke: rgba(217, 119, 6, 0.8);
-  stroke-dasharray: 4 3;
-}
-
-.la-stretch {
-  fill: rgba(217, 119, 6, 0.85);
-}
-
-.legend-note {
-  margin: 2px 0 0;
-  font-size: 10.5px;
-  color: var(--ed-text-dim);
 }
 
 .spring-glyph {
