@@ -37,13 +37,30 @@ export function startPaletteDrag(
   let raf = 0
   let pending: DragOverMessage | null = null
 
+  // The drop coordinates are relative to the page surface, which may sit inside
+  // a larger, centred viewport (a fixed-size page) or be scrolled inside the
+  // iframe. Convert the iframe's own screen box + the page's offset within it
+  // into editor-window coordinates.
+  const surface = (): { left: number; top: number; right: number; bottom: number } => {
+    const fr = iframe.getBoundingClientRect()
+    const page = iframe.contentDocument?.querySelector<HTMLElement>('.tb-page')
+    if (!page) return { left: fr.left, top: fr.top, right: fr.right, bottom: fr.bottom }
+    const pr = page.getBoundingClientRect()
+    return {
+      left: fr.left + pr.left,
+      top: fr.top + pr.top,
+      right: fr.left + pr.right,
+      bottom: fr.top + pr.bottom,
+    }
+  }
+
   const overCanvas = (x: number, y: number): boolean => {
-    const r = iframe.getBoundingClientRect()
+    const r = surface()
     return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
   }
 
   const rectAt = (x: number, y: number): Rect => {
-    const r = iframe.getBoundingClientRect()
+    const r = surface()
     const size = DEFAULT_SIZES[kind]
     return {
       x: snap(x - r.left - size.w / 2),

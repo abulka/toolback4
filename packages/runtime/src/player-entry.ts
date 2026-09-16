@@ -11,5 +11,5 @@ const book = (window as unknown as { __TOOLBACK_BOOK__?: import('@toolback/forma
   .__TOOLBACK_BOOK__
 
 if (book) {
-  runBook(book, document.body as HTMLElement, 'desktop', undefined, resolveStartPageIndex(book))
+  runBook(book, document.body as HTMLElement, undefined, resolveStartPageIndex(book))
 }

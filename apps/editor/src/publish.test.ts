@@ -6,7 +6,6 @@ const BG = { id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', obje
 const book: Book = {
   id: 'b',
   title: 'My Quiz',
-  canvas: { desktop: { width: 100, height: 100 } },
   backgrounds: [BG],
   pages: [
     {
@@ -19,7 +18,7 @@ const book: Book = {
           id: 'o1',
           name: 'btn',
           control: 'button',
-          rect: { x: 0, y: 0, w: 10, h: 10 },
+          x: { mode: 'left', left: 0, width: 10 }, y: { mode: 'top', top: 0, height: 10 },
           props: { text: 'Press' },
           on: {},
         },
@@ -76,7 +75,7 @@ describe('scanLibImports', () => {
               id: 'o1',
               name: 'btn',
               control: 'button',
-              rect: { x: 0, y: 0, w: 10, h: 10 },
+              x: { mode: 'left', left: 0, width: 10 }, y: { mode: 'top', top: 0, height: 10 },
               props: {},
               on: scripts.object ? { click: scripts.object } : {},
             },
@@ -84,7 +83,7 @@ describe('scanLibImports', () => {
               id: 'g1',
               name: 'grp',
               control: 'group',
-              rect: { x: 0, y: 0, w: 20, h: 20 },
+              x: { mode: 'left', left: 0, width: 20 }, y: { mode: 'top', top: 0, height: 20 },
               props: {},
               on: {},
               children: [
@@ -92,7 +91,7 @@ describe('scanLibImports', () => {
                   id: 'o2',
                   name: 'inner',
                   control: 'label',
-                  rect: { x: 0, y: 0, w: 10, h: 10 },
+                  x: { mode: 'left', left: 0, width: 10 }, y: { mode: 'top', top: 0, height: 10 },
                   props: {},
                   on: scripts.groupChild ? { click: scripts.groupChild } : {},
                 },

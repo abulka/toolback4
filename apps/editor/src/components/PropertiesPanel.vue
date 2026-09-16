@@ -2,15 +2,10 @@
 import { computed, ref } from 'vue'
 import type { AlignMode, MatchDim, Rect } from '@toolback/format'
 import {
-  anchorOf,
-  ANCHORS_H,
-  ANCHORS_V,
-  canFix,
   describeFit,
+  EDGES_H,
+  EDGES_V,
   fitBadge,
-  isFixed,
-  modeFor,
-  type FitAnchor,
 } from '../fitModes'
 import { useBookStore } from '../stores/book'
 import { collectStoreKeys } from '../storeKeys'
@@ -27,41 +22,26 @@ const store = useBookStore()
 const storeKeyList = computed(() => [...collectStoreKeys(store.book), 'self.name'])
 const sel = computed(() => store.selectedObject)
 const multi = computed(() => store.selectionIds.length > 1)
-// the rect the canvas actually renders (glue-derived) so the
-// X/Y/W/H fields always match what's on screen
+// the rect the canvas actually renders from the object's edge distances, so
+// the X/Y/W/H fields always match what's on screen
 const rect = computed<Rect | null>(() =>
   sel.value ? store.effectiveRectOf(sel.value.id) : null,
 )
 
-// ---- responsive glue ----
-// Two questions per axis: which edge(s) the object glues to (anchor) and
-// whether the margins stay a fixed px or scale with the page. fitModes.ts maps
-// that pair onto the stored lens tokens so the panel never shows pin/fill.
-const fitH = computed(() => sel.value?.fit?.x ?? 'free')
-const fitV = computed(() => sel.value?.fit?.y ?? 'free')
-const anchorH = computed(() => anchorOf(fitH.value, 'x'))
-const anchorV = computed(() => anchorOf(fitV.value, 'y'))
-const fixedH = computed(() => isFixed(fitH.value))
-const fixedV = computed(() => isFixed(fitV.value))
-const canFixH = computed(() => canFix(anchorH.value))
-const canFixV = computed(() => canFix(anchorV.value))
-const fitLabel = computed(() => fitBadge(fitH.value, fitV.value))
+// ---- responsive edge constraints ----
+// One question per axis: which page (or group) edges does the object follow?
+const edgeX = computed(() => sel.value?.x.mode ?? 'left')
+const edgeY = computed(() => sel.value?.y.mode ?? 'top')
+const fitLabel = computed(() => fitBadge(edgeX.value, edgeY.value))
 const isGlued = computed(() => fitLabel.value !== '')
-const fitHint = computed(() => describeFit(fitH.value, fitV.value))
+const fitHint = computed(() => describeFit(edgeX.value, edgeY.value))
 function onFitH(e: Event): void {
   if (!sel.value) return
-  const anchor = (e.target as HTMLSelectElement).value as FitAnchor
-  store.setObjectFit(sel.value.id, 'x', modeFor(anchor, fixedH.value, 'x'))
+  store.setObjectEdge(sel.value.id, 'x', (e.target as HTMLSelectElement).value as never)
 }
 function onFitV(e: Event): void {
   if (!sel.value) return
-  const anchor = (e.target as HTMLSelectElement).value as FitAnchor
-  store.setObjectFit(sel.value.id, 'y', modeFor(anchor, fixedV.value, 'y'))
-}
-function setFixed(axis: 'x' | 'y', on: boolean): void {
-  if (!sel.value) return
-  const anchor = axis === 'x' ? anchorH.value : anchorV.value
-  store.setObjectFit(sel.value.id, axis, modeFor(anchor, on, axis))
+  store.setObjectEdge(sel.value.id, 'y', (e.target as HTMLSelectElement).value as never)
 }
 
 const EVENTS = ['click', 'dblclick', 'change', 'input', 'mouseenter', 'mouseleave'] as const
@@ -189,15 +169,16 @@ function onProviderChange(e: Event): void {
 }
 function onGenerateImage(): void {
   if (!sel.value) return
+  const r = store.effectiveRectOf(sel.value.id)
   store.updateProps(sel.value.id, {
-     src: randomImageUrl(sel.value.rect.w, sel.value.rect.h, imageProvider.value),
+     src: randomImageUrl(r?.w ?? 600, r?.h ?? 400, imageProvider.value),
   })
 }
 
 function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
   if (!sel.value) return
   const n = Math.max(8, Math.round(Number((e.target as HTMLInputElement).value)) || 0)
-  // deliberate typed writes release the glued axis they touch
+  // typed writes keep the edges the object follows, moving it now
   store.setGeometry(sel.value.id, { [field]: n })
 }
 
@@ -258,16 +239,15 @@ function isGroupSel(): boolean {
   return sel.value?.control === 'group'
 }
 
-/** the selection is a single group member (fit is top-level only) */
+/** the selection is a single group member */
 function isMember(): boolean {
   return store.selectionIds.length === 1 && store.selectionParentId !== null
 }
 
-/** responsive UI for any top-level object — groups included (a group's box
- *  carries the glue; members ride it and stretch scales them). Members and
- *  nested objects have no fit of their own, so they're excluded. */
+/** every object carries its own edge choices (members constrain to their
+ *  group box rather than the page) */
 function canFit(): boolean {
-  return !isMember()
+  return true
 }
 
 /** ungrouping discards the group's own scripts — ask before destroying them */
@@ -367,7 +347,7 @@ function onPaste(): void {
     <div class="head">
       <span class="obj-kind">{{ sel!.control }}</span>
       <span class="obj-name">{{ sel!.name }}</span>
-      <span v-if="canFit() && isGlued" class="fit-badge" :title="`Responsive glue: ${fitLabel}. The canvas derives the constrained axis from the shared layout at every page size.`">{{ fitLabel }}</span>
+      <span v-if="canFit() && isGlued" class="fit-badge" :title="`Responsive edges: ${fitLabel}. The browser keeps these distances as the page resizes.`">{{ fitLabel }}</span>
       <button
         class="copy-json"
         :class="{ ok: copied }"
@@ -512,56 +492,28 @@ function onPaste(): void {
       <button class="action" @click="onUngroup">Ungroup</button>
     </div>
 
-    <h2 v-if="canFit()">Responsive · {{ store.breakpoint }}</h2>
+    <h2 v-if="canFit()">Responsive</h2>
     <div v-if="canFit()" class="fit-row">
       <div class="fit-axis">
         <label>Horizontal</label>
-        <div class="fit-control">
-          <select :value="anchorH" @change="onFitH">
-            <option v-for="f in ANCHORS_H" :key="f.id" :value="f.id">{{ f.label }}</option>
-          </select>
-          <label
-            v-if="canFixH"
-            class="fixed-toggle"
-            title="Keep the margin a fixed number of px instead of scaling it with the page"
-          >
-            <input
-              type="checkbox"
-              :checked="fixedH"
-              @change="setFixed('x', ($event.target as HTMLInputElement).checked)"
-            />
-            Fixed
-          </label>
-        </div>
+        <select :value="edgeX" @change="onFitH">
+          <option v-for="f in EDGES_H" :key="f.id" :value="f.id">{{ f.label }}</option>
+        </select>
       </div>
       <div class="fit-axis">
         <label>Vertical</label>
-        <div class="fit-control">
-          <select :value="anchorV" @change="onFitV">
-            <option v-for="f in ANCHORS_V" :key="f.id" :value="f.id">{{ f.label }}</option>
-          </select>
-          <label
-            v-if="canFixV"
-            class="fixed-toggle"
-            title="Keep the margin a fixed number of px instead of scaling it with the page"
-          >
-            <input
-              type="checkbox"
-              :checked="fixedV"
-              @change="setFixed('y', ($event.target as HTMLInputElement).checked)"
-            />
-            Fixed
-          </label>
-        </div>
+        <select :value="edgeY" @change="onFitV">
+          <option v-for="f in EDGES_V" :key="f.id" :value="f.id">{{ f.label }}</option>
+        </select>
       </div>
     </div>
     <p v-if="canFit()" class="hint fit-desc">{{ fitHint }}</p>
     <p v-if="canFit() && isGlued" class="hint responsive-hint">
-      Edits here adjust the shared layout at every breakpoint.
+      Edits here change the distances the object keeps from the edges it follows.
     </p>
     <p v-if="isMember()" class="hint responsive-hint">
-      Responsive glue lives on the group box — this member rides it, and scales
-      with it when the group is set to Stretch.
+      This member constrains to its group box — resizing the group scales its
+      contents with it; resizing the page re-resolves this member's own edges.
     </p>
 
     <h2>Geometry</h2>

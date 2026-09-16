@@ -3,11 +3,11 @@ import {
   CONTROL_KINDS,
   DEFAULT_SIZES,
   IMAGE_PROVIDERS,
-  AUTO_HEIGHT_MARGIN,
   alignRects,
+  applyRectToObject,
   backgroundFor,
   centerBlockRects,
-  contentHeightFor,
+  contentExtent,
   createBook,
   createBackground,
   createGroup,
@@ -19,15 +19,23 @@ import {
   parseBook,
   randomImageUrl,
   rebaseRect,
-  resolveObjectRect,
-  resolvePageSize,
+  rectForObject,
+  resolvePageBox,
   resolveStartPageIndex,
+  resolveX,
+  resolveY,
   safeParseBook,
+  scaleEdges,
   scaleRect,
+  scaleSubtreeEdges,
   treeRows,
-  unlensObjectRect,
   unionRects,
   unrebaseRect,
+  writeRectPart,
+  xEdgeFromRect,
+  yEdgeFromRect,
+  type XEdge,
+  type YEdge,
 } from './index'
 import { sampleBook } from './sample'
 
@@ -168,54 +176,39 @@ describe('format', () => {
       expect(backgroundFor(book, page)).toBe(book.backgrounds[0])
     })
 
-    it('resolvePageSize: background override wins per breakpoint, else book canvas', () => {
+    it('resolvePageBox: a fixed page keeps its size; a fluid page fills the container and grows with content', () => {
       const book = createBook('F')
-      const bg = backgroundFor(book, book.pages[0]!)
-      expect(resolvePageSize(book, bg, 'desktop')).toEqual({ width: 1280, height: 800 })
-      expect(resolvePageSize(book, bg, 'tablet')).toEqual({ width: 768, height: 1024 })
-      bg.size = { desktop: { width: 320, height: 240 } }
-      expect(resolvePageSize(book, bg, 'desktop')).toEqual({ width: 320, height: 240 })
-      // tablet has no override → book canvas
-      expect(resolvePageSize(book, bg, 'tablet')).toEqual({ width: 768, height: 1024 })
-      // undefined background → book canvas
-      expect(resolvePageSize(book, undefined, 'desktop')).toEqual({ width: 1280, height: 800 })
-    })
-
-    it('resolvePageSize auto-height grows to content and floors at the min height', () => {
-      const book = createBook('A')
-      const bg = backgroundFor(book, book.pages[0]!)
-      const base = { width: 1280, height: 800 }
-      // no flag → objects are ignored, behaviour unchanged
+      const page = book.pages[0]!
+      const container = { width: 1024, height: 700 }
+      // fluid: box fills the container
+      expect(resolvePageBox(page, container, [])).toEqual(container)
+      // a near-edge object below the fold grows the box by exactly its extent
       const tall = createObject('card', 'tall', { x: 0, y: 1000, w: 200, h: 100 })
-      expect(resolvePageSize(book, bg, 'desktop', [tall])).toEqual(base)
-      // flag on → height is content bottom + margin
-      bg.autoHeight = true
-      expect(resolvePageSize(book, bg, 'desktop', [tall])).toEqual({
-        width: 1280,
-        height: 1100 + AUTO_HEIGHT_MARGIN,
-      })
-      // content inside the base does not grow it
+      expect(resolvePageBox(page, container, [tall])).toEqual({ width: 1024, height: 1100 })
+      // past the right edge grows the width too, on the same rule
+      const wide = createObject('card', 'wide', { x: 0, y: 10, w: 1200, h: 100 })
+      expect(resolvePageBox(page, container, [wide])).toEqual({ width: 1200, height: 700 })
+      // short content never shrinks below the container
       const short = createObject('card', 'short', { x: 0, y: 10, w: 200, h: 100 })
-      expect(resolvePageSize(book, bg, 'desktop', [short])).toEqual(base)
-      // empty objects → min height
-      expect(resolvePageSize(book, bg, 'desktop', [])).toEqual(base)
-      // the flag is global — tablet derives too (base 768×1024, content 1100)
-      expect(resolvePageSize(book, bg, 'tablet', [tall])).toEqual({
-        width: 768,
-        height: 1100 + AUTO_HEIGHT_MARGIN,
-      })
-    })
-
-    it('contentHeightFor measures top-level boxes and respects the margin floor', () => {
-      const base = { width: 1280, height: 800 }
-      const a = createObject('card', 'a', { x: 10, y: 900, w: 100, h: 50 })
-      const b = createObject('card', 'b', { x: 10, y: 700, w: 100, h: 50 })
-      expect(contentHeightFor([a, b], base, base, 800)).toBe(950 + AUTO_HEIGHT_MARGIN)
-      expect(contentHeightFor([], base, base, 800)).toBe(800)
-      // a group's box is its own rect; members are ignored for measurement
+      expect(resolvePageBox(page, container, [short])).toEqual(container)
+      // far-edge / follows-both / centred objects sit inside the box
+      const pinned = createObject('card', 'pin', { x: 0, y: 0, w: 200, h: 100 })
+      pinned.x = { mode: 'right', right: 10, width: 200 }
+      pinned.y = { mode: 'bottom', bottom: 10, height: 100 }
+      expect(resolvePageBox(page, container, [pinned])).toEqual(container)
+      const fill = createObject('card', 'fill', { x: 0, y: 0, w: 200, h: 100 })
+      fill.x = { mode: 'both', left: 10, right: 10 }
+      fill.y = { mode: 'both', top: 10, bottom: 10 }
+      expect(resolvePageBox(page, container, [fill])).toEqual(container)
+      // only near edges contribute to the extent
+      expect(contentExtent([tall, pinned, fill])).toEqual({ right: 200, bottom: 1100 })
+      // a group's box is its own constraint; members are ignored
       const child = createObject('label', 'inner', { x: 0, y: 0, w: 50, h: 50 })
       const group = createGroup('g', { x: 0, y: 1200, w: 200, h: 200 }, [child])
-      expect(contentHeightFor([group], base, base, 800)).toBe(1400 + AUTO_HEIGHT_MARGIN)
+      expect(resolvePageBox(page, container, [group])).toEqual({ width: 1024, height: 1400 })
+      // fixed page: its own size
+      page.size = { width: 360, height: 420 }
+      expect(resolvePageBox(page, container, [tall])).toEqual({ width: 360, height: 420 })
     })
 
     it('createPage links a backgroundId', () => {
@@ -226,23 +219,42 @@ describe('format', () => {
       expect(page.objects).toEqual([])
     })
 
-    it('round-trips the autoHeight flag through parse', () => {
-      const book = createBook('AH')
-      const bg = backgroundFor(book, book.pages[0]!)
-      bg.autoHeight = true
+    it('round-trips a fixed page size through parse', () => {
+      const book = createBook('P')
+      book.pages[0]!.size = { width: 320, height: 240 }
       const parsed = parseBook(JSON.parse(JSON.stringify(book)))
-      expect(parsed.backgrounds[0]!.autoHeight).toBe(true)
+      expect(parsed.pages[0]!.size).toEqual({ width: 320, height: 240 })
     })
 
-    it('migrates the legacy per-breakpoint autoHeight object to a boolean', () => {
-      const book = createBook('AH')
-      const raw = JSON.parse(JSON.stringify(book)) as Record<string, unknown>
-      const bgs = raw['backgrounds'] as Array<Record<string, unknown>>
-      bgs[0]!['autoHeight'] = { desktop: true, mobile: false }
-      expect(parseBook(raw).backgrounds[0]!.autoHeight).toBe(true)
-      // all-off collapses to absent
-      bgs[0]!['autoHeight'] = { desktop: false, tablet: false }
-      expect(parseBook(raw).backgrounds[0]!.autoHeight).toBeUndefined()
+    it('migrates a background size to fixed pages and drops the old sizing fields', () => {
+      const raw = {
+        id: 'b1',
+        title: 'old',
+        canvas: {
+          desktop: { width: 1024, height: 768 },
+          tablet: { width: 800, height: 600 },
+        },
+        backgrounds: [
+          {
+            id: 'bg1',
+            name: 'Popup',
+            color: '#ffffff',
+            size: { desktop: { width: 320, height: 240 } },
+            objects: [],
+          },
+          { id: 'bg2', name: 'Main', color: '#ffffff', objects: [] },
+        ],
+        pages: [
+          { id: 'p1', name: 'Dialog', backgroundId: 'bg1', objects: [] },
+          { id: 'p2', name: 'Other', backgroundId: 'bg2', objects: [] },
+        ],
+      }
+      const book = parseBook(raw)
+      expect(book.pages[0]!.size).toEqual({ width: 320, height: 240 })
+      expect(book.pages[1]!.size).toBeUndefined()
+      expect('canvas' in book).toBe(false)
+      expect('design' in book).toBe(false)
+      expect('size' in book.backgrounds[0]!).toBe(false)
     })
   })
 
@@ -332,164 +344,135 @@ describe('format', () => {
   })
 })
 
-describe('resolveObjectRect (responsive glue — lens)', () => {
-  // base page 1280x800, mobile page 390x844
+describe('edge constraints', () => {
   const ref = { width: 1280, height: 800 }
-  const page = { width: 390, height: 844 }
+  const box = { width: 1000, height: 600 }
   const base = { x: 1080, y: 200, w: 176, h: 48 }
 
-  function obj(fit?: Record<string, string>) {
+  function obj(x?: XEdge, y?: YEdge) {
     const o = createObject('button', 'b1', { ...base })
-    if (fit) o.fit = fit
+    if (x) o.x = x
+    if (y) o.y = y
     return o
   }
 
-  function rect(fit?: Record<string, string>) {
-    return resolveObjectRect(obj(fit), page, ref)
+  function rect(edge: { x?: XEdge; y?: YEdge }) {
+    return rectForObject(obj(edge.x, edge.y), box)
   }
 
-  it('defaults to Free = keeps the authored px at every size', () => {
-    expect(rect()).toEqual({ ...base })
-    expect(rect({})).toEqual({ ...base })
-    expect(rect({ x: 'free', y: 'free' })).toEqual({ ...base })
+  it('resolveX / resolveY resolve each mode against the box', () => {
+    expect(resolveX({ mode: 'left', left: 40, width: 100 }, 1000)).toEqual({ left: 40, width: 100 })
+    expect(resolveX({ mode: 'right', right: 30, width: 100 }, 1000)).toEqual({ left: 870, width: 100 })
+    expect(resolveX({ mode: 'both', left: 20, right: 30 }, 1000)).toEqual({ left: 20, width: 950 })
+    expect(resolveX({ mode: 'center', width: 100 }, 1000)).toEqual({ left: 450, width: 100 })
+    expect(resolveY({ mode: 'bottom', bottom: 20, height: 40 }, 600)).toEqual({ top: 540, height: 40 })
+    expect(resolveY({ mode: 'both', top: 10, bottom: 20 }, 600)).toEqual({ top: 10, height: 570 })
   })
 
-  it('left keeps the left proportion (x scales with the page width)', () => {
-    const r = rect({ x: 'left' })
-    expect(r.x).toBe(Math.round(1080 * (390 / 1280)))
-    expect(r.w).toBe(176)
+  it('left keeps its distance from the left and its width', () => {
+    const r = rect({ x: { mode: 'left', left: 40, width: 100 } })
+    expect(r).toMatchObject({ x: 40, w: 100 })
+    expect(rectForObject(obj({ mode: 'left', left: 40, width: 100 }), { width: 2000, height: 600 }).x).toBe(40)
   })
 
-  it('right keeps the right proportion (the gap scales with the page width)', () => {
-    const r = rect({ x: 'right' })
-    expect(r.x).toBe(Math.round((1080 + 176) * (390 / 1280)) - 176)
-    // authored right gap was 24 → scales to ~24 · 390/1280
-    expect(Math.abs(390 - (r.x + r.w) - 24 * (390 / 1280))).toBeLessThanOrEqual(1)
+  it('right keeps its distance from the right and its width', () => {
+    expect(rect({ x: { mode: 'right', right: 30, width: 100 } }).x).toBe(1000 - 30 - 100)
+    expect(rectForObject(obj({ mode: 'right', right: 30, width: 100 }), { width: 400, height: 600 }).x).toBe(400 - 30 - 100)
   })
 
-  it('center centers the object middle on the page axis', () => {
-    const r = rect({ x: 'center' })
-    expect(r.x).toBe((390 - 176) / 2)
-    expect(r.x + r.w / 2).toBe(195) // page middle
+  it('both keeps both margins and stretches the width', () => {
+    const r = rect({ x: { mode: 'both', left: 20, right: 30 } })
+    expect(r.x).toBe(20)
+    expect(r.w).toBe(1000 - 50)
+    expect(rectForObject(obj({ mode: 'both', left: 20, right: 30 }), { width: 2000, height: 600 }).w).toBe(2000 - 50)
   })
 
-  it('stretch scales the size and both margins proportionally', () => {
-    const wide = { width: 1920, height: 800 }
-    const r = resolveObjectRect(obj({ x: 'stretch' }), wide, ref)
-    expect(r.w).toBe(Math.round(176 * (1920 / 1280)))
-    expect(r.x).toBe(Math.round(1080 * (1920 / 1280)))
-    // on the narrower mobile page it shrinks by the same ratio
-    expect(rect({ x: 'stretch' }).w).toBe(Math.max(1, Math.round(176 * (390 / 1280))))
+  it('center keeps its width and centres on the box', () => {
+    const r = rect({ x: { mode: 'center', width: 100 } })
+    expect(r.x).toBe((1000 - 100) / 2)
+    expect(r.w).toBe(100)
   })
 
-  it('vertical modes mirror horizontal math', () => {
-    expect(rect({ y: 'top' }).y).toBe(Math.round(200 * (844 / 800)))
-    expect(rect({ y: 'center' }).y).toBe((844 - 48) / 2)
-    expect(rect({ y: 'bottom' }).y).toBe(Math.round((200 + 48) * (844 / 800)) - 48)
+  it('vertical choices mirror the horizontal ones', () => {
+    expect(rect({ y: { mode: 'top', top: 12, height: 40 } })).toMatchObject({ y: 12, h: 40 })
+    expect(rect({ y: { mode: 'bottom', bottom: 12, height: 40 } }).y).toBe(600 - 12 - 40)
+    expect(rect({ y: { mode: 'both', top: 10, bottom: 20 } }).h).toBe(600 - 30)
+    expect(rect({ y: { mode: 'center', height: 40 } }).y).toBe((600 - 40) / 2)
   })
 
-  it('combines horizontal and vertical modes independently', () => {
-    const r = rect({ x: 'right', y: 'bottom' })
-    expect(r.x).toBe(Math.round((1080 + 176) * (390 / 1280)) - 176)
-    expect(r.y).toBe(Math.round((200 + 48) * (844 / 800)) - 48)
+  it('writeRectPart keeps which edges a control follows', () => {
+    const o = obj()
+    o.x = { mode: 'right', right: 30, width: 100 }
+    writeRectPart(o, 'x', 500, box)
+    expect(o.x).toEqual({ mode: 'right', right: box.width - (500 + 100), width: 100 })
+    // a width write on a far-edge control keeps the far edge
+    writeRectPart(o, 'w', 200, box)
+    expect(o.x).toMatchObject({ mode: 'right', width: 200 })
+
+    const both = obj()
+    both.x = { mode: 'both', left: 20, right: 30 }
+    writeRectPart(both, 'x', 120, box)
+    expect(both.x).toEqual({ mode: 'both', left: 120, right: -70 })
+    // a width write on a follows-both control switches it to a fixed left size
+    writeRectPart(both, 'w', 200, box)
+    expect(both.x).toEqual({ mode: 'left', left: 120, width: 200 })
+
+    const centred = obj()
+    centred.x = { mode: 'center', width: 100 }
+    writeRectPart(centred, 'x', 300, box)
+    expect(centred.x).toEqual({ mode: 'left', left: 300, width: 100 })
   })
 
-  it('pin-right keeps a constant right-margin gap (size fixed)', () => {
-    // authored right gap = 1280 - (1080 + 176) = 24
-    const r = rect({ x: 'pin-right' })
-    expect(r.w).toBe(176)
-    expect(390 - (r.x + r.w)).toBe(24)
-    // wide page: same constant gap
-    const w = resolveObjectRect(obj({ x: 'pin-right' }), { width: 1920, height: 800 }, ref)
-    expect(1920 - (w.x + w.w)).toBe(24)
+  it('xEdgeFromRect / yEdgeFromRect rebuild a rect into any mode', () => {
+    expect(xEdgeFromRect({ x: 20, y: 0, w: 100, h: 40 }, 1000, 'left')).toEqual({ mode: 'left', left: 20, width: 100 })
+    expect(xEdgeFromRect({ x: 20, y: 0, w: 100, h: 40 }, 1000, 'right')).toEqual({ mode: 'right', right: 880, width: 100 })
+    expect(xEdgeFromRect({ x: 20, y: 0, w: 100, h: 40 }, 1000, 'both')).toEqual({ mode: 'both', left: 20, right: 880 })
+    expect(yEdgeFromRect({ x: 0, y: 30, w: 10, h: 40 }, 600, 'bottom')).toEqual({ mode: 'bottom', bottom: 530, height: 40 })
   })
 
-  it('pin-bottom keeps a constant bottom-margin gap', () => {
-    const r = rect({ y: 'pin-bottom' })
-    expect(r.h).toBe(48)
-    expect(844 - (r.y + r.h)).toBe(Math.round(800 - (200 + 48)))
+  it('scaleEdges scales distances and sizes for every mode', () => {
+    const left = obj({ mode: 'left', left: 40, width: 100 })
+    scaleEdges(left, 2, 3)
+    expect(left.x).toEqual({ mode: 'left', left: 80, width: 200 })
+    expect(left.y).toMatchObject({ mode: 'top', top: base.y * 3, height: base.h * 3 })
+
+    const right = obj({ mode: 'right', right: 30, width: 100 })
+    scaleEdges(right, 0.5, 1)
+    expect(right.x).toEqual({ mode: 'right', right: 15, width: 50 })
+
+    const both = obj({ mode: 'both', left: 20, right: 30 })
+    scaleEdges(both, 2, 1)
+    expect(both.x).toEqual({ mode: 'both', left: 40, right: 60 })
+
+    const centred = obj({ mode: 'center', width: 100 })
+    scaleEdges(centred, 2, 1)
+    expect(centred.x).toEqual({ mode: 'center', width: 200 })
   })
 
-  it('fill keeps both margins constant and lets the size grow', () => {
-    // authored left gap 1080, right gap 24
-    const wide = resolveObjectRect(obj({ x: 'fill' }), { width: 1920, height: 800 }, ref)
-    expect(wide.x).toBe(1080)
-    expect(1920 - (wide.x + wide.w)).toBe(24)
-    expect(wide.w).toBe(176 + (1920 - 1280))
-    // a narrower page shrinks the size but keeps both margins
-    const narrow = resolveObjectRect(obj({ x: 'fill' }), { width: 1200, height: 800 }, ref)
-    expect(narrow.x).toBe(1080)
-    expect(1200 - (narrow.x + narrow.w)).toBe(24)
-    expect(narrow.w).toBe(176 + (1200 - 1280))
+  it('scaleEdges clamps a scaled size to at least 1px', () => {
+    const o = obj({ mode: 'left', left: 0, width: 1 })
+    scaleEdges(o, 0.1, 1)
+    expect(o.x).toEqual({ mode: 'left', left: 0, width: 1 })
   })
 
-  it('pin/fill are identity at the base size', () => {
-    expect(resolveObjectRect(obj({ x: 'pin-right', y: 'pin-bottom' }), ref, ref)).toEqual({ ...base })
-    expect(resolveObjectRect(obj({ x: 'fill', y: 'fill' }), ref, ref)).toEqual({ ...base })
+  it('scaleSubtreeEdges recurses into nested groups', () => {
+    const child = createObject('label', 'inner', { x: 10, y: 10, w: 100, h: 40 })
+    const inner = createGroup('g2', { x: 20, y: 20, w: 120, h: 60 }, [child])
+    const outer = createGroup('g1', { x: 40, y: 40, w: 200, h: 120 }, [inner])
+    scaleSubtreeEdges(outer, 2, 2)
+    expect(outer.x).toMatchObject({ mode: 'left', left: 80, width: 400 })
+    expect(outer.children![0]!.x).toMatchObject({ mode: 'left', left: 40, width: 240 })
+    expect(outer.children![0]!.children![0]!.x).toMatchObject({ mode: 'left', left: 20, width: 200 })
   })
 
-  it('at the base size the constrained axes are identity; only Center moves', () => {
-    expect(resolveObjectRect(obj(), ref, ref)).toEqual({ ...base })
-    expect(resolveObjectRect(obj({ x: 'right', y: 'bottom' }), ref, ref)).toEqual({ ...base })
-    expect(resolveObjectRect(obj({ x: 'left', y: 'top' }), ref, ref)).toEqual({ ...base })
-    expect(resolveObjectRect(obj({ x: 'stretch', y: 'stretch' }), ref, ref)).toEqual({ ...base })
-    const centered = resolveObjectRect(obj({ x: 'center', y: 'center' }), ref, ref)
-    expect(centered.x).toBe((1280 - 176) / 2)
-    expect(centered.y).toBe((800 - 48) / 2)
-    expect(centered.w).toBe(176) // size untouched by center
+  it('applyRectToObject preserves the current mode by default', () => {
+    const o = obj({ mode: 'right', right: 30, width: 100 })
+    applyRectToObject(o, { x: 100, y: 0, w: 100, h: 40 }, box)
+    expect(o.x).toEqual({ mode: 'right', right: box.width - 200, width: 100 })
   })
 
-  it('the authored rect is the reference data for other sizes', () => {
-    const o = obj({ x: 'center' })
-    o.rect = { x: 100, y: 100, w: 176, h: 48 }
-    expect(resolveObjectRect(o, ref, ref).x).toBe((1280 - 176) / 2)
-    expect(resolveObjectRect(o, page, ref).x).toBe((390 - 176) / 2)
-  })
-
-  it('unlensObjectRect inverts the lens back onto the base rect', () => {
-    const fit = { x: 'right', y: 'bottom' } as const
-    const refRect = { ...base }
-    // drag to a new position at mobile; deriving the base rect then lensing it
-    // forward must reproduce exactly what was dragged
-    const dragged = { x: 40, y: 60, w: 176, h: 48 }
-    const nextRef = unlensObjectRect(refRect, dragged, fit, page, ref)
-    const round = resolveObjectRect({ ...obj(fit), rect: nextRef }, page, ref)
-    expect(round).toEqual(dragged)
-  })
-
-  it('unlensObjectRect is the identity at the base size', () => {
-    const refRect = { ...base }
-    const dragged = { x: 40, y: 60, w: 200, h: 60 }
-    expect(unlensObjectRect(refRect, dragged, { x: 'right', y: 'bottom' }, ref, ref)).toEqual(dragged)
-    expect(unlensObjectRect(refRect, dragged, { x: 'stretch', y: 'stretch' }, ref, ref)).toEqual(dragged)
-    expect(unlensObjectRect(refRect, dragged, { x: 'pin-right', y: 'pin-bottom' }, ref, ref)).toEqual(dragged)
-    expect(unlensObjectRect(refRect, dragged, { x: 'fill', y: 'fill' }, ref, ref)).toEqual(dragged)
-  })
-
-  it('unlensObjectRect inverts pin-right / fill back onto the base rect', () => {
-    const cases = [
-      { x: 'pin-right', y: 'pin-bottom' },
-      { x: 'fill', y: 'fill' },
-    ] as const
-    for (const fit of cases) {
-      const refRect = { ...base }
-      const dragged = { x: 40, y: 60, w: 200, h: 60 }
-      const nextRef = unlensObjectRect(refRect, dragged, fit, page, ref)
-      const round = resolveObjectRect({ ...obj(fit), rect: nextRef }, page, ref)
-      expect(round).toEqual(dragged)
-    }
-  })
-
-  it('unlensObjectRect leaves a Center axis rigid on its base', () => {
-    const refRect = { ...base }
-    const next = unlensObjectRect(refRect, { x: 999, y: 60, w: 176, h: 48 }, { x: 'center' }, page, ref)
-    expect(next.x).toBe(refRect.x) // centered has no free parameter
-    expect(next.y).toBe(60)
-  })
-
-  it('round-trips fit through schema parse', () => {
-    const o = obj({ x: 'right', y: 'bottom' })
-    const parsed = safeParseBook({
+  it('migrates rect + fit to frozen edge distances at the reference size', () => {
+    const legacy = (fit: Record<string, string>) => ({
       id: 'b',
       title: 't',
       canvas: { desktop: ref },
@@ -499,16 +482,50 @@ describe('resolveObjectRect (responsive glue — lens)', () => {
           id: 'p',
           name: 'p',
           backgroundId: '',
-          objects: [{ ...o, props: {}, on: {} }],
+          objects: [{ id: 'o', name: 'o', control: 'label', rect: { ...base }, props: {}, on: {}, fit }],
         },
       ],
     })
-    expect(parsed.success).toBe(true)
-    expect(parsed.data!.pages[0]!.objects[0]!.fit).toEqual({ x: 'right', y: 'bottom' })
+    const left = parseBook(legacy({ x: 'left', y: 'top' })).pages[0]!.objects[0]!
+    expect(left.x).toEqual({ mode: 'left', left: 1080, width: 176 })
+    expect(left.y).toEqual({ mode: 'top', top: 200, height: 48 })
+    const right = parseBook(legacy({ x: 'right', y: 'pin-bottom' })).pages[0]!.objects[0]!
+    expect(right.x).toEqual({ mode: 'right', right: 24, width: 176 })
+    expect(right.y).toEqual({ mode: 'bottom', bottom: 552, height: 48 })
+    const fill = parseBook(legacy({ x: 'fill', y: 'fill' })).pages[0]!.objects[0]!
+    expect(fill.x).toEqual({ mode: 'both', left: 1080, right: 24 })
+    expect(fill.y).toEqual({ mode: 'both', top: 200, bottom: 552 })
+    // proportional stretch collapses to the near edge (nearest fixed equivalent)
+    const stretch = parseBook(legacy({ x: 'stretch', y: 'stretch' })).pages[0]!.objects[0]!
+    expect(stretch.x).toEqual({ mode: 'left', left: 1080, width: 176 })
+    expect(stretch.y).toEqual({ mode: 'top', top: 200, height: 48 })
+    const center = parseBook(legacy({ x: 'center', y: 'center' })).pages[0]!.objects[0]!
+    expect(center.x).toEqual({ mode: 'center', width: 176 })
+    expect(center.y).toEqual({ mode: 'center', height: 48 })
+    // legacy tokens prop/middle upgrade first
+    const tokens = parseBook(legacy({ x: 'prop', y: 'middle' })).pages[0]!.objects[0]!
+    expect(tokens.x).toEqual({ mode: 'left', left: 1080, width: 176 })
+    expect(tokens.y).toEqual({ mode: 'center', height: 48 })
+    // no fit at all -> fixed left/top
+    const plain = parseBook({
+      id: 'b',
+      title: 't',
+      canvas: { desktop: ref },
+      backgrounds: [],
+      pages: [
+        {
+          id: 'p',
+          name: 'p',
+          backgroundId: '',
+          objects: [{ id: 'o', name: 'o', control: 'label', rect: { ...base }, props: {}, on: {} }],
+        },
+      ],
+    }).pages[0]!.objects[0]!
+    expect(plain.x).toEqual({ mode: 'left', left: 1080, width: 176 })
   })
 
-  it('migrates legacy objects: rect = rects.desktop, bp rects + fit tokens upgraded', () => {
-    const legacy = (fit: Record<string, string>) => ({
+  it('migrates legacy rects.desktop and drops rects', () => {
+    const book = parseBook({
       id: 'b',
       title: 't',
       canvas: { desktop: ref },
@@ -523,32 +540,23 @@ describe('resolveObjectRect (responsive glue — lens)', () => {
               id: 'o',
               name: 'o',
               control: 'label',
-              rects: { desktop: { ...base }, tablet: { x: 1, y: 1, w: 10, h: 10 }, mobile: { x: 2, y: 2, w: 20, h: 20 } },
+              rects: { desktop: { ...base }, tablet: { x: 1, y: 1, w: 10, h: 10 } },
               props: {},
               on: {},
-              fit,
             },
           ],
         },
       ],
     })
-    // tablet/mobile rects are dropped, the authored layout becomes `rect`
-    const a = parseBook(legacy({ x: 'left', y: 'top' }))
-    expect(a.pages[0]!.objects[0]!.rect).toEqual({ ...base })
-    expect('rects' in a.pages[0]!.objects[0]!).toBe(false)
-    // left/top are current proportional modes and must survive a parse
-    expect(a.pages[0]!.objects[0]!.fit).toEqual({ x: 'left', y: 'top' })
-    const b = parseBook(legacy({ x: 'prop', y: 'prop' }))
-    expect(b.pages[0]!.objects[0]!.fit).toEqual({ x: 'left', y: 'top' })
-    const c = parseBook(legacy({ x: 'right', y: 'middle' }))
-    expect(c.pages[0]!.objects[0]!.fit).toEqual({ x: 'right', y: 'center' })
+    const o = book.pages[0]!.objects[0]!
+    expect('rects' in o).toBe(false)
+    expect(o.x).toEqual({ mode: 'left', left: 1080, width: 176 })
   })
 
-  it('rejects invalid fit modes on parse', () => {
+  it('round-trips constraints through parse', () => {
     const parsed = safeParseBook({
       id: 'b',
       title: 't',
-      canvas: { desktop: ref },
       backgrounds: [],
       pages: [
         {
@@ -556,7 +564,36 @@ describe('resolveObjectRect (responsive glue — lens)', () => {
           name: 'p',
           backgroundId: '',
           objects: [
-            { id: 'o', name: 'o', control: 'label', rect: { ...base }, props: {}, on: {}, fit: { x: 'sideways' } },
+            {
+              id: 'o',
+              name: 'o',
+              control: 'label',
+              x: { mode: 'right', right: 24, width: 176 },
+              y: { mode: 'both', top: 10, bottom: 20 },
+              props: {},
+              on: {},
+            },
+          ],
+        },
+      ],
+    })
+    expect(parsed.success).toBe(true)
+    expect(parsed.data!.pages[0]!.objects[0]!.x).toEqual({ mode: 'right', right: 24, width: 176 })
+    expect(parsed.data!.pages[0]!.objects[0]!.y).toEqual({ mode: 'both', top: 10, bottom: 20 })
+  })
+
+  it('rejects an invalid edge mode on parse', () => {
+    const parsed = safeParseBook({
+      id: 'b',
+      title: 't',
+      backgrounds: [],
+      pages: [
+        {
+          id: 'p',
+          name: 'p',
+          backgroundId: '',
+          objects: [
+            { id: 'o', name: 'o', control: 'label', x: { mode: 'sideways', left: 0, width: 10 }, y: { mode: 'top', top: 0, height: 10 }, props: {}, on: {} },
           ],
         },
       ],

@@ -7,7 +7,6 @@ function book(pages: Array<{ script: string; objects: string[] }>): Book {
   return {
     id: 'b',
     title: 't',
-    canvas: { desktop: { width: 100, height: 100 } },
     backgrounds: [BG],
     pages: pages.map((p, i) => ({
       id: `p${i}`,
@@ -18,7 +17,7 @@ function book(pages: Array<{ script: string; objects: string[] }>): Book {
         id: `o${i}_${j}`,
         name: n,
         control: 'label' as const,
-        rect: { x: 0, y: 0, w: 10, h: 10 },
+        x: { mode: 'left', left: 0, width: 10 }, y: { mode: 'top', top: 0, height: 10 },
         props: {},
         on: {},
       })),

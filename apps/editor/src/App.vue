@@ -19,6 +19,13 @@ import OpenDialog from './components/OpenDialog.vue'
 
 const store = useBookStore()
 const iframe = ref<HTMLIFrameElement | null>(null)
+const canvasArea = ref<HTMLElement | null>(null)
+// bump to re-measure editor chrome that overlays the iframe (its position is
+// not reactive, but the layout that moves it is)
+const layoutTick = ref(0)
+function bumpLayout(): void {
+  layoutTick.value++
+}
 
 // --- RHS panel tabs (Objects and Store live in their own tabs)
 type PropsTab = 'page' | 'selection' | 'objects' | 'store'
@@ -88,6 +95,10 @@ const fileMenu = ref<HTMLElement | null>(null)
 const openDialogOpen = ref(false)
 const authorMenuOpen = ref(false)
 const authorMenu = ref<HTMLElement | null>(null)
+const springMenuOpen = ref(false)
+const springMenu = ref<HTMLElement | null>(null)
+const springHelpOpen = ref(false)
+const springHelp = ref<HTMLElement | null>(null)
 
 interface FileAction {
   label: string
@@ -136,6 +147,15 @@ function onDocClickAuthor(e: MouseEvent): void {
   if (!authorMenuOpen.value) return
   if (authorMenu.value && !authorMenu.value.contains(e.target as Node)) {
     authorMenuOpen.value = false
+  }
+}
+
+function onDocClickSpring(e: MouseEvent): void {
+  if (springMenuOpen.value && springMenu.value && !springMenu.value.contains(e.target as Node)) {
+    springMenuOpen.value = false
+  }
+  if (springHelpOpen.value && springHelp.value && !springHelp.value.contains(e.target as Node)) {
+    springHelpOpen.value = false
   }
 }
 
@@ -302,7 +322,9 @@ onMounted(async () => {
   document.addEventListener('keydown', onGroupKey)
   document.addEventListener('click', onDocClickAuthor)
   document.addEventListener('click', onDocClickFile)
+  document.addEventListener('click', onDocClickSpring)
   document.addEventListener('click', onDocClick)
+  window.addEventListener('resize', bumpLayout)
   if (iframe.value) wireCanvas(iframe.value)
   await store.restoreAutosave()
   await store.refreshRecents()
@@ -320,6 +342,8 @@ onUnmounted(() => {
   document.removeEventListener('click', onDocClick)
   document.removeEventListener('click', onDocClickAuthor)
   document.removeEventListener('click', onDocClickFile)
+  document.removeEventListener('click', onDocClickSpring)
+  window.removeEventListener('resize', bumpLayout)
 })
 
 const objectRows = computed(() => treeRows(store.targetObjects))
@@ -383,8 +407,6 @@ async function onExport(): Promise<void> {
   }
 }
 
-const BREAKPOINTS = ['desktop', 'tablet', 'mobile'] as const
-
 /** browser-safe base64 of UTF-8 text, chunked for large payloads */
 function toDataUrl(text: string): string {
   const bytes = new TextEncoder().encode(text)
@@ -433,10 +455,126 @@ async function onPublish(): Promise<void> {
   }
 }
 
-const canvasStyle = computed(() => {
-  const size = store.activeCanvasSize
-  return { width: `${size.width}px`, height: `${size.height}px` }
+// preview width: restrict the canvas iframe like Chrome's device toolbar.
+// An editor setting only — nothing about it is stored in the book.
+type PreviewWidth = number | 'window'
+const PREVIEW_PRESETS: Array<{ label: string; value: PreviewWidth }> = [
+  { label: 'Window', value: 'window' },
+  { label: 'Phone 390', value: 390 },
+  { label: 'Tablet 768', value: 768 },
+  { label: 'Laptop 1024', value: 1024 },
+  { label: 'Desktop 1280', value: 1280 },
+]
+function readPreviewWidth(): PreviewWidth {
+  const raw = localStorage.getItem('toolback.previewWidth')
+  if (!raw || raw === 'window') return 'window'
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : 'window'
+}
+const previewWidth = ref<PreviewWidth>(readPreviewWidth())
+function setPreviewWidth(v: PreviewWidth): void {
+  previewWidth.value = v
+  localStorage.setItem('toolback.previewWidth', v === 'window' ? 'window' : String(v))
+}
+
+const canvasStyle = computed(() => ({
+  width: previewWidth.value === 'window' ? '100%' : `${previewWidth.value}px`,
+  height: '100%',
+}))
+
+// --- fixed-size page: drag the bottom-right corner to resize -----------------
+
+const PAGE_MIN_W = 160
+const PAGE_MIN_H = 120
+const PAGE_MAX = 4096
+
+// while dragging, the grip tracks the pointer directly; otherwise it sits on
+// the rendered page corner (the page is centred, so its corner moves at half
+// the size delta — driving from the pointer keeps the two locked together)
+const pageResizeDrag = ref<{ left: number; top: number } | null>(null)
+
+/** screen position (within .canvas-area) of the page's bottom-right corner */
+const pageResizePos = computed<{ left: number; top: number } | null>(() => {
+  if (pageResizeDrag.value) return pageResizeDrag.value
+  layoutTick.value
+  const el = iframe.value
+  const area = canvasArea.value
+  if (!el || !area) return null
+  if (store.isRunning || store.editing.kind !== 'page' || !store.activePage.size) return null
+  const pr = store.pageRect
+  if (pr.w <= 0 || pr.h <= 0) return null
+  const ir = el.getBoundingClientRect()
+  const ar = area.getBoundingClientRect()
+  return {
+    left: ir.left - ar.left + pr.x + pr.w,
+    top: ir.top - ar.top + pr.y + pr.h,
+  }
 })
+
+// The page is centred in the viewport, so its dragged corner moves at half the
+// size delta; solve for the size that puts the corner exactly under the pointer.
+// Once the page overflows the viewport it becomes edge-anchored (1:1).
+function sizeAtPointer(px: number, viewport: number): number {
+  const centered = 2 * px - viewport
+  return centered <= viewport ? centered : px
+}
+
+function startPageResize(e: PointerEvent): void {
+  const page = store.activePage
+  const el = iframe.value
+  const area = canvasArea.value
+  if (!page.size || store.isRunning || !el || !area) return
+  const ir = el.getBoundingClientRect()
+  const ar = area.getBoundingClientRect()
+  const doc = el.contentDocument
+  const vw = doc?.documentElement.clientWidth || ir.width
+  const vh = doc?.documentElement.clientHeight || ir.height
+  const target = e.currentTarget as HTMLElement
+  try {
+    target.setPointerCapture(e.pointerId)
+  } catch {
+    // synthetic events — window listeners below still track the drag
+  }
+  pageResizeDrag.value = { left: e.clientX - ar.left, top: e.clientY - ar.top }
+  const move = (ev: PointerEvent): void => {
+    const scrollX = doc?.documentElement.scrollLeft ?? 0
+    const scrollY = doc?.documentElement.scrollTop ?? 0
+    const px = ev.clientX - ir.left + scrollX
+    const py = ev.clientY - ir.top + scrollY
+    const w = Math.max(PAGE_MIN_W, Math.min(PAGE_MAX, Math.round(sizeAtPointer(px, vw))))
+    const h = Math.max(PAGE_MIN_H, Math.min(PAGE_MAX, Math.round(sizeAtPointer(py, vh))))
+    pageResizeDrag.value = { left: ev.clientX - ar.left, top: ev.clientY - ar.top }
+    store.setPageSize(store.currentPageIndex, { width: w, height: h })
+  }
+  const up = (): void => {
+    pageResizeDrag.value = null
+    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointerup', up)
+    window.removeEventListener('pointercancel', up)
+  }
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', up)
+  window.addEventListener('pointercancel', up)
+}
+
+// --- page size (Page tab): fluid (fills the window) or a fixed dialog size ---
+function setPageFixed(on: boolean): void {
+  const page = store.activePage
+  if (on) store.setPageSize(store.currentPageIndex, page.size ?? { width: 360, height: 420 })
+  else store.setPageSize(store.currentPageIndex, null)
+}
+function setPageWidth(e: Event): void {
+  const page = store.activePage
+  if (!page.size) return
+  const n = Number((e.target as HTMLInputElement).value)
+  if (Number.isFinite(n)) store.setPageSize(store.currentPageIndex, { ...page.size, width: n })
+}
+function setPageHeight(e: Event): void {
+  const page = store.activePage
+  if (!page.size) return
+  const n = Number((e.target as HTMLInputElement).value)
+  if (Number.isFinite(n)) store.setPageSize(store.currentPageIndex, { ...page.size, height: n })
+}
 
 /** what the status bar calls the thing being edited */
 const targetLabel = computed(() =>
@@ -520,16 +658,17 @@ function startPaletteSplitDrag(e: PointerEvent): void {
           <button :disabled="!store.canRedo" @click="store.redo()">↷</button>
           <button class="dup" :disabled="store.isRunning || !store.selectionIds.length" @click="store.duplicateSelected()">⧉</button>
         </div>
-        <div class="bp-switch" title="Preview breakpoint">
-          <button
-            v-for="bp in BREAKPOINTS"
-            :key="bp"
-            :class="{ on: store.breakpoint === bp }"
+        <div class="bp-switch" title="Preview width — restricts the canvas viewport, never the book">
+          <span class="spring-glyph" aria-hidden="true">▭</span>
+          <select
+            :value="String(previewWidth)"
             :disabled="store.isRunning"
-            @click="store.setBreakpoint(bp)"
+            @change="setPreviewWidth(($event.target as HTMLSelectElement).value === 'window' ? 'window' : Number(($event.target as HTMLSelectElement).value))"
           >
-            {{ bp[0]!.toUpperCase() + bp.slice(1) }}
-          </button>
+            <option v-for="p in PREVIEW_PRESETS" :key="String(p.value)" :value="String(p.value)">
+              {{ p.label }}
+            </option>
+          </select>
         </div>
         <div class="spring-wrap">
           <div class="spring-switch" title="Glue springs — which objects to show">
@@ -555,9 +694,48 @@ function startPaletteSplitDrag(e: PointerEvent): void {
               title="Hide all springs"
               @click="store.setFitHintMode('off')"
             >Off</button>
+            <button
+              class="spring-toggle spring-gear"
+              :class="{ on: springMenuOpen }"
+              :disabled="store.isRunning"
+              title="Spring display options"
+              @click.stop="springMenuOpen = !springMenuOpen; springHelpOpen = false"
+            >⚙</button>
+            <button
+              class="spring-toggle spring-help-toggle"
+              :class="{ on: springHelpOpen }"
+              title="What the springs, buttons and options mean"
+              @click.stop="springHelpOpen = !springHelpOpen; springMenuOpen = false"
+            >?</button>
           </div>
-          <div class="spring-legend" role="tooltip">
-            <div class="spring-legend-inner">
+          <div v-if="springHelpOpen" ref="springHelp" class="settings-pop spring-help" role="dialog" @click.stop>
+            <h3>Edge springs — help</h3>
+            <p class="help-lede">
+              Springs show the <b>edge constraints</b> each object follows. A line runs from the
+              object to the page edge (or group-box edge) it is glued to, so you can see how the
+              layout adapts when the window resizes. A faint dashed box marks a group whose
+              members are constrained to it.
+            </p>
+            <div class="help-section">
+              <h4>All / Sel / Off</h4>
+              <ul>
+                <li><b>All</b> — springs for every object, background objects included.</li>
+                <li><b>Sel</b> — springs for the current selection only.</li>
+                <li><b>Off</b> — hide all springs. Your choice sticks across sessions.</li>
+              </ul>
+            </div>
+            <div class="help-section">
+              <h4>⚙ Options</h4>
+              <ul>
+                <li><b>Show captions</b> — the small labels on each spring.</li>
+                <li><b>Include pixel numbers</b> — add the distance, e.g. <code>left 198</code>; off shows just <code>left</code>.</li>
+                <li><b>Include group members in All</b> — off leaves out the springs inside groups (the group box stays outlined).</li>
+                <li><b>Only objects with custom constraints</b> — hides objects that only follow the default Left + Top.</li>
+                <li><b>Hide zero-length captions</b> — drops the label when an object sits flush on an edge.</li>
+              </ul>
+            </div>
+            <div class="help-section">
+              <h4>Legend — what the lines mean</h4>
               <div class="legend-row">
                 <svg class="legend-swatch" width="34" height="12" viewBox="0 0 34 12" aria-hidden="true">
                   <path class="lz-edge" d="M2 6 L6 3 L10 9 L14 3 L18 9 L22 3 L26 9 L30 6" />
@@ -582,6 +760,54 @@ function startPaletteSplitDrag(e: PointerEvent): void {
                 <span><b>Fixed</b> margins are <b>solid</b> · <b>scaled</b> margins are <b>dashed</b></span>
               </div>
             </div>
+          </div>
+          <div v-if="springMenuOpen" ref="springMenu" class="settings-pop spring-pop" @click.stop>
+            <h3>Spring options</h3>
+            <label class="check">
+              <input
+                type="checkbox"
+                :checked="store.fitHints.labels"
+                @change="store.setFitHints({ labels: ($event.target as HTMLInputElement).checked })"
+              />
+              Show captions
+            </label>
+            <label class="check" :class="{ muted: !store.fitHints.labels }">
+              <input
+                type="checkbox"
+                :disabled="!store.fitHints.labels"
+                :checked="store.fitHints.lengths"
+                @change="store.setFitHints({ lengths: ($event.target as HTMLInputElement).checked })"
+              />
+              Include pixel numbers
+            </label>
+            <label class="check">
+              <input
+                type="checkbox"
+                :checked="store.fitHints.groupMembers"
+                @change="store.setFitHints({ groupMembers: ($event.target as HTMLInputElement).checked })"
+              />
+              Include group members in All
+            </label>
+            <label class="check">
+              <input
+                type="checkbox"
+                :checked="store.fitHints.nonDefaultOnly"
+                @change="store.setFitHints({ nonDefaultOnly: ($event.target as HTMLInputElement).checked })"
+              />
+              Only objects with custom constraints
+            </label>
+            <label class="check">
+              <input
+                type="checkbox"
+                :checked="store.fitHints.skipZeroLabels"
+                @change="store.setFitHints({ skipZeroLabels: ($event.target as HTMLInputElement).checked })"
+              />
+              Hide zero-length captions
+            </label>
+            <p class="hint">
+              “Custom” hides objects that only follow the default Left + Top. Zero-length
+              captions are the ones that sit flush on an edge.
+            </p>
           </div>
         </div>
       </div>
@@ -670,7 +896,7 @@ function startPaletteSplitDrag(e: PointerEvent): void {
       @dblclick="store.resetPaletteWidth()"
     ></div>
 
-    <main class="canvas-area" :class="{ active: store.dragOverCanvas }">
+    <main ref="canvasArea" class="canvas-area" :class="{ active: store.dragOverCanvas }">
       <iframe
         ref="iframe"
         class="canvas"
@@ -678,6 +904,13 @@ function startPaletteSplitDrag(e: PointerEvent): void {
         src="/canvas.html"
         title="toolback canvas"
       ></iframe>
+      <div
+        v-if="pageResizePos"
+        class="page-resize"
+        :style="{ left: `${pageResizePos.left}px`, top: `${pageResizePos.top}px` }"
+        title="Drag to resize the fixed-size page"
+        @pointerdown.prevent="startPageResize"
+      ></div>
     </main>
 
     <div
@@ -705,7 +938,7 @@ function startPaletteSplitDrag(e: PointerEvent): void {
             <input :value="store.activePage.name" disabled />
           </div>
           <div class="field">
-            <label>Background (shared objects + page size)</label>
+            <label>Background (shared objects)</label>
             <div class="bg-row">
               <select :value="pageBackgroundId" @change="onPageBackgroundChange">
                 <option v-for="b in store.book.backgrounds" :key="b.id" :value="b.id">
@@ -719,6 +952,44 @@ function startPaletteSplitDrag(e: PointerEvent): void {
               >Properties…</button>
             </div>
           </div>
+
+          <div class="field">
+            <label>Page size</label>
+            <label class="check-row">
+              <input
+                type="radio"
+                name="pagesize"
+                :checked="!store.activePage.size"
+                @change="setPageFixed(false)"
+              />
+              Fills the window (grows with content)
+            </label>
+            <label class="check-row">
+              <input
+                type="radio"
+                name="pagesize"
+                :checked="!!store.activePage.size"
+                @change="setPageFixed(true)"
+              />
+              Fixed size (dialog / popup / plugin window)
+            </label>
+            <div v-if="store.activePage.size" class="size-inputs">
+              <input
+                type="number"
+                min="1"
+                :value="store.activePage.size.width"
+                @change="setPageWidth($event)"
+              />
+              <span class="times">×</span>
+              <input
+                type="number"
+                min="1"
+                :value="store.activePage.size.height"
+                @change="setPageHeight($event)"
+              />
+            </div>
+          </div>
+
           <label class="check-row" title="Offer this page in the ⚡ Author menu — its scripts get the author API at authoring time">
             <input
               type="checkbox"
@@ -756,8 +1027,7 @@ function startPaletteSplitDrag(e: PointerEvent): void {
         <template v-else>
           <p class="hint bg-banner">
             Editing background <strong>"{{ store.activeBackground?.name }}"</strong> — its objects
-            appear on all {{ store.backgroundPageCount }} page(s) that use it. Page-size:
-            {{ store.activeCanvasSize.width }} × {{ store.activeCanvasSize.height }}.
+            appear on all {{ store.backgroundPageCount }} page(s) that use it.
           </p>
           <div class="field">
             <label>Background name</label>
@@ -777,9 +1047,9 @@ function startPaletteSplitDrag(e: PointerEvent): void {
           </div>
           <button
             class="bg-props full"
-            title="Page size, per breakpoint"
+            title="Background name, colour and delete"
             @click="store.backgroundDialogId = store.editing.id"
-          >Page size & properties…</button>
+          >Background properties…</button>
 
           <div class="row">
             <h2 class="tab-head">Background script</h2>
@@ -1088,31 +1358,48 @@ body.tb-palette-dragging * {
 
 .bp-switch {
   display: flex;
+  align-items: center;
   gap: 2px;
   border: 1px solid var(--ed-border);
   border-radius: 6px;
-  padding: 2px;
+  padding: 2px 4px 2px 2px;
   background: var(--ed-bg);
 }
 
-.bp-switch button {
+.bp-switch select {
   font: 500 11px/1 system-ui, sans-serif;
-  color: var(--ed-text-dim);
+  color: var(--ed-text);
   background: transparent;
   border: none;
   border-radius: 4px;
-  padding: 5px 8px;
+  padding: 4px 4px;
   cursor: pointer;
 }
 
-.bp-switch button.on {
-  color: #fff;
-  background: var(--ed-accent);
-}
-
-.bp-switch button:disabled {
+.bp-switch select:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.size-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 4px;
+}
+
+.size-inputs input {
+  width: 82px;
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  color: var(--ed-text);
+  padding: 6px 8px;
+  font: 12px ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.size-inputs .times {
+  color: var(--ed-text-dim);
 }
 
 .spring-wrap {
@@ -1127,29 +1414,6 @@ body.tb-palette-dragging * {
   border-radius: 6px;
   padding: 2px;
   background: var(--ed-bg);
-}
-
-.spring-legend {
-  display: none;
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 90;
-  padding-top: 8px;
-}
-
-.spring-wrap:hover .spring-legend,
-.spring-wrap:focus-within .spring-legend {
-  display: block;
-}
-
-.spring-legend-inner {
-  width: 320px;
-  background: var(--ed-panel);
-  border: 1px solid var(--ed-border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
 .legend-row {
@@ -1222,6 +1486,89 @@ body.tb-palette-dragging * {
 .spring-toggle:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.spring-gear,
+.spring-help-toggle {
+  padding: 5px 7px;
+}
+
+.spring-help-toggle {
+  font-weight: 700;
+}
+
+/* both popovers anchor under the control; the help panel is wider + scrolls */
+.spring-pop,
+.spring-help {
+  left: 0;
+  right: auto;
+}
+
+.spring-help {
+  width: 340px;
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+.spring-pop .check + .check {
+  margin-top: 8px;
+}
+
+.spring-pop .check.muted {
+  opacity: 0.5;
+}
+
+.spring-help .help-lede {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ed-text-dim);
+}
+
+.spring-help .help-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ed-border);
+}
+
+.spring-help .help-section h4 {
+  margin: 0 0 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ed-text);
+}
+
+.spring-help .help-section ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ed-text-dim);
+}
+
+.spring-help .help-section li + li {
+  margin-top: 5px;
+}
+
+.spring-help .help-section b {
+  color: var(--ed-text);
+}
+
+.spring-help code {
+  font: 500 11px/1 ui-monospace, monospace;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: var(--ed-bg);
+}
+
+.spring-help .legend-row {
+  margin-bottom: 9px;
+}
+
+.spring-help .legend-row:last-child {
+  margin-bottom: 0;
 }
 
 .dim {
@@ -1698,17 +2045,41 @@ h2:first-child {
 }
 
 .canvas-area {
+  position: relative;
   grid-area: canvas;
-  overflow: auto;
-  padding: 20px;
+  overflow: hidden;
+  padding: 16px;
+  display: flex;
+  justify-content: center;
 }
 
 .canvas {
+  display: block;
   background: #fff;
   border: none;
   outline: 1px solid var(--ed-border);
   outline-offset: -1px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* fixed-size page: a corner grip on the page's bottom-right, like the old
+   background preview — drag to resize, exact numbers stay in the Page tab */
+.page-resize {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border: 2px solid var(--ed-accent);
+  border-radius: 3px;
+  cursor: nwse-resize;
+  touch-action: none;
+  z-index: 5;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.page-resize:hover {
+  background: var(--ed-accent);
 }
 
 .canvas-area.active .canvas {

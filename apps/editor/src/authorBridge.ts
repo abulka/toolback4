@@ -25,7 +25,8 @@ export function authorRef(o: { id: string; name: string; control: string }): {
 function objectSnapshot(store: Store, id: string): Record<string, unknown> | null {
   const obj = store.allObjects.find((o) => o.id === id)
   if (!obj) return null
-  const r = store.effectiveRectOf(obj.id) ?? obj.rect
+  const r = store.effectiveRectOf(obj.id)
+  if (!r) return null
   return {
     id: obj.id,
     name: obj.name,
@@ -138,7 +139,8 @@ export function executeAuthorOp(store: Store, op: string, args: unknown): unknow
       const dy = typeof pos[2] === 'number' ? (pos[2] as number) : 0
       const obj = store.allObjects.find((o) => o.id === id)
       if (!obj) throw new Error(`author.moveObject: unknown id "${id}"`)
-      const r = store.effectiveRectOf(obj.id) ?? obj.rect
+      const r = store.effectiveRectOf(obj.id)
+      if (!r) throw new Error(`author.moveObject: unknown id "${id}"`)
       store.setGeometry(id, { x: r.x + dx, y: r.y + dy })
       return { id }
     }
@@ -184,7 +186,6 @@ export function executeAuthorOp(store: Store, op: string, args: unknown): unknow
         pluginPages: store.book.pages.filter((p) => p.author).map((p) => p.name),
         objectCount: store.objectCount,
         canvas: store.activeCanvasSize,
-        breakpoint: store.breakpoint,
       }
     }
     case 'message': {

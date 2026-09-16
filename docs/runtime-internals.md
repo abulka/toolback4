@@ -31,25 +31,40 @@ JSON document (`Book`). The editor owns it; the canvas is a renderer.
 ## 2. Data model (`packages/format`)
 
 ```ts
-Book    { id, title, canvas: { desktop: {w,h}, tablet?, mobile? },
+Book    { id, title,
           backgrounds: Background[], pages: Page[],
           startPageId?, store?: [key,value][] }
 Background {
   id, name, color, script,        // script = shared fns + backgroundEnter() hook
-  size?: { desktop?, tablet?, mobile? },
   objects: PageObject[],
 }
-Page    { id, name, script, backgroundId, author?, objects: PageObject[] }
+Page    { id, name, script, backgroundId, author?, size?: {w,h}, objects: PageObject[] }
 PageObject {
   id, name,                       // name = unique per page/background; the `controls[name]` handle
   control: 'button'|'label'|'input'|'image'|'card'|'container'|'switch'|'group',
-  rect: Rect,                     // the ONE authored layout; `fit` adapts it per page size
+  x: XEdge,                       // horizontal edge constraint (see §4.1)
+  y: YEdge,                       // vertical edge constraint
   props: Record<string, unknown>, // control-specific, e.g. { text }
   on: Record<string, string>,     // eventName -> script source
-  children?: PageObject[],        // groups only; members' rects are parent-relative
-  fit?: { x?: FitHMode; y?: FitVMode },  // responsive glue (see §4.1)
+  children?: PageObject[],        // groups only; members constrain to the group box
 }
+XEdge = { mode:'left'; left; width }
+      | { mode:'right'; right; width }
+      | { mode:'both'; left; right }
+      | { mode:'center'; width }
+YEdge = { mode:'top'; top; height }
+      | { mode:'bottom'; bottom; height }
+      | { mode:'both'; top; bottom }
+      | { mode:'center'; height }
 ```
+
+- **Pages are web pages.** A page with no `size` fills the window it is shown in
+  (the editor canvas area, or the browser) and grows with its content, never
+  shorter than the window. A page with a `size` is a fixed surface (dialog /
+  popup / author plugin window). Breakpoints, `Book.canvas`, `Book.design`,
+  `Background.size` and `Background.autoHeight` are gone; `parseBook` migrates
+  old files (`canvas` desktop size → the reference every old fitted rect is
+  measured against, then discarded; a background `size` → its pages' `size`).
 
 - Zod schemas with `.default()`s; `parseBook` normalizes on load. Factories
   (`createObject`, `createGroup`, `createPage`, `createBook`) return parsed
@@ -58,10 +73,11 @@ PageObject {
   optional/dangling-safe: `resolveStartPageIndex(book)` returns the matching
   index or `0`. The published entry (`player-entry.ts`) passes it to `runBook`,
   and the editor opens it on load/refresh; it is not a per-run override.
-- Every object has **one authored layout** (`rect`) plus an optional `fit`
-  (see §4.1); there are no per-breakpoint rects.
-- Groups are **parent objects**: a member's rect is relative to its group; a
-  group's rect is the tight union of its members (see §5.3).
+- Every object stores its **edge distances** (`x`/`y`; see §4.1), not a rect or
+  a scale mode; there is no remembered "designed at" size.
+- Groups are **parent objects**: a member constrains to the group box; a group's
+  box is its own `x`/`y` and hugs its members. A group handle resize (or a typed
+  W/H / scripted size) scales the members with it (see §5).
 - Style props: `color` (colour names via `resolveColor` — a curated map plus
   any CSS colour string — or raw CSS) and `fontFamily` (one of the five
   simplified stacks in `FONT_STACKS`) are applied at render
@@ -77,9 +93,9 @@ PageObject {
 
 ### 3.1 Run loop & navigation
 
-`runBook(book, root, breakpoint, onError, startPageIndex)` builds a `RunState`
-and calls `runPage`. One global `active` handle — a second `runBook` replaces
-the first (`stopRun` unwinds everything). `runPage`:
+`runBook(book, root, onError, startPageIndex)` builds a `RunState` and calls
+`runPage`. One global `active` handle — a second `runBook` replaces the first
+(`stopRun` unwinds everything). `runPage`:
 
 1. `navLock` guards re-entrancy (`page.go` inside `pageEnter` etc.).
 2. Fires `pageLeave` (async-safe: `Promise.resolve(leave()).catch`), then
@@ -264,11 +280,18 @@ and communicates with the editor only through messages (`toolback:selection`,
 - **Drag**: one batched `toolback:commit {kind:'move', objects:[{id, rect}]}` per
   gesture, rects in **page-absolute** coordinates. The store rebases each into
   its parent-relative slot (`absOriginOf` sums the ancestor origins) and
-  re-snaps group boxes to the tight union of their members.
-- **Group resize**: live preview via a CSS `transform` scale from the fixed
-  corner (the layout box is untouched mid-drag); the commit sends the group
-  rect plus every descendant scaled around the same fixed corner — preview
-  and commit agree for every handle.
+  re-snaps group boxes to the tight union of their members. During a move the
+  controller also re-derives the cached `rects` of every descendant of a moved
+  object from their start rects (`followers`, captured at pointer-down), so a
+  group's members' springs and hit-testing track the ghost live instead of
+  lagging until the commit's re-render.
+- **Group resize**: a group handle drag leaves the layout box alone and previews
+  a CSS `transform: scale(fx, fy)` anchored on the fixed corner, stretching the
+  whole subtree. The commit sends only the group's rect + `dir`; the store scales
+  every descendant's edge distances by the box ratio (`scaleSubtreeEdges`, §5)
+  and writes the box, so the preview maps onto the re-render. A stretch axis
+  (`both`) that the handle moved becomes a fixed near-edge size. Non-group
+  objects resize their own box directly; their members re-resolve their edges.
 - **Aspect lock (Shift-drag)**: holding Shift on a **corner** handle resizes
   with the object's start aspect ratio held (`resizeRectAspect`,
   `packages/runtime/src/design.ts`) — the driver axis is whichever the pointer
@@ -278,103 +301,168 @@ and communicates with the editor only through messages (`toolback:selection`,
 - **Clip indicators**: after every render (and live during drags) the
   controller lays a dashed red `.tb-clip` box over any object that sticks out
   of the page. The controller's `rects` map is always the source of truth for
-  these — it reads rendered DOM positions, so fit-aware rendering is
+  these — it reads rendered DOM positions, so CSS edge rendering is
   automatically reflected.
-- **Glue springs**: the `.tb-fithint` overlay draws a spring from every
-  *constrained* object (fit with a non-Free axis) to the page edge(s) it's
-  glued to. **Shape encodes the anchor**: an **edge** anchor
-  (left/top/right/bottom, and both sides) is a zigzag with a square anchor and
-  an arrowhead at the object pointing back at it; **center** is a plain straight
-  connector with circle anchors and the page centerline. **Line style encodes the
-  margin behaviour**: `fixed` is solid, `scaled` is dashed. Edges are slate,
-  center is pale grey, and every spring is drawn over a translucent white halo so
-  it reads on dark pages. Drawn for all objects —
-  background objects included (`bgRects` fallback) — whenever the `≋`
-  All/Sel/Off control says so (the load message carries `fitHints` as a
-  `FitHintMode`), with a hover legend in the toolbar. `'selected'` draws only
-  the current selection; `'off'` draws nothing. Free renders nothing. The hint
-  is the page's first child, so it paints above the page background but
-  **under** the controls; page-edge anchor glyphs are nudged just inside the
-  page so clipping doesn't cut them. Pure decoration — `pointer-events: none`,
-  rebuilt on render and drag redraws. Reads `data-tb-fit-x/y` the renderer
-  stamps on each wrapper.
-- **Drags re-anchor the shared layout**: canvas drags run the dragged rect
-  through `unlensObjectRect` and write the object's one `rect` — glued axes
-  re-anchor, free axes take the value. Center is rigid (the canvas clamps its
-  axis). No constraint ever "fights back" and there is nothing to release.
+- **Edge springs**: the `.tb-fithint` overlay draws a spring from every object
+  to each edge it follows, **one axis at a time** (by default every object draws
+  at least the left/top springs). The load message carries the whole
+  `FitHintOptions` (`mode: 'all' | 'selected' | 'off'` plus the popover options)
+  and `setFitHints` normalizes a bare mode string for back-compat; the All/Sel/Off
+  buttons patch `mode`, the fourth segment opens the options popover.
+  `springShown(el)` gates the drawing pass: the `modeAllows` gate (Selected =
+  selection only) plus `groupMembers:false` (skip members in All) and
+  `nonDefaultOnly` (skip objects whose x/y are both the default left/top). The
+  group-outline pass uses `modeAllows` alone, so hiding a member's spring never
+  hides the group box it sits in. Each spring carries a
+  `.tb-fithint-label` caption with the edge word and (unless `lengths:false`) its
+  pixel distance (`right 198`, `top 46`, `centre`); `labels:false` drops captions
+  entirely and `skipZeroLabels` (default on) drops the ones whose distance rounds
+  to 0, so a flush edge is not captioned. Captions are **placed on the roomier
+  side of the spring and clamped inside the page/group box** using text-derived
+  size estimates (no layout read), so a page-edge caption is pushed clear of the
+  border instead of sitting on it. **Shape encodes the anchor**: an **edge**
+  choice (left/top/right/bottom, and both) is a zigzag with a square anchor and an
+  arrowhead at the object pointing back at it; **center** is a plain straight
+  connector with circle anchors. Distances are always fixed, so every edge spring
+  is solid. Edges are slate, center is pale grey, and every spring is drawn over a
+  translucent white halo so it reads on dark pages. **Members draw their own
+  springs against the parent group box** (the group wrapper's rect, via the
+  `rects`/`bgRects` maps) rather than the page; top-level objects use the page box
+  (`origin` + `pageBounds`). Covers background objects too (`bgRects` fallback),
+  with a **?** help popup in the toolbar (buttons + options + line legend). The
+  hint is the page's first child, so it
+  paints above the page background but **under** the controls; page-edge anchor
+  glyphs are nudged just inside the page so clipping doesn't cut them. Pure
+  decoration — `pointer-events: none`, rebuilt on render, drag redraws and window
+  resizes (`DesignController.refresh`). Reads the `data-tb-edge-x/y` modes the
+  renderer stamps on each wrapper.
+- **Group outlines** (`.tb-group-outline`): a quiet dashed slate box tracing a
+  group that has no selection box of its own but whose edges matter — every
+  group in `drillPath` (so each nesting level stays faintly visible while an
+  inner child is selected), plus every group whose members are in view at the
+  current mode (so a member's springs always land on a visible edge; the
+  `groupMembers`/`nonDefaultOnly` filters hide springs, not the box). A group
+  can be both drilled and in-view, or selected: a selected group is
+  always excluded — its `.tb-sel` box is the loud one — and `fitHints.mode:'off'`
+  leaves only the drilled ancestors. Built by `redrawGroupOutlines` (the set is
+  the pure `groupOutlineIds`), positioned from the `rects`/`bgRects` maps like
+  the selection boxes, painted under `.tb-sel`, and refreshed whenever the
+  selection, drill path or hint mode changes.
+- **Drags rewrite edge distances**: canvas drags send page-absolute rects; the
+  store converts each to the object's `x`/`y` distances against its page/group
+  box, keeping the edges it already follows. A centred axis is rigid (the canvas
+  clamps it); there is nothing to release.
 
-### 4.1 Responsive glue (`fit`) — the lens model
+### 4.1 Edge constraints (`x` / `y`)
 
-`PageObject.fit` (`x`, `y`) is a **non-destructive render lens** resolved at
-render/read time only by `resolveObjectRect` (`packages/format`): constrained
-axes derive from the one authored `rect` (left/top scale position, right/bottom
-scale the edge gap, center centers the middle, stretch scales position+size,
-**pin-right/pin-bottom** keep the far-edge gap a constant px, **fill** keeps
-both margins constant while the size grows), free axes keep the authored
-coordinate. Internally this is `fit`; the author-facing surface is the
-**Responsive** section of the properties panel
-(`apps/editor/src/components/PropertiesPanel.vue`), described as "glue" or
-"springs" in the guide. The panel presents each axis as an **anchor** — Free ·
-Left/Top · Center · Right/Bottom · **Both sides** — plus a **Fixed** toggle for
-Right/Bottom/Both; `apps/editor/src/fitModes.ts` is the single mapping between
-that pair and the tokens (Both + Fixed = `fill`, Both + scaled = `stretch`,
-Right + Fixed = `pin-right`, …), so the internal names never surface. **The lens
-applies at every size, including the reference size** (there the page size
-equals the base, so
-Free/Left/Right/Top/Bottom/Pin/Stretch/Fill are identity and only Center moves)
-— this is what makes setting Center visibly center the object without writing
-anything; switching back to Free restores the authored layout exactly.
-Invariant: **fit never writes rects.** Deliberate geometry writes (panel
-fields, scripts, author bridge) fold through `unlensObjectRect` back onto the
-base rect; a typed position on a centered axis releases that axis. Canvas drags
-go through `applyRects`, which re-anchors top-level objects and rebases members
-to their group's rendered box.
+Every `PageObject` stores the distance(s) it keeps from the edges it follows,
+like CSS `left`/`right`/`top`/`bottom`:
 
-A missing `fit` resolves to **free** (the model default: the authored
-coordinate applies everywhere). The editor, however, seeds each newly-placed
-control — and each newly-created top-level group — with `{ x: 'left', y: 'top' }`
-so a fresh object adapts sensibly when the page resizes; only objects with no
-`fit` (e.g. legacy books) fall back to free.
+- `{ mode:'left', left, width }` — fixed distance from the left edge, fixed size
+- `{ mode:'right', right, width }` — fixed distance from the right edge
+- `{ mode:'both', left, right }` — both margins fixed, so the size stretches
+- `{ mode:'center', width }` — fixed size, centred
 
-Known limitations: a Center axis is rigid (its position is fully determined, so
-the canvas clamps that axis and it must be changed from the dropdown); a
-top-level group carries the glue and resizing it scales its members onto the new
-box, while members and nested groups have **no independent fit** (they are
-relative to the group box and ride/scale with it).
+`y` mirrors with `top` / `bottom` / `both` / `center`. There is no stored
+reference size and no scaling mode; `resolveX`/`resolveY` derive a rect against a
+containing box (`rectForObject`), and the renderer writes the distances straight
+to CSS (`applyEdgeStyles`: `left`+`width`, `right`+`width`, `left`+`right`, or
+`left: calc(50% - w/2)`). Percentages resolve against the containing box — the
+page for top-level objects, the parent group wrapper for members — so the browser
+repositions everything on resize with **no JavaScript re-render**.
 
-### 4.2 Auto-height "web page" pages
+The author-facing surface is the **Responsive** section of the properties panel
+(`apps/editor/src/components/PropertiesPanel.vue`): four plain choices per axis
+(Follows left · Follows right · Follows both (stretches) · Centred), stored
+directly as the `mode`. `apps/editor/src/fitModes.ts` holds the labels and
+descriptions. Switching a choice re-derives the distances from the current
+rendered rect (`xEdgeFromRect`/`yEdgeFromRect`), so the object stays put.
 
-A background can turn on **Height fits content** (a single
-`Background.autoHeight: boolean`, applying to every breakpoint; the
-properties-dialog checkbox). `resolvePageSize(book, bg, bp, objects?)` then
-derives the height from content — the bottom of the lowest top-level object
-(fit-aware, groups measured by their box), plus a 24px gap once that passes the
-minimum, floored at the authored height for that breakpoint
-(`contentHeightFor`, `packages/format`) — while the width stays fixed. The
-legacy per-breakpoint object form is collapsed to a boolean by
-`migrateBackgrounds`.
+Invariant: **an edge constraint is the stored geometry, not a render lens.**
+Deliberate writes (`writeRectPart`, used by panel fields, scripts and the author
+bridge) move the control now while keeping the mode: `x`/`y` on a follows-both
+control translates it, on a centred control drops the centring to a near edge,
+and a `width`/`height` write on a follows-both control switches that axis to a
+fixed size held to the left/top. Canvas drags go through `applyRects`, which
+builds the new distances for top-level objects and rebases members into their
+group's frame.
 
-Invariant: **auto-height changes the page box, never the fit lens.** The lens is
-resolved with the *base* sizes (the number in the size dialog), so vertical glue
-(Bottom/Center/Both sides) is measured against the base and can never depend on the
-grown height — otherwise bottom-glue would feed its own height back in. So
-`renderPage` takes the base `canvasSize` (the lens) plus an optional `boxHeight`
-(the CSS height); `renderBookPage`/`renderBackgroundView` compute the box from
-their object list but keep the lens on the base, and `runPage`'s ControlApi
-`apiSize` / `author.ts` reads also stay base. Only layout at render/navigation
-time drives growth; a script moving an object mid-run does not re-measure.
+A legacy book with `rect` + `fit` is migrated at parse time
+(`migrateConstraints`): free/left/top/stretch → follows the near edge,
+right/bottom/pin-* → follows the far edge, fill → follows both, center → centred,
+each measured at the old desktop reference size and frozen into fixed distances.
+
+ControlApi reads use the same resolution: `runPage` and `author.ts` build a
+`parentBoxMap` (the resolved page box for top-level objects, the resolved group
+box for members) plus `pageBoxFor`, and each `ControlApi` resolves its
+`x`/`y`/`width`/`height` — and the box a write re-derives against — from that
+containing box, so script reads agree with the render.
+
+Known limitations: a centred axis is rigid (its position is fully determined, so
+the canvas clamps it and it must be changed from the dropdown); group members
+carry their own constraints **relative to the group box** (see §5).
+
+### 4.2 Fluid pages (the page box)
+
+`resolvePageBox(page, container, objects)` (`packages/format`) is the single
+source of a page's size. A **fixed** page (`Page.size`) returns that size. An
+**ordinary** page returns `max(container, content extent)`, where the extent is
+`contentExtent(objects)`: the right/bottom of every object whose x/y mode is
+**left/top** (near edge, groups included). Right/bottom/both/centred objects sit
+inside the page box by definition and never enlarge it — this is what makes
+"follows bottom" mean a fixed distance from the page's real bottom edge without
+circularity.
+
+At render time a fluid page is given `width:100%; height:100vh` (or `100%` inside
+a sized popup/author box) with `min-width`/`min-height` set to the content
+extent, so the browser grows and scrolls the page with no re-measure. Only layout
+at render/navigation time drives growth; a script moving an object mid-run does
+not re-grow the page. The container is `measureViewport(root)` (the document's
+client box) for a base page, or an explicit box for popups/author windows. A
+fixed page is centred in the window (`margin: auto`); a fluid page fills it.
+
+The editor canvas mirrors this: `renderBookPage`/`renderBackgroundView` render
+fluid pages, and `editorLink`'s `syncCanvasWidth()` toggles
+`.tb-canvas-root--fluid` so the wrapper spans **max(viewport, content extent)**
+— `min-width:100%` covers the empty case (a plain `max-content` wrapper would
+collapse a fluid page whose content fits), while the inherited `max-content`
+covers horizontal overflow so objects past the right edge stay inside the design
+overlay and remain hit-testable. `syncCanvasWidth()` runs **before** the rects
+are measured/`onRendered`, because a fixed→fluid navigation must widen the
+wrapper first: measuring against a still-collapsed wrapper puts right/bottom
+anchors (and the selection/clip overlays derived from them) in the wrong place
+until the next re-render. On resize the editor sends a fresh viewport and
+calls `design.refresh()` to re-measure the overlay; the page itself reflows
+purely in CSS. Scroll preservation is gone — the page's size comes from
+constraints, not from measuring the DOM, so clearing and rebuilding the page no
+longer collapses it.
 
 ## 5. Group invariants (`apps/editor/src/stores/book.ts`)
 
-1. **Tight union**: after any member move/resize/delete, `expandGroup` shifts
-   members so their union starts at the group's local origin and sets the
-   group's base rect to the union size (breakpoint-independent — members are
-   relative, one base layout covers every size). Member absolute positions are
-   preserved; recurses up for nested groups.
+1. **Hug the members**: after any member move/resize/delete, a member's edge
+   change, or a group-level resize, `expandGroup` solves every member against
+   the current group box, shifts the group so the union starts at its local
+   origin, and sets the box to the union — near/far members keep their absolute
+   positions. Members keep their own edge modes. A **centred** member re-centres
+   when the box changes, so `expandGroup` **iterates to a fixed point** (up to
+   12 passes) to reach a genuinely tight box. Recurses up for nested groups.
+   **Two ways a group changes size:** a **handle drag** — and a typed W/H, and a
+   scripted `group.width`/`height` — means "size the group": the store scales
+   every descendant's edges by the box ratio (`scaleSubtreeEdges` in
+   `@toolback/format`) around the fixed corner, so sizes and positions scale
+   together, and `expandGroup` then only rounds the box tight. A **page/window
+   resize** is ambient: CSS re-resolves each member's own edges and nothing is
+   scaled. Because a page box change caused by a **content** edit (moving another
+   control, resizing the page) would otherwise leave a stretch (`both`) group
+   larger than its members, every `sync()` first runs `rehugStretchedGroups()` —
+   an idempotent depth-first `expandGroup` over `both`-axis groups, so only a
+   pure viewport reflow (no store mutation) can leave a group bigger than its
+   contents. A stretch (`both`) axis that a handle resized becomes a fixed
+   near-edge size so the hand resize sticks.
 2. **Same-parent rule**: grouping requires all selected objects to share a
    parent. Ungrouping splices children back at the group's index with their
    rects made absolute against the group's rendered box at the current
-   breakpoint (so it never jumps on screen); ungrouping a scripted group asks
+   viewport (so it never jumps on screen); ungrouping a scripted group asks
    first (the script is lost).
 3. **Duplication** (`duplicateSelected`): deep-clone with fresh ids and fresh
    names from a shared used-names set (nested group levels never collide),
@@ -388,15 +476,16 @@ iframe.
 
 | Editor → canvas | payload | meaning |
 |---|---|---|
-| `toolback:load` | book, breakpoint, pageIndex, design, selection | full re-render (the only sync; idempotent) |
+| `toolback:load` | book, pageIndex, view, design, selection, fitHints | full re-render (the only sync; idempotent) |
 | `toolback:dragOver` / `dragEnd` | control, rect | palette ghost preview |
-| `toolback:authorStart` | book, pageIndex, breakpoint | run a plugin page in author mode (M6c) |
+| `toolback:authorStart` | book, pageIndex | run a plugin page in author mode (M6c) |
 | `toolback:authorStop` | — | stop the running plugin |
 | `toolback:authorReply` | id, ok, result / error | resolves one pending bridge call |
 
 | Canvas → editor | payload | meaning |
 |---|---|---|
 | `toolback:ready` | — | iframe booted; editor answers with `load` |
+| `toolback:viewport` | width, height | measured canvas viewport (the editor store mirrors it for its page-box/edge math) |
 | `toolback:rects` | rects map | layout measured (design hit-testing) |
 | `toolback:selection` | ids | canvas selection changed (multi-select, drill) |
 | `toolback:commit` | kind move/resize, objects | a drag/resize finished (undoable edit) |
@@ -434,17 +523,23 @@ IndexedDB autosave. Components never touch `book` directly.
   edits are undoable/redoable like any book edit (coalesced under
   `designstore`); still applied while running (record no-ops, matching every
   run-mode edit), which is how the ⇓ "copy to design" action works.
+- **Edge writes / page box**: `pageBox()` is `resolvePageBox` against the
+  mirrored viewport; `renderedRectOf`/`renderedPageRectOf` resolve an object's
+  rect from its `x`/`y` against its page/group box (`boxForObject`).
+  `applyRects` (canvas commits), `setGeometry` (panel fields, author bridge) and
+  `setObjectEdge` (Responsive dropdowns) all write through
+  `writeRectPart`/`applyRectToObject`, keeping the edges each control follows.
+  `fillObjectToPage`/`fillObjectWidth`/`fillObjectHeight` pin both margins;
+  `centerObjectInPage` sets both axes centred. `expandGroup` re-hugs a group box
+  around its members.
 - **Align / distribute / match** (`alignSelection`, `distributeSelection`,
   `matchSizeSelection`, `centerSelectionOnPage`): five pure helpers in
   `@toolback/format` (`alignRects`, `centerBlockRects`, `distributeRects`,
   `matchSizeRects`) applied to the selection's **rendered** page-absolute rects
-  (`renderedPageRectOf` mirrors `renderObjectInto`, including a stretched/filled
-  top-level group's member scale), then written back through
-  `writeRenderedRects`: top-level objects fold through `unlensObjectRect` (glue
-  preserved, centered axes released), members rebase into the group's local
-  base frame after un-scaling. All four are one `record` step each and no-op on
-  a mixed-parent selection. `fillObjectWidth`/`fillObjectHeight`/
-  `centerObjectInPage` are the single-object companions to `fillObjectToPage`.
+  (`renderedPageRectOf` sums the ancestor group boxes), then written back through
+  `writeRenderedRects` (members rebase into the group's local frame; every
+  object keeps its edges). All four are one `record` step each and no-op on a
+  mixed-parent selection.
 
 ## 8. IntelliSense generation (`apps/editor/src/monacoApiLib.ts`)
 
@@ -557,11 +652,11 @@ match what will resolve at runtime:
    (not the TS lib if the name collides with a DOM global). Pages/backgrounds
    should also be excluded from `FUNCTION_RESERVED` in `monacoApiLib.ts` if
    they become callable user functions.
-4. **Fit is render-time only.** `resolveObjectRect` (the one authored `rect` +
-   glue) is the single source of rects at render and ControlApi reads. Never
-   write a fitted rect into `rect` — reads would freeze the glue. A deliberate
-   geometry write folds the rendered target back onto the base rect via
-   `unlensObjectRect`; a canvas drag does the same via `applyRects`.
+4. **Edges are the stored geometry.** `x`/`y` are the single source of a
+   control's rect at render and ControlApi reads (`rectForObject` + CSS). A
+   geometry write keeps the control's mode via `writeRectPart`; a canvas drag
+   converts the page-absolute rect through `applyRects`. Never bake a resolved
+   rect back into `x`/`y` — the distances are the authored data.
 5. Group handlers must be reached through the **owner-chain dispatch**, never
    by attaching listeners to group wrappers (double-fire risk).
 6. `{{…}}` template grammar and `collectStoreKeys` must stay in sync about
@@ -578,6 +673,17 @@ match what will resolve at runtime:
    canvas sets it at boot from `public/libs/importmap.json`; shelf output must
    always be ESM — `build-libs.mjs` emits `/libs/<name>.js` and both publish
    and preview consume that layout.
-9. **Auto-height never feeds the lens.** `resolvePageSize(..., objects)` may
-   grow the page *box*; the fit lens stays on the base sizes (see §4.2). Never
-   pass the grown size as `resolveObjectRect`'s page size.
+9. **Far edges cannot feed the page size.** `resolvePageBox` may grow the page
+   *box* past the container; only left/top (near-edge) objects contribute to
+   `contentExtent` (see §4.2). A right/bottom/both/centred object never enlarges
+   the page.
+10. **A group scales when you size it, not when the page reflows.** A group
+    resize — a handle drag (`applyRects` with `dir`), a typed W/H
+    (`setGeometry`), or a scripted `group.width`/`height` — scales descendants'
+    edge distances via `scaleSubtreeEdges`, around the fixed corner. An ambient
+    reflow (page/window resize, no `dir`) must **not** scale: CSS re-resolves
+    each member's own edges. A stretch (`both`) axis a handle resized becomes a
+    fixed near-edge size. `sync()` re-hugs every `both`-axis group
+    (`rehugStretchedGroups`) so a page box change caused by an edit can never
+    leave a group larger than its members — never re-hug on a pure viewport
+    resize (no store mutation), which must stay CSS-only.

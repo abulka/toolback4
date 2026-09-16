@@ -1,6 +1,6 @@
-import type { Book, Breakpoint, Rect } from '@toolback/format'
-import { flattenObjects, resolvePageSize } from '@toolback/format'
-import { renderBookPage } from './index'
+import type { Book, Rect } from '@toolback/format'
+import { DEFAULT_DIALOG_SIZE, flattenObjects } from '@toolback/format'
+import { pageBoxFor, parentBoxMap, renderBookPage } from './index'
 import { rewriteLibImports, toolbackImport } from './libs'
 import {
   controlWrapper,
@@ -105,7 +105,6 @@ interface AuthorSession {
   box: HTMLElement
   start: {
     holder: HTMLElement
-    breakpoint: Breakpoint
     onError?: (message: string) => void
     call?: AuthorCaller
     onState?: (active: boolean) => void
@@ -145,7 +144,6 @@ export function syncAuthorScripts(book: Book): void {
     book,
     book.pages.indexOf(page),
     s.start.holder,
-    s.start.breakpoint,
     s.start.onError,
     s.start.call,
     s.start.onState,
@@ -173,7 +171,6 @@ export function startAuthorMode(
   book: Book,
   pageIndex: number,
   holder: HTMLElement,
-  breakpoint: Breakpoint,
   onError?: (message: string) => void,
   call?: AuthorCaller,
   onState?: (active: boolean) => void,
@@ -235,9 +232,12 @@ export function startAuthorMode(
   // just like run mode (hot-reload resets to the same seed)
   const store = createStore(book.store ?? [])
 
-  // geometry: the plugin page renders like any page (its background decides
-  // the size — a 320×240 background makes a compact plugin window)
-  renderBookPage(book, pageIndex, content, breakpoint)
+  // geometry: the plugin page renders like any page; a fixed page uses its own
+  // size (a compact plugin window), otherwise a sensible default dialog size
+  const size = page.size ?? DEFAULT_DIALOG_SIZE
+  content.style.width = `${size.width}px`
+  content.style.height = `${size.height}px`
+  renderBookPage(book, pageIndex, content, size)
   const pageRoot = content.querySelector<HTMLElement>('.tb-page')!
 
   // placed top-left with a small offset so the base page stays visible
@@ -252,14 +252,12 @@ export function startAuthorMode(
   const flat = flattenObjects([...bgObjects, ...page.objects])
 
   const controls: Record<string, ControlApi> = {}
-  const bg = book.backgrounds.find((b) => b.id === page.backgroundId)
-  const apiSize =
-    bg ? { page: resolvePageSize(book, bg, breakpoint), ref: resolvePageSize(book, bg, 'desktop') } : null
+  const boxes = parentBoxMap([...bgObjects, ...page.objects], pageBoxFor(page, size, [...bgObjects, ...page.objects]))
   for (const obj of flat) {
     const wrapper = controlWrapper(pageRoot, obj.name)
     const el = wrapper?.firstElementChild as HTMLElement | null
     if (el && wrapper) {
-      controls[obj.name] = makeControlApi(obj, el, wrapper, listeners, apiSize ?? undefined)
+      controls[obj.name] = makeControlApi(obj, el, wrapper, listeners, boxes.get(obj.id))
     }
   }
 
@@ -420,7 +418,6 @@ export function startAuthorMode(
     box,
     start: {
       holder,
-      breakpoint,
       onError,
       call,
       onState,

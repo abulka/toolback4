@@ -1,6 +1,5 @@
-import type { ControlKind, FitHMode, FitHintMode, FitVMode, Rect } from '@toolback/format'
-import { scaleRect } from '@toolback/format'
-import { DEFAULT_PROPS } from '@toolback/format'
+import type { ControlKind, FitHintMode, FitHintOptions, Rect, XEdgeMode, YEdgeMode } from '@toolback/format'
+import { DEFAULT_FIT_HINTS, DEFAULT_PROPS, normalizeFitHints } from '@toolback/format'
 import { renderObject } from '@toolback/controls'
 
 export const GRID = 8
@@ -80,9 +79,24 @@ export function isCornerHandle(dir: HandleDir): boolean {
   return dir.length === 2
 }
 
-/** transform-origin that keeps the resize-opposite corner fixed while scaling */
-function scaleOriginFor(dir: HandleDir): string {
-  return `${dir.includes('w') ? '100' : '0'}% ${dir.includes('n') ? '100' : '0'}%`
+/**
+ * The groups that should carry a subtle outline: every group we've drilled
+ * into (so each nesting level stays faintly visible while inner children are
+ * selected) plus every group whose members are currently drawing edge springs
+ * (so the springs always land on a visible edge). A selected group is left out
+ * — its loud selection box already shows the box.
+ */
+export function groupOutlineIds(input: {
+  drillPath: string[]
+  selected: Iterable<string>
+  hintParentIds: Iterable<string>
+  mode: FitHintMode
+}): string[] {
+  const wanted = new Set<string>()
+  for (const id of input.drillPath) wanted.add(id)
+  if (input.mode !== 'off') for (const id of input.hintParentIds) wanted.add(id)
+  for (const id of input.selected) wanted.delete(id)
+  return [...wanted]
 }
 
 export type DesignOutMessage =
@@ -92,22 +106,25 @@ export type DesignOutMessage =
       type: 'toolback:commit'
       kind: 'move' | 'resize'
       objects: Array<{ id: string; rect: Rect }>
-      /** resize handle direction, so the store can scale a glued group's
-       *  members around the same fixed corner */
+      /** resize handle direction (which edge/corner the pointer moved) */
       dir?: HandleDir
     }
 
 export interface DesignController {
   attach(wrapper: HTMLElement): void
   setEnabled(enabled: boolean): void
-  /** which objects draw the glue-spring hints on the canvas */
-  setFitHintMode(mode: FitHintMode): void
+  /** how the edge-spring hints are drawn (mode + captions + filters) */
+  setFitHints(options: FitHintOptions | FitHintMode): void
   onRendered(selection: string[]): void
+  /** re-measure the rendered rects after a browser reflow (window resize) */
+  refresh(): void
   dragOver(control: ControlKind, rect: Rect): void
   dragEnd(): void
   /** Escape: steps out one group level (selecting the group you were in); at
    *  the outermost level it does nothing — Esc never deselects */
   escape(): void
+  /** clear the selection (clicking the empty gutter outside the page) */
+  clearSelection(): void
   readonly selectedIds: string[]
   readonly enabled: boolean
 }
@@ -117,6 +134,9 @@ type DragState =
       mode: 'move'
       ids: string[]
       start: Map<string, Rect>
+      /** members of the moved ids and their start rects, so their cached rects
+       *  track the group ghost live instead of lagging until the commit */
+      followers: Map<string, { rect: Rect; owner: string }>
       startX: number
       startY: number
       moved: boolean
@@ -160,6 +180,7 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   let badge: HTMLElement | null = null
   let handles: HTMLElement[] = []
   let selBoxes = new Map<string, HTMLElement>()
+  let groupOutlines = new Map<string, HTMLElement>()
   let pageRoot: HTMLElement | null = null
   let selected = new Set<string>()
   // groups we've drilled into, outermost→innermost. Objects at the "current
@@ -235,6 +256,61 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     return box
   }
 
+  function groupOutlineFor(id: string): HTMLElement {
+    let box = groupOutlines.get(id)
+    if (!box) {
+      box = wrapper!.ownerDocument.createElement('div')
+      box.className = 'tb-group-outline'
+      box.dataset.tbGroupOutlineId = id
+      overlay!.appendChild(box)
+      groupOutlines.set(id, box)
+    }
+    return box
+  }
+
+  /**
+   * Draw the subtle group boxes: the drilled ancestors plus any group whose
+   * members are in view at the current mode. Selected groups are skipped (their
+   * `.tb-sel` box is the loud one). Keeps and hides stale boxes, like `.tb-sel`.
+   *
+   * Uses `modeAllows` rather than `springShown`: hiding member springs (the
+   * "group members in All" / "custom constraints only" options) must NOT hide
+   * the group box itself — the box is still what the members are laid out in.
+   */
+  function redrawGroupOutlines(): void {
+    if (!wrapper || !overlay) return
+    const hintParentIds = new Set<string>()
+    if (enabled && fitHints.mode !== 'off' && pageRoot) {
+      for (const el of Array.from(pageRoot.querySelectorAll<HTMLElement>('[data-tb-id]'))) {
+        if (!modeAllows(el)) continue
+        const pid = el.parentElement?.closest<HTMLElement>('[data-tb-id]')?.dataset.tbId
+        if (pid) hintParentIds.add(pid)
+      }
+    }
+    const wanted = new Set(
+      groupOutlineIds({
+        drillPath: enabled ? drillPath : [],
+        selected: enabled ? selected : [],
+        hintParentIds,
+        mode: enabled ? fitHints.mode : 'off',
+      }),
+    )
+    for (const id of wanted) if (!isGroupObject(id)) wanted.delete(id)
+    for (const id of wanted) groupOutlineFor(id)
+    for (const [id, box] of groupOutlines) {
+      const r = wanted.has(id) ? (rects.get(id) ?? bgRects.get(id)) : undefined
+      if (!r) {
+        box.style.display = 'none'
+        continue
+      }
+      box.style.display = 'block'
+      box.style.left = `${r.x}px`
+      box.style.top = `${r.y}px`
+      box.style.width = `${r.w}px`
+      box.style.height = `${r.h}px`
+    }
+  }
+
   function refreshRects(): void {
     rects = new Map()
     bgRects = new Map()
@@ -306,15 +382,13 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   }
 
   /**
-   * The declared responsive glue of every object drawn as slate "springs":
-   * coil springs from each constrained object to the page edge it's glued to
-   * (with a square anchor at the edge); center/middle draws two springs
-   * pushing from either side onto the object's two sides. So you can see at a
-   * glance what every object is constrained to — background objects included.
-   * Default Free (left/top) draws nothing. Hidden by the ≋ toolbar control
-   * (All / Selected / Off).
+   * The edges every object follows, drawn as slate "springs": one from the
+   * object to each page edge it anchors to (with a square anchor at the edge);
+   * `center` draws a straight connector from either side. So you can see at a
+   * glance what every object follows — background objects included. Configured
+   * by the ≋ toolbar control (All / Selected / Off plus its options popover).
    */
-  let fitHintMode: FitHintMode = 'all'
+  let fitHints: FitHintOptions = { ...DEFAULT_FIT_HINTS }
   let fitHint: HTMLElement | null = null
 
   function clearFitHint(): void {
@@ -322,12 +396,43 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     fitHint = null
   }
 
+  /** the mode gate alone (All = everything, Selected = the selection, Off = none) */
+  function modeAllows(el: HTMLElement): boolean {
+    const id = el.dataset.tbId
+    if (!id) return false
+    if (fitHints.mode === 'off') return false
+    if (fitHints.mode === 'selected' && !selected.has(id)) return false
+    return true
+  }
+
   /**
-   * A glue spring's shape is its ANCHOR: `edge` (one far/near edge or both) is
-   * a zigzag, `center` is a straight connector with a centerline. Its line
-   * style is the MARGIN behaviour: `fixed` is solid, `scaled` is dashed. Every
-   * spring is drawn twice — a translucent white halo under the coloured stroke
-   * — so it stays legible on dark pages. Short edge spans fall back to a stub.
+   * Whether this object draws springs under the current options: the mode gate
+   * plus the "skip group members in All" and "only non-default constraints"
+   * filters. The group-outline pass uses `modeAllows` instead, so hiding a
+   * member's spring never hides the group box it is laid out in.
+   */
+  function springShown(el: HTMLElement): boolean {
+    if (!modeAllows(el)) return false
+    const inGroup = !!el.parentElement?.closest<HTMLElement>('[data-tb-id]')
+    if (fitHints.mode === 'all' && !fitHints.groupMembers && inGroup) return false
+    if (fitHints.nonDefaultOnly && el.dataset.tbEdgeX === 'left' && el.dataset.tbEdgeY === 'top')
+      return false
+    return true
+  }
+
+  /** the caption text for one edge, or null when captions/this caption are off */
+  function captionFor(edge: string, distance: number): string | null {
+    if (!fitHints.labels) return null
+    if (fitHints.skipZeroLabels && Math.round(distance) === 0) return null
+    return fitHints.lengths ? `${edge} ${Math.round(distance)}` : edge
+  }
+
+  /**
+   * A spring's shape is the anchor: an `edge` choice (left/right/top/bottom,
+   * or both) is a zigzag, `center` is a straight connector. Distances are
+   * always fixed, so every spring is solid. Each is drawn twice — a translucent
+   * white halo under the coloured stroke — so it stays legible on dark pages.
+   * Short edge spans fall back to a stub.
    */
   type SpringKind = 'edge' | 'center'
   type SpringStyle = 'fixed' | 'scaled'
@@ -380,6 +485,67 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     svg.appendChild(path)
   }
 
+  type LabelPlacement = 'above' | 'below' | 'left' | 'right'
+
+  // captions are sized from the text, not measured after paint: the clamp then
+  // works on the first frame and is deterministic under happy-dom (no layout)
+  const LABEL_CHAR = 5.5
+  const LABEL_HEIGHT = 12
+  const LABEL_GAP = 4
+
+  function labelSize(text: string): { w: number; h: number } {
+    return { w: Math.max(14, text.length * LABEL_CHAR), h: LABEL_HEIGHT }
+  }
+
+  /** one short caption beside a spring: the edge word + its pixel distance */
+  function drawLabel(
+    hint: HTMLElement,
+    doc: Document,
+    x: number,
+    y: number,
+    text: string,
+    placement: LabelPlacement,
+    box: Box,
+  ): void {
+    const e = doc.createElement('div')
+    e.className = 'tb-fithint-label'
+    e.textContent = text
+    const { w, h } = labelSize(text)
+    const pad = 2
+    // clamp along the spring so the caption stays fully inside the page/group
+    // box — a flush or page-edge spring would otherwise sit on the border
+    if (placement === 'above' || placement === 'below') {
+      const min = box.x + w / 2 + pad
+      const max = box.x + box.w - w / 2 - pad
+      x = max >= min ? Math.min(Math.max(x, min), max) : box.x + box.w / 2
+    } else {
+      const min = box.y + h / 2 + pad
+      const max = box.y + box.h - h / 2 - pad
+      y = max >= min ? Math.min(Math.max(y, min), max) : box.y + box.h / 2
+    }
+    e.style.left = `${x}px`
+    e.style.top = `${y}px`
+    e.style.transform =
+      placement === 'above'
+        ? `translate(-50%, calc(-100% - ${LABEL_GAP}px))`
+        : placement === 'below'
+          ? `translate(-50%, ${LABEL_GAP}px)`
+          : placement === 'left'
+            ? `translate(calc(-100% - ${LABEL_GAP}px), -50%)`
+            : `translate(${LABEL_GAP}px, -50%)`
+    hint.appendChild(e)
+  }
+
+  /** choose the roomier side for a caption so it does not sit on an edge */
+  function labelPlacement(axis: 'h' | 'v', x1: number, y1: number, x2: number, y2: number, box: Box): LabelPlacement {
+    if (axis === 'h') {
+      const cy = (y1 + y2) / 2
+      return cy - box.y >= box.y + box.h - cy ? 'above' : 'below'
+    }
+    const cx = (x1 + x2) / 2
+    return cx > box.x + box.w / 2 ? 'left' : 'right'
+  }
+
   function drawSpring(
     hint: HTMLElement,
     doc: Document,
@@ -389,8 +555,22 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     y2: number,
     kind: SpringKind,
     style: SpringStyle,
+    box: Box,
+    label?: { text: string; axis: 'h' | 'v' },
   ): void {
     const len = Math.hypot(x2 - x1, y2 - y1)
+    const labelAt = (): void => {
+      if (!label) return
+      drawLabel(
+        hint,
+        doc,
+        (x1 + x2) / 2,
+        (y1 + y2) / 2,
+        label.text,
+        labelPlacement(label.axis, x1, y1, x2, y2, box),
+        box,
+      )
+    }
     if (kind !== 'center' && len < 12) {
       const e = doc.createElement('div')
       e.className = `tb-fithint-line tb-fithint-line--${kind} tb-fithint-line--${style}`
@@ -399,9 +579,13 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       e.style.width = `${Math.max(2, Math.abs(x2 - x1))}px`
       e.style.height = `${Math.max(2, Math.abs(y2 - y1))}px`
       hint.appendChild(e)
+      labelAt()
       return
     }
-    if (kind === 'center' && len < 1) return
+    if (kind === 'center' && len < 1) {
+      labelAt()
+      return
+    }
     const reach = kind === 'edge' ? SPRING_AMP : 2
     const pad = reach + 2
     const minx = Math.min(x1, x2) - pad
@@ -419,9 +603,10 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     addPath(svg, doc, d, 'tb-fithint-halo', 'rgba(255, 255, 255, 0.55)', 4)
     addPath(svg, doc, d, 'tb-fithint-spring-path', 'currentColor', 1.5)
     hint.appendChild(svg)
+    labelAt()
   }
 
-  /** anchor glyph at a page edge: square (edge glue), circle (center) */
+  /** anchor glyph at a page edge: square (edge), circle (center) */
   function drawAnchor(
     hint: HTMLElement,
     doc: Document,
@@ -455,56 +640,50 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     hint.appendChild(e)
   }
 
-  /** horizontal glue spring for one object (shape = anchor, style = fixed/scaled) */
+  /** the containing box a spring is measured against (page or parent group) */
+  type Box = { x: number; y: number; w: number; h: number }
+
+  /** horizontal edge spring(s) for one object: shape = edge anchor / centre */
   function drawAxisH(
     hint: HTMLElement,
     doc: Document,
     r: Rect,
-    bounds: { w: number; h: number },
-    fx: FitHMode | undefined,
+    box: Box,
+    mode: XEdgeMode | undefined,
   ): void {
     const cy = r.y + r.h / 2
-    switch (fx) {
+    const left = box.x
+    const right = box.x + box.w
+    const near = (): void => {
+      const text = captionFor('left', r.x - left)
+      drawSpring(hint, doc, left, cy, r.x, cy, 'edge', 'fixed', box, text ? { text, axis: 'h' } : undefined)
+      drawAnchor(hint, doc, left, cy, 'edge', 'left')
+      drawArrow(hint, doc, r.x, cy, 'right')
+    }
+    const far = (): void => {
+      const text = captionFor('right', right - (r.x + r.w))
+      drawSpring(hint, doc, r.x + r.w, cy, right, cy, 'edge', 'fixed', box, text ? { text, axis: 'h' } : undefined)
+      drawAnchor(hint, doc, right, cy, 'edge', 'right')
+      drawArrow(hint, doc, r.x + r.w, cy, 'left')
+    }
+    switch (mode) {
       case undefined:
-      case 'free':
-        return // Free = no constraint, nothing to show
+        return
       case 'left':
-        drawSpring(hint, doc, 0, cy, r.x, cy, 'edge', 'scaled')
-        drawAnchor(hint, doc, 0, cy, 'edge', 'left')
-        drawArrow(hint, doc, r.x, cy, 'right')
+        near()
         break
       case 'right':
-        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'edge', 'scaled')
-        drawAnchor(hint, doc, bounds.w, cy, 'edge', 'right')
-        drawArrow(hint, doc, r.x + r.w, cy, 'left')
+        far()
         break
-      case 'pin-right':
-        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'edge', 'fixed')
-        drawAnchor(hint, doc, bounds.w, cy, 'edge', 'right')
-        drawArrow(hint, doc, r.x + r.w, cy, 'left')
-        break
-      case 'stretch':
-        drawSpring(hint, doc, 0, cy, r.x, cy, 'edge', 'scaled')
-        drawAnchor(hint, doc, 0, cy, 'edge', 'left')
-        drawArrow(hint, doc, r.x, cy, 'right')
-        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'edge', 'scaled')
-        drawAnchor(hint, doc, bounds.w, cy, 'edge', 'right')
-        drawArrow(hint, doc, r.x + r.w, cy, 'left')
-        break
-      case 'fill':
-        drawSpring(hint, doc, 0, cy, r.x, cy, 'edge', 'fixed')
-        drawAnchor(hint, doc, 0, cy, 'edge', 'left')
-        drawArrow(hint, doc, r.x, cy, 'right')
-        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'edge', 'fixed')
-        drawAnchor(hint, doc, bounds.w, cy, 'edge', 'right')
-        drawArrow(hint, doc, r.x + r.w, cy, 'left')
+      case 'both':
+        near()
+        far()
         break
       case 'center':
-        // two straight connectors + the page centerline through the object
-        drawSpring(hint, doc, 0, cy, r.x, cy, 'center', 'fixed')
-        drawSpring(hint, doc, r.x + r.w, cy, bounds.w, cy, 'center', 'fixed')
-        drawAnchor(hint, doc, 0, cy, 'center', 'left')
-        drawAnchor(hint, doc, bounds.w, cy, 'center', 'right')
+        drawSpring(hint, doc, left, cy, r.x, cy, 'center', 'fixed', box, fitHints.labels ? { text: 'centre', axis: 'h' } : undefined)
+        drawSpring(hint, doc, r.x + r.w, cy, right, cy, 'center', 'fixed', box)
+        drawAnchor(hint, doc, left, cy, 'center', 'left')
+        drawAnchor(hint, doc, right, cy, 'center', 'right')
         break
     }
   }
@@ -514,57 +693,49 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     hint: HTMLElement,
     doc: Document,
     r: Rect,
-    bounds: { w: number; h: number },
-    fy: FitVMode | undefined,
+    box: Box,
+    mode: YEdgeMode | undefined,
   ): void {
     const cx = r.x + r.w / 2
-    switch (fy) {
+    const top = box.y
+    const bottom = box.y + box.h
+    const near = (): void => {
+      const text = captionFor('top', r.y - top)
+      drawSpring(hint, doc, cx, top, cx, r.y, 'edge', 'fixed', box, text ? { text, axis: 'v' } : undefined)
+      drawAnchor(hint, doc, cx, top, 'edge', 'top')
+      drawArrow(hint, doc, cx, r.y, 'down')
+    }
+    const far = (): void => {
+      const text = captionFor('bottom', bottom - (r.y + r.h))
+      drawSpring(hint, doc, cx, r.y + r.h, cx, bottom, 'edge', 'fixed', box, text ? { text, axis: 'v' } : undefined)
+      drawAnchor(hint, doc, cx, bottom, 'edge', 'bottom')
+      drawArrow(hint, doc, cx, r.y + r.h, 'up')
+    }
+    switch (mode) {
       case undefined:
-      case 'free':
-        return // Free = no constraint, nothing to show
+        return
       case 'top':
-        drawSpring(hint, doc, cx, 0, cx, r.y, 'edge', 'scaled')
-        drawAnchor(hint, doc, cx, 0, 'edge', 'top')
-        drawArrow(hint, doc, cx, r.y, 'down')
+        near()
         break
       case 'bottom':
-        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'edge', 'scaled')
-        drawAnchor(hint, doc, cx, bounds.h, 'edge', 'bottom')
-        drawArrow(hint, doc, cx, r.y + r.h, 'up')
+        far()
         break
-      case 'pin-bottom':
-        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'edge', 'fixed')
-        drawAnchor(hint, doc, cx, bounds.h, 'edge', 'bottom')
-        drawArrow(hint, doc, cx, r.y + r.h, 'up')
-        break
-      case 'stretch':
-        drawSpring(hint, doc, cx, 0, cx, r.y, 'edge', 'scaled')
-        drawAnchor(hint, doc, cx, 0, 'edge', 'top')
-        drawArrow(hint, doc, cx, r.y, 'down')
-        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'edge', 'scaled')
-        drawAnchor(hint, doc, cx, bounds.h, 'edge', 'bottom')
-        drawArrow(hint, doc, cx, r.y + r.h, 'up')
-        break
-      case 'fill':
-        drawSpring(hint, doc, cx, 0, cx, r.y, 'edge', 'fixed')
-        drawAnchor(hint, doc, cx, 0, 'edge', 'top')
-        drawArrow(hint, doc, cx, r.y, 'down')
-        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'edge', 'fixed')
-        drawAnchor(hint, doc, cx, bounds.h, 'edge', 'bottom')
-        drawArrow(hint, doc, cx, r.y + r.h, 'up')
+      case 'both':
+        near()
+        far()
         break
       case 'center':
-        drawSpring(hint, doc, cx, 0, cx, r.y, 'center', 'fixed')
-        drawSpring(hint, doc, cx, r.y + r.h, cx, bounds.h, 'center', 'fixed')
-        drawAnchor(hint, doc, cx, 0, 'center', 'top')
-        drawAnchor(hint, doc, cx, bounds.h, 'center', 'bottom')
+        drawSpring(hint, doc, cx, top, cx, r.y, 'center', 'fixed', box, fitHints.labels ? { text: 'centre', axis: 'v' } : undefined)
+        drawSpring(hint, doc, cx, r.y + r.h, cx, bottom, 'center', 'fixed', box)
+        drawAnchor(hint, doc, cx, top, 'center', 'top')
+        drawAnchor(hint, doc, cx, bottom, 'center', 'bottom')
         break
     }
   }
 
   function drawFitHints(): void {
     clearFitHint()
-    if (!overlay || !enabled || !pageRoot || fitHintMode === 'off') return
+    if (!overlay || !enabled || !pageRoot || fitHints.mode === 'off') return
     const bounds = pageBounds()
     if (bounds.w <= 0 || bounds.h <= 0) return
 
@@ -586,17 +757,25 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     let drew = false
     for (const el of Array.from(pageRoot.querySelectorAll<HTMLElement>('[data-tb-id]'))) {
       const id = el.dataset.tbId
-      if (!id) continue
-      // group members are relative to their group — no independent fit
-      if (el.parentElement?.closest('[data-tb-id]')) continue
-      if (fitHintMode === 'selected' && !selected.has(id)) continue
+      if (!id || !springShown(el)) continue
       const r = rects.get(id) ?? bgRects.get(id)
       if (!r) continue
-      const fx = el.dataset.tbFitX as FitHMode | undefined
-      const fy = el.dataset.tbFitY as FitVMode | undefined
-      if ((!fx || fx === 'free') && (!fy || fy === 'free')) continue
-      drawAxisH(hint, doc, r, bounds, fx)
-      drawAxisV(hint, doc, r, bounds, fy)
+      // a top-level object is measured against the page box, a member against
+      // its parent group's box — both in wrapper coordinates (the hint frame)
+      const parentEl = el.parentElement?.closest<HTMLElement>('[data-tb-id]') ?? null
+      let box: Box
+      if (parentEl) {
+        const pid = parentEl.dataset.tbId
+        const pr = pid ? (rects.get(pid) ?? bgRects.get(pid)) : undefined
+        if (!pr) continue
+        box = { x: pr.x, y: pr.y, w: pr.w, h: pr.h }
+      } else {
+        box = { x: origin.x, y: origin.y, w: bounds.w, h: bounds.h }
+      }
+      const fx = el.dataset.tbEdgeX as XEdgeMode | undefined
+      const fy = el.dataset.tbEdgeY as YEdgeMode | undefined
+      drawAxisH(hint, doc, r, box, fx)
+      drawAxisV(hint, doc, r, box, fy)
       drew = true
     }
     if (!drew) clearFitHint()
@@ -689,29 +868,55 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     el.style.height = `${r.h}px`
   }
 
-  /** live feedback for group resize: CSS-scale the whole subtree from the fixed corner */
-  function applyGroupTransform(id: string, ghost: Rect, start: Rect, dir: HandleDir): void {
-    const el = objectEl(id)
-    if (!el) return
-    const fx = start.w === 0 ? 1 : ghost.w / start.w
-    const fy = start.h === 0 ? 1 : ghost.h / start.h
-    el.style.transformOrigin = `${dir.includes('w') ? '100' : '0'}% ${dir.includes('n') ? '100' : '0'}%`
-    el.style.transform = `scale(${fx}, ${fy})`
-  }
-
-  function descendantsOf(id: string): Array<{ id: string; rect: Rect }> {
-    const el = objectEl(id)
-    if (!el) return []
-    const out: Array<{ id: string; rect: Rect }> = []
-    for (const d of Array.from(el.querySelectorAll<HTMLElement>('[data-tb-id]'))) {
-      const did = d.dataset.tbId
-      if (did && rects.has(did)) out.push({ id: did, rect: rects.get(did)! })
+  /**
+   * The members of a moved object, with their start rects. The DOM rides along
+   * (members are positioned relative to the group), but `rects` is not
+   * re-measured mid-drag, so their cached rects are re-derived from these on
+   * every move — otherwise their springs lag behind the group ghost until the
+   * commit re-renders.
+   */
+  function followersOf(id: string): Map<string, { rect: Rect; owner: string }> {
+    const out = new Map<string, { rect: Rect; owner: string }>()
+    const root = objectEl(id)
+    if (!root) return out
+    for (const el of Array.from(root.querySelectorAll<HTMLElement>('[data-tb-id]'))) {
+      const childId = el.dataset.tbId
+      if (!childId) continue
+      const r = rects.get(childId)
+      if (r) out.set(childId, { rect: r, owner: id })
     }
     return out
   }
 
-  function isGroupEl(id: string): boolean {
-    return objectEl(id)?.querySelector('[data-tb-id]') != null
+  /** is this object a group (its object element wraps a `.tb-group`)? */
+  function isGroupObject(id: string): boolean {
+    return !!objectEl(id)?.firstElementChild?.classList.contains('tb-group')
+  }
+
+  /**
+   * Live preview of a group resize: leave the layout box alone and scale the
+   * whole subtree with a CSS transform anchored at the corner the handle keeps
+   * fixed. The commit scales the stored edge distances, so the preview maps
+   * exactly onto the re-rendered result (the store's resize path).
+   */
+  function applyGroupScale(id: string, start: Rect, ghost: Rect, dir: HandleDir): void {
+    const el = objectEl(id)
+    if (!el || start.w <= 0 || start.h <= 0) return
+    const ox = dir.includes('w') ? '100%' : '0%'
+    const oy = dir.includes('n') ? '100%' : '0%'
+    el.style.transformOrigin = `${ox} ${oy}`
+    el.style.transform = `scale(${ghost.w / start.w}, ${ghost.h / start.h})`
+  }
+
+  /** drop any preview transform left on the page (a load rebuilds the DOM) */
+  function clearTransforms(): void {
+    if (!pageRoot) return
+    for (const el of Array.from(pageRoot.querySelectorAll<HTMLElement>('[data-tb-id]'))) {
+      if (el.style.transform) {
+        el.style.transform = ''
+        el.style.transformOrigin = ''
+      }
+    }
   }
 
   function redrawSelection(override?: Rect): void {
@@ -756,12 +961,14 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
         badge.style.top = `${r.y + r.h + 8}px`
         badge.textContent = `${Math.round(r.w)} × ${Math.round(r.h)}`
         drawFitHints()
+        redrawGroupOutlines()
         return
       }
     }
     for (const h of handles) h.style.display = 'none'
     badge.style.display = 'none'
     drawFitHints()
+    redrawGroupOutlines()
   }
 
   function setSelected(ids: Iterable<string>): void {
@@ -791,6 +998,7 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     // handlers (Esc drill-out, F3, ⌘Z, ⌥D/⌥G/⌥U, z-order, delete) never fire
     // after clicking into the canvas. Claim focus explicitly.
     window.focus()
+    clearTransforms()
     const target = e.target as HTMLElement
     const dir = target?.dataset?.dir as HandleDir | undefined
     if (dir && selected.size === 1) {
@@ -837,10 +1045,13 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
         const r = rects.get(id)
         if (r) start.set(id, r)
       }
+      const followers = new Map<string, { rect: Rect; owner: string }>()
+      for (const id of ids) for (const [cid, f] of followersOf(id)) followers.set(cid, f)
       drag = {
         mode: 'move',
         ids,
         start,
+        followers,
         startX: e.clientX,
         startY: e.clientY,
         moved: false,
@@ -892,11 +1103,11 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       for (const id of drag.ids) {
         const base = drag.start.get(id)
         if (!base) continue
-        // Center/Middle position is fully determined by the page: don't let the
-        // ghost slide on a locked axis while the glue lens is live there
+        // a centred object's position is fully determined by its box: don't
+        // let the ghost slide on a locked axis
         const el = objectEl(id)
-        const lockX = el?.dataset.tbLensX === '1' && el.dataset.tbFitX === 'center'
-        const lockY = el?.dataset.tbLensY === '1' && el.dataset.tbFitY === 'center'
+        const lockX = el?.dataset.tbEdgeX === 'center'
+        const lockY = el?.dataset.tbEdgeY === 'center'
         const moved = {
           x: base.x + (lockX ? 0 : dx),
           y: base.y + (lockY ? 0 : dy),
@@ -905,6 +1116,19 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
         }
         rects.set(id, moved) // keep the hit-test/outline map in sync so the outline follows
         applyGhostRect(id, moved)
+      }
+      // members inside a moved group ride the ghost too (their DOM already
+      // does); re-derive their cached rects from the start so their springs
+      // follow live instead of lagging until the commit re-renders
+      for (const [cid, f] of drag.followers) {
+        const base = drag.start.get(f.owner)
+        const owner = rects.get(f.owner)
+        if (!base || !owner) continue
+        rects.set(cid, {
+          ...f.rect,
+          x: f.rect.x + (owner.x - base.x),
+          y: f.rect.y + (owner.y - base.y),
+        })
       }
       redrawSelection()
       drawClipIndicators()
@@ -915,12 +1139,10 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
           ? resizeRectAspect(drag.rect, drag.dir, rawDx, rawDy)
           : resizeRect(drag.rect, drag.dir, rawDx, rawDy)
       rects.set(drag.id, drag.ghost) // clip indicator tracks the ghost live
-      if (isGroupEl(drag.id)) {
-        // live feedback: CSS-scale the subtree from the fixed corner only —
-        // the layout box must stay untouched, or the visual double-scales and
-        // members appear to escape the bounds mid-drag. The transform maps
-        // the old box exactly onto the ghost, matching the commit math.
-        applyGroupTransform(drag.id, drag.ghost, drag.rect, drag.dir)
+      // a group resize scales the whole subtree; other objects just resize
+      // their box (members then resolve their own edges against it)
+      if (isGroupObject(drag.id)) {
+        applyGroupScale(drag.id, drag.rect, drag.ghost, drag.dir)
       } else {
         applyGhostRect(drag.id, drag.ghost)
       }
@@ -946,25 +1168,7 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       send({ type: 'toolback:commit', kind: 'move', objects })
     } else if (drag.mode === 'resize' && drag.moved) {
       const objects: Array<{ id: string; rect: Rect }> = [{ id: drag.id, rect: drag.ghost }]
-      if (isGroupEl(drag.id)) {
-        // members scale around the FIXED corner of the handle (same origin as
-        // the CSS transform preview): 'w' keeps the right edge, 'n' keeps the
-        // bottom. The store converts these page-absolute rects to
-        // parent-relative (group commit is applied first in the batch), then
-        // snaps the group box to the tight union of the scaled members.
-        const G = drag.rect
-        const fx = G.w === 0 ? 1 : drag.ghost.w / G.w
-        const fy = G.h === 0 ? 1 : drag.ghost.h / G.h
-        const ox = drag.dir.includes('w') ? G.x + G.w : G.x
-        const oy = drag.dir.includes('n') ? G.y + G.h : G.y
-        for (const d of descendantsOf(drag.id)) {
-          objects.push({ id: d.id, rect: scaleRect(d.rect, { x: ox, y: oy }, fx, fy) })
-        }
-      }
       send({ type: 'toolback:commit', kind: 'resize', objects, dir: drag.dir })
-      // leave the transform in place: it maps the stale layout exactly onto
-      // the committed state until the sync re-renders (clearing it here would
-      // flicker the group back to its pre-resize size for a frame)
     } else if (drag.mode === 'marquee') {
       marquee!.style.display = 'none'
       if (drag.moved) {
@@ -1049,11 +1253,20 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     setEnabled(on: boolean): void {
       applyEnabled(on)
     },
-    setFitHintMode(mode: FitHintMode): void {
-      if (fitHintMode === mode) return
-      fitHintMode = mode
-      if (mode === 'off') clearFitHint()
+    setFitHints(raw: FitHintOptions | FitHintMode): void {
+      const next = normalizeFitHints(raw)
+      const same =
+        next.mode === fitHints.mode &&
+        next.labels === fitHints.labels &&
+        next.lengths === fitHints.lengths &&
+        next.groupMembers === fitHints.groupMembers &&
+        next.nonDefaultOnly === fitHints.nonDefaultOnly &&
+        next.skipZeroLabels === fitHints.skipZeroLabels
+      if (same) return
+      fitHints = next
+      if (fitHints.mode === 'off') clearFitHint()
       else if (enabled && pageRoot) drawFitHints()
+      redrawGroupOutlines()
     },
     dragOver(control: ControlKind, rect: Rect): void {
       if (!wrapper || !enabled) return
@@ -1068,7 +1281,8 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
             id: 'ghost',
             name: 'ghost',
             control,
-            rect,
+            x: { mode: 'left', left: rect.x, width: rect.w },
+            y: { mode: 'top', top: rect.y, height: rect.h },
             props: { ...DEFAULT_PROPS[control] },
             on: {},
           }),
@@ -1090,6 +1304,12 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       drillPath = selection.length ? contextOf(selection[0]!) : []
       setSelected(selection)
     },
+    refresh(): void {
+      if (!pageRoot?.isConnected) pageRoot = wrapper?.querySelector<HTMLElement>('.tb-page') ?? null
+      if (!pageRoot) return
+      refreshRects()
+      redrawSelection()
+    },
     escape(): void {
       // at the outermost level Esc is ignored — it never deselects the
       // top-level selection
@@ -1098,6 +1318,13 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       const stepped = drillPath[drillPath.length - 1]!
       drillPath.pop()
       selected = new Set([stepped])
+      sendSelection()
+      redrawSelection()
+    },
+    clearSelection(): void {
+      if (selected.size === 0 && drillPath.length === 0) return
+      selected = new Set()
+      drillPath = []
       sendSelection()
       redrawSelection()
     },

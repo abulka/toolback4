@@ -7,7 +7,7 @@ const BG = { id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', obje
 const book = {
   id: 'b',
   title: 't',
-  canvas: { desktop: { width: 100, height: 100 } },
+ 
   backgrounds: [BG],
   pages: [],
 } as unknown as Book

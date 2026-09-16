@@ -46,7 +46,7 @@ describe('example books', () => {
         const errors: string[] = []
         const root = document.createElement('div')
         for (let i = 0; i < book.pages.length; i++) {
-          const handle = runBook(book, root, 'desktop', (m) => errors.push(m), i)
+          const handle = runBook(book, root, (m) => errors.push(m), i)
           await new Promise((r) => setTimeout(r, 400))
           handle.stop()
         }

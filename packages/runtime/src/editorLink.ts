@@ -1,7 +1,9 @@
-import type { Book, Breakpoint, ControlKind, FitHintMode, Rect } from '@toolback/format'
+import type { Book, ControlKind, FitHintMode, FitHintOptions, Rect } from '@toolback/format'
+import { normalizeFitHints } from '@toolback/format'
 import {
   createStore,
   getObjectRects,
+  measureViewport,
   renderBackgroundView,
   renderBookPage,
   renderDynamicText,
@@ -23,22 +25,22 @@ export type EditorToCanvasMessage =
   | {
       type: 'toolback:load'
       book: Book
-      breakpoint?: Breakpoint
       pageIndex?: number
       view?: ToolbackView
       design?: boolean
       selection?: string[] | null
-      /** which objects draw glue-spring hints on the canvas (toolbar control) */
-      fitHints?: FitHintMode
+      /** how edge-spring hints are drawn (toolbar control: mode + options) */
+      fitHints?: FitHintOptions | FitHintMode
     }
   | { type: 'toolback:dragOver'; control: ControlKind; rect: Rect }
   | { type: 'toolback:dragEnd' }
   | { type: 'toolback:esc' }
-  | { type: 'toolback:authorStart'; book: Book; pageIndex: number; breakpoint?: Breakpoint }
+  | { type: 'toolback:authorStart'; book: Book; pageIndex: number }
   | { type: 'toolback:authorStop' }
 
 export type CanvasToEditorMessage =
   | { type: 'toolback:ready' }
+  | { type: 'toolback:viewport'; width: number; height: number }
   | { type: 'toolback:rects'; rects: ObjectRects }
   | { type: 'toolback:selection'; ids: string[] }
   | { type: 'toolback:commit'; kind: 'move' | 'resize'; objects: Array<{ id: string; rect: Rect }>; dir?: HandleDir }
@@ -247,6 +249,14 @@ export function listenForEditor(
   function ensureStructure(): void {
     if (wrapper && wrapper.isConnected && holder) return
     const doc = root.ownerDocument
+    // a full-viewport gutter sits behind the (centred, page-sized) wrapper so a
+    // click outside a fixed-size page deselects, just like empty page space
+    const gutter = doc.createElement('div')
+    gutter.className = 'tb-canvas-gutter'
+    gutter.addEventListener('pointerdown', () => {
+      if (design.enabled) design.clearSelection()
+    })
+    root.appendChild(gutter)
     wrapper = doc.createElement('div')
     wrapper.className = 'tb-canvas-root'
     holder = doc.createElement('div')
@@ -254,6 +264,96 @@ export function listenForEditor(
     wrapper.appendChild(holder)
     root.appendChild(wrapper)
     design.attach(wrapper)
+  }
+
+  function sendViewport(): void {
+    if (!holder) return
+    const size = measureViewport(holder)
+    send({ type: 'toolback:viewport', width: size.width, height: size.height })
+  }
+
+  /** a fluid page fills the viewport, so its wrapper spans the full width; a
+   *  fixed page keeps the wrapper at the page size so it can centre */
+  function syncCanvasWidth(): void {
+    if (!wrapper || !holder) return
+    const pageRoot = holder.querySelector<HTMLElement>('.tb-page')
+    const fluid = !!pageRoot && pageRoot.style.width === '100%'
+    wrapper.classList.toggle('tb-canvas-root--fluid', fluid)
+  }
+
+  function renderLoad(data: Extract<EditorToCanvasMessage, { type: 'toolback:load' }>): void {
+    try {
+      ensureStructure()
+      // note: design re-renders (undo, prop edits, plugin-driven inserts)
+      // must NOT tear the author plugin down — the box lives in its own
+      // layer beside the page holder; it stops via authorStop/toggleRun
+      const fallbackIndex = Number.isInteger(data.pageIndex) ? (data.pageIndex as number) : 0
+      const view: ToolbackView = data.view ?? { kind: 'page', index: fallbackIndex }
+      // run mode always plays a page: a background view resolves to the first
+      // page using that background
+      const runIndexFor = (): number => {
+        if (view.kind === 'page') return view.index
+        const i = data.book.pages.findIndex((p) => p.backgroundId === view.id)
+        return i === -1 ? 0 : i
+      }
+      if (data.design) {
+        stopStoreStream()
+        stopRun()
+        if (view.kind === 'background') {
+          renderBackgroundView(data.book, view.id, holder!)
+        } else {
+          renderBookPage(data.book, view.index, holder!)
+        }
+        const pageRoot = holder!.querySelector<HTMLElement>('.tb-page')
+        // set the fluid wrapper class BEFORE measuring: a fluid page is
+        // `width:100%`, so the wrapper must span the viewport first or the
+        // first-measured rects/page box come out against a collapsed wrapper
+        // (right/bottom anchors then look wrong until the next navigation)
+        syncCanvasWidth()
+        // design-time preview: {{key}} labels resolve against the book's
+        // stored values, so the canvas shows what a run will seed (unset keys
+        // render empty, exactly like at run time)
+        if (pageRoot) {
+          const page =
+            view.kind === 'background'
+              ? { objects: data.book.backgrounds.find((b) => b.id === view.id)?.objects ?? [] }
+              : (data.book.pages[view.index] ?? data.book.pages[0]!)
+          renderDynamicText(pageRoot, page, createStore(data.book.store ?? []))
+        }
+        send({ type: 'toolback:rects', rects: pageRoot ? getObjectRects(pageRoot) : {} })
+        design.setEnabled(true)
+        design.setFitHints(normalizeFitHints(data.fitHints))
+        design.onRendered(data.selection ?? [])
+        // a running author plugin hot-reloads when its page's scripts changed
+        syncAuthorScripts(data.book)
+      } else {
+        design.setEnabled(false)
+        const handle = runBook(
+          data.book,
+          holder!,
+          (message) => send({ type: 'toolback:scriptError', message }),
+          runIndexFor(),
+          (open) => send({ type: 'toolback:popups', open }),
+        )
+        const pageRoot = holder!.querySelector<HTMLElement>('.tb-page')
+        syncCanvasWidth()
+        send({ type: 'toolback:rects', rects: pageRoot ? getObjectRects(pageRoot) : {} })
+
+        // stream store contents to the editor's store browser
+        stopStoreStream()
+        const sendStore = (): void => {
+          send({
+            type: 'toolback:store',
+            entries: handle.store.snapshot().map(([k, v]) => [k, serializeStoreValue(v)]),
+          })
+        }
+        sendStore()
+        storeUnsub = handle.store.subscribe(sendStore)
+      }
+      sendViewport()
+    } catch (err) {
+      send({ type: 'toolback:error', message: String(err) })
+    }
   }
 
   const onMessage = (e: MessageEvent): void => {
@@ -279,7 +379,6 @@ export function listenForEditor(
           data.book,
           data.pageIndex,
           holder!,
-          data.breakpoint ?? 'desktop',
           (message) => send({ type: 'toolback:scriptError', message }),
           (op, args) => authorCaller(op, args),
           (active) => send({ type: 'toolback:authorState', active }),
@@ -301,72 +400,7 @@ export function listenForEditor(
       return
     }
     if (data.type !== 'toolback:load') return
-    try {
-      ensureStructure()
-      // note: design re-renders (undo, prop edits, plugin-driven inserts)
-      // must NOT tear the author plugin down — the box lives in its own
-      // layer beside the page holder; it stops via authorStop/toggleRun
-      const fallbackIndex = Number.isInteger(data.pageIndex) ? (data.pageIndex as number) : 0
-      const view: ToolbackView = data.view ?? { kind: 'page', index: fallbackIndex }
-      // run mode always plays a page: a background view resolves to the first
-      // page using that background
-      const runIndexFor = (): number => {
-        if (view.kind === 'page') return view.index
-        const i = data.book.pages.findIndex((p) => p.backgroundId === view.id)
-        return i === -1 ? 0 : i
-      }
-      if (data.design) {
-        stopStoreStream()
-        stopRun()
-        if (view.kind === 'background') {
-          renderBackgroundView(data.book, view.id, holder!, data.breakpoint ?? 'desktop')
-        } else {
-          renderBookPage(data.book, view.index, holder!, data.breakpoint ?? 'desktop')
-        }
-        const pageRoot = holder!.querySelector<HTMLElement>('.tb-page')
-        // design-time preview: {{key}} labels resolve against the book's
-        // stored values, so the canvas shows what a run will seed (unset keys
-        // render empty, exactly like at run time)
-        if (pageRoot) {
-          const page =
-            view.kind === 'background'
-              ? { objects: data.book.backgrounds.find((b) => b.id === view.id)?.objects ?? [] }
-              : (data.book.pages[view.index] ?? data.book.pages[0]!)
-          renderDynamicText(pageRoot, page, createStore(data.book.store ?? []))
-        }
-        send({ type: 'toolback:rects', rects: pageRoot ? getObjectRects(pageRoot) : {} })
-        design.setEnabled(true)
-        design.setFitHintMode(data.fitHints ?? 'all')
-        design.onRendered(data.selection ?? [])
-        // a running author plugin hot-reloads when its page's scripts changed
-        syncAuthorScripts(data.book)
-      } else {
-        design.setEnabled(false)
-        const handle = runBook(
-          data.book,
-          holder!,
-          data.breakpoint ?? 'desktop',
-          (message) => send({ type: 'toolback:scriptError', message }),
-          runIndexFor(),
-          (open) => send({ type: 'toolback:popups', open }),
-        )
-        const pageRoot = holder!.querySelector<HTMLElement>('.tb-page')
-        send({ type: 'toolback:rects', rects: pageRoot ? getObjectRects(pageRoot) : {} })
-
-        // stream store contents to the editor's store browser
-        stopStoreStream()
-        const sendStore = (): void => {
-          send({
-            type: 'toolback:store',
-            entries: handle.store.snapshot().map(([k, v]) => [k, serializeStoreValue(v)]),
-          })
-        }
-        sendStore()
-        storeUnsub = handle.store.subscribe(sendStore)
-      }
-    } catch (err) {
-      send({ type: 'toolback:error', message: String(err) })
-    }
+    renderLoad(data)
   }
 
   // keydowns inside the canvas never reach the editor window, so editor-wide
@@ -447,7 +481,17 @@ const onKey = (e: KeyboardEvent): void => {
     }
   }
 }
+  // CSS repositions the page and its controls on resize, so design mode only
+  // re-measures the overlay (no re-render, which would reset selection/scroll);
+  // the editor store still needs the fresh viewport for its own geometry
+  const onResize = (): void => {
+    if (!wrapper) return
+    sendViewport()
+    if (design.enabled) design.refresh()
+  }
+
   window.addEventListener('keydown', onKey, true)
+  window.addEventListener('resize', onResize)
 
   window.addEventListener('message', onMessage)
   send({ type: 'toolback:ready' })
@@ -455,5 +499,6 @@ const onKey = (e: KeyboardEvent): void => {
   return () => {
     window.removeEventListener('message', onMessage)
     window.removeEventListener('keydown', onKey, true)
+    window.removeEventListener('resize', onResize)
   }
 }

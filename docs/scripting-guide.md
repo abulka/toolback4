@@ -55,9 +55,9 @@ subtree together in the order.
 ## Align & distribute
 
 Select two or more objects under the same parent and the Selection panel grows
-an **Align** section. These are design-time geometry commands — they write the
-one authored layout (undoable in a single step), so existing Responsive glue is
-preserved and re-derives at every breakpoint.
+an **Align** section. These are design-time geometry commands — they write each
+object's edge distances (undoable in a single step), so every object keeps the
+edges it follows.
 
 - **Align** (6 buttons) — left / right / top / bottom / horizontal-center /
   vertical-center, aligned to the selection's bounding box. Great for form
@@ -70,10 +70,10 @@ preserved and re-derives at every breakpoint.
   box is centered. This is the OK/Cancel case: aligning each button's own
   center to the page would stack them, so Center moves the pair together.
 
-Alignment measures each object's **rendered** position at the current
-breakpoint, then folds the result back onto the shared layout. Aligning a
-**Center**-glued object releases that axis (a centered coordinate has nothing to
-edit), exactly like typing a position.
+Alignment measures each object's **rendered** position at the current viewport
+size, then writes the distances back. Every object keeps the edges it already
+follows (a right-following object stays right-following, with its gap
+re-derived), exactly like typing a position.
 
 ## Duplicate
 
@@ -205,9 +205,9 @@ Get/set properties:
   simplified, web-safe set; works on switches too)
 
 Geometry changes apply immediately, and they stick for the whole run — even
-across `page.go` navigations. An object has **one layout** shared by every
-breakpoint; a geometry write edits that layout (constrained axes re-derive
-through their glue), so the change is visible at every page size.
+across `page.go` navigations. A geometry write moves the control now while
+keeping which page edges it follows (see *Responsive edges*), so the change is
+visible at every page size.
 
 Methods:
 
@@ -261,109 +261,106 @@ Things to know:
 - **Markdown is bundled with the player**, so published books render it
   **offline** — no library-shelf or network involved.
 
-### Responsive breakpoints (glue)
+### Responsive edges
 
 Every object can carry a **Responsive** setting — a horizontal and a vertical
-"glue" mode, edited in the Selection panel (the *Responsive* row). It answers
-the question *"how should this object adapt when the page is a different
-size?"* The two axes are independent: constraining one leaves the other axis as
+choice, edited in the Selection panel (the *Responsive* row). It answers the
+question *"which page edge does this object follow when the window is a
+different size?"* The two axes are independent: changing one leaves the other as
 it was.
-Each object has **one authored layout**; at every breakpoint the page size
-changes and the constrained axes re-derive from that layout.
 
-The Responsive row asks **two questions per axis**:
+Each choice keeps a **fixed distance in pixels**:
 
-1. **What does the object stick to?** the left/top edge, the right/bottom edge,
-   **both** edges, the center, or nothing (Free).
-2. **Do the margins stay a fixed pixel value, or scale with the page?**
+- **Follows left** — keeps its distance from the page's left edge and its own
+  width (it does not grow when the page grows).
+- **Follows right** — keeps its distance from the page's right edge and its own
+  width.
+- **Follows both (stretches)** — keeps its distance from both edges, so it grows
+  and shrinks with the page width.
+- **Centred** — keeps its width and stays in the middle.
 
-The dropdown offers **Free · Left/Top · Center · Right/Bottom · Both sides**, and
-a **Fixed** checkbox appears for **Right/Bottom** and **Both sides**:
+The vertical row mirrors this with **Follows top**, **Follows bottom**,
+**Follows both**, and **Centred**.
 
-- **Free** — no constraint on that axis: it keeps the authored coordinate
-  everywhere. Free is the fallback for an object with no Responsive setting at
-  all (a legacy file, for example).
-- **Left / Top** — the margin to that edge keeps its share of the page (it
-  scales). There is no **Fixed** choice here because a *fixed* left/top margin
-  is exactly **Free**.
-- **Center** — the object's **middle** is centered on that axis.
-- **Right / Bottom** — the gap to that edge keeps its share of the page. Tick
-  **Fixed** and the gap stays a constant number of pixels instead, so the object
-  moves with the edge (a corner button that stays 24px from the right at every
-  page size).
-- **Both sides** — the object sticks to *both* edges, so its size follows the
-  page. With **Fixed** off this is **Stretch**: both margins scale, so the whole
-  object zooms with the page (a full-width nav bar, a footer). With **Fixed** on
-  it is **Fill**: both margins stay the same number of pixels and the size
-  absorbs the page's extra width (a content panel with fixed 24px gutters).
-
-Example: a hamburger button designed 24px from the right edge of a 1280px
-desktop page. Horizontal **Right** keeps that gap's share — on a 640px page the
-gap scales down with the page. Tick **Fixed** and the gap stays exactly 24px.
-**Both sides** without Fixed is **Stretch** (everything scales); with Fixed it
-is **Fill** (the gutters stay, the size grows). **Center** keeps its middle on
-the page's horizontal axis at every size.
+Example: a hamburger button 24px from the right edge of the page. Horizontal
+**Follows right** keeps that 24px gap at every window size, so the button rides
+the right edge. **Follows both** would keep a fixed margin on each side and let
+the button's width absorb the difference (a content panel with 24px gutters).
 
 Things to know:
 
-- **New objects start glued Left/Top.** A freshly placed control — and a new
-  group — gets Horizontal **Left** + Vertical **Top**, so it scales with the
-  page. **Free** is the fallback when an object carries no Responsive setting at
-  all (a legacy file, for example). A constraint only exists on an axis where
-  you set one, and the two axes are independent: setting Horizontal to Center
-  only constrains the horizontal axis, leaving the vertical axis at whatever it
-  already was (Top for a new object).
-- **Constraints never write the layout.** A constraint is a render *lens*: the
-  canvas derives the constrained axis at each page size; switching the mode
-  back to Free restores the authored layout exactly. Center always aligns the
-  object's **middle** to the page axis.
-- **At the base size the constrained axes are identity** — the authored layout
-  already encodes that gap or size, so only Center moves anything on the page
-  you designed. Constraints govern the *other* sizes.
-- **Dragging edits the shared layout.** There is no per-breakpoint override:
-  dragging edits the one layout, and glued axes re-anchor around the drag, so
-  the change is visible at every size. Center is rigid — dragging along a
-  centered axis does nothing (change the mode to move it).
-- **Shift-drag a corner** to resize with the object's current aspect ratio held
-  — useful for images and cards. Single-axis edge handles resize normally.
-- **Deliberate writes win silently.** Typing X in the Geometry panel (or a
-  script writing `button.x`, or the author bridge) edits the shared layout,
-  re-anchoring a glued axis — no prompt. A size write on a Center/Right/Bottom
-  axis keeps the constraint (the position re-derives around the new size); on a
-  Stretch axis the size is the constraint.
+- **New objects start Follows left + Follows top.** A freshly placed control —
+  and a new group — keeps a fixed offset from the page's top-left. Switch either
+  row to change how it follows.
+- **The browser does the work.** Each object is positioned with CSS (`left`,
+  `right`, `top`, `bottom`, or `50%`), so resizing the window repositions
+  everything with no re-render. Reading `x`/`y`/`width`/`height` in a script
+  returns the on-screen value.
+- **Page size follows content.** A fluid page is as wide and tall as the window
+  and grows with content placed from the top/left. Only **Follows left** /
+  **Follows top** objects can enlarge the page — a control deliberately placed
+  low down makes the page scroll. **Follows right/bottom**, **Follows both** and
+  **Centred** objects sit inside the page box, so they never feed the page's own
+  size. That is what lets **Follows bottom** mean "N pixels from the page's
+  bottom edge" even when the page is taller than the window.
+- **Switching a choice keeps the object where it is.** The distances are derived
+  from what is on screen, so you only change how it behaves from then on.
+- **Dragging edits the distance it follows.** There is no per-window override:
+  dragging a right-following object changes its distance from the right; a
+  left/top object takes the new position directly. A centred object cannot be
+  dragged along its centred axis (change the choice to move it).
+- **Shift-drag a corner** holds the object's current aspect ratio — useful for
+  images and cards. Single-axis edge handles resize normally.
+- **Deliberate writes keep the edges.** Typing X in the Geometry panel (or a
+  script writing `button.x`, or the author bridge) moves the control now while
+  keeping which edges it follows; a `width`/`height` write on a **Follows both**
+  control switches it to a fixed size held to the left/top. See *Scripts and
+  geometry* below.
 - **Fill page.** The Geometry section's **Fill page** button (with a margin
-  box) sizes the selected object to the page minus that margin and sets both
-  axes to **Both sides** with **Fixed** off (**Stretch**) — so the margin
-  scales with the page. **Fill width** / **Fill height** do a single axis. To
-  keep the margin a constant pixel value, tick **Fixed** on that axis (that is
-  **Fill** / **Pin**). **Center** glues the object to both page center lines.
-  Works on top-level objects; a group member rides its group's box instead.
-
-
-- **A spring shows every constraint in the canvas.** Its **shape is the
-  anchor**: **Left/Top/Right/Bottom** draw one solid zigzag from the object to
-  the glued page edge — a square anchor sits on the edge and a small arrowhead
-  at the object points back at it — and **Both sides** draws that zigzag from
-  *both* edges. **Center** draws a plain straight line from each page edge to
-  the object's two sides, with circle anchors and the page centerline through
-  the object. Its **line style is the margin behaviour**: **Fixed** margins are
-  **solid**, **scaled** margins are **dashed**. Edges are slate and center is
-  pale grey, and every spring sits on a faint white halo for dark pages. The
-  springs are drawn **behind the controls**, so they never cover what's on the
-  page. Background objects show their springs too; a **Free** axis draws
-  nothing. The **≋ All/Sel/Off** control in the top bar shows springs for every
-  object, only the current selection, or none (the choice sticks) — hover it for
-  a legend.
+  box) pins both axes to the page edges at that margin (**Follows both**);
+  **Fill width** / **Fill height** do a single axis. **Center** sets both axes
+  to **Centred**. Works on top-level objects; a group member follows its group's
+  box instead.
+- **A spring shows every edge an object follows.** A solid zigzag runs from the
+  object to each page edge it follows — a square anchor sits on the edge and a
+  small arrowhead at the object points back at it. **Centred** draws a plain
+  straight connector to each side with circle anchors. Each spring carries a
+  small caption with the edge and its **pixel distance** (e.g. `right 198`,
+  `top 46`, `centre`) so you can judge the gaps at a glance. Springs are drawn
+  **behind the controls**, so they never cover what's on the page. Background
+  objects show their springs too, and a **group's members** show theirs inside
+  the group — measured against the **group box**, not the page. The **≋
+  All/Sel/Off** control in the top bar shows springs for every object, only the
+  current selection, or none (the choice sticks). Switch to **Sel** or **Off**
+  when the default left/top springs get busy. Where a spring lands on a
+  **group's** edge, that group box is traced with a faint dashed outline too, so
+  the edge a spring points at is always visible. Click the **?** beside it for a
+  short help popup — what the buttons and options do plus a legend of the lines.
+- **Spring options (the ⚙ next to All/Sel/Off).** The options you set stick. You
+  can turn the **captions** off, or keep the edge word without the pixel
+  **numbers** (`left` instead of `left 198`). In **All** you can leave out the
+  springs **inside groups** (much calmer on a busy page — the group boxes stay
+  faintly outlined, they just no longer show every member's springs). **Only
+  objects with custom constraints** hides everything that just follows the
+  default Left + Top, so only the objects you deliberately anchored show springs.
+  **Hide zero-length captions** (on by default) drops the label when an object
+  sits flush on an edge, and captions are nudged to stay clear of the
+  page/group border either way.
 - Objects that stick out of the current page get a **dashed red outline** on the
   canvas, so the clipping you'd otherwise have to guess at is made visible.
-- Scripts read the *rendered* (lensed) rect: a Center-x button reports its
-  centered x. Writing `x`/`y`/`width`/`height` releases the touched axis and
-  applies the value.
-- **Groups**: glue moves the whole box; a stretching group scales its members
-  with it (the same fixed-corner math as group resize). Fit is top-level only
-  — members sit relative to their group and never derive. Dragging a
-  constrained group always asks before moving it.
-- **Backgrounds**: glue works on background objects too — a right-glued nav
+- **Groups**: a group's box carries its own edge choices. **Resizing the group
+  by a handle scales it** — every member's size and its distances inside the box
+  grow or shrink together (right/bottom/both and Centred members included), like
+  scaling a picture. Resizing the **page** (the browser window or canvas width)
+  does **not** scale a group: each member just follows its own edges — a
+  Follows-right/bottom/both member rides the matching group edge, and a Centred
+  member re-centres. Use group handles to size a group and per-member edges to
+  make it adapt. A typed width/height in the panel (or a script setting
+  `group.width`/`group.height`) scales it exactly like a handle drag, keeping the
+  top-left fixed. A group set to **Follows both** is kept tight around its
+  members: a page-size change that follows an edit re-hugs it, so its box never
+  shows empty space inside.
+- **Backgrounds**: edges work on background objects too — a right-following nav
   button on a background follows the edge on every page that shows it.
 
 ### page
@@ -704,7 +701,16 @@ Alt+U) releases the members back.
 What a group gives you:
 
 - **Move as one** — dragging the group (or setting its `x`/`y`) moves every
-  member. Resizing the group scales members proportionally.
+  member that follows the near edges. **Resizing the group scales it**: drag any
+  handle and every member's size and its distance inside the box grow or shrink
+  together (like scaling a picture) around the corner you didn't drag. This
+  holds however a member follows edges — right/bottom/both and Centred included
+  — and **Shift** on a corner keeps the group's proportions. The box stays the
+  tight bounds of its members. A typed width/height in the panel, or a scripted
+  `myGroup.width = 400`, scales the group the same way (holding the top-left).
+  By contrast, when the **page** changes size each member simply follows its own
+  edges; nothing is scaled. A **Follows both** group is re-hugged to its members
+  whenever the page box changes through an edit, so its box always hugs them.
 - **Hide as one** — `myGroup.visible = false` hides the whole group.
 - **Shared scripts with `forward`** — a group's event handlers fire when the
   event happens on *any* member **that lets the message through**. The
@@ -732,7 +738,7 @@ self.x += 2 // the group itself nudges over
 - **Members stay addressable** — group members are ordinary objects: bare
   names and `controls.<name>` reach them wherever they sit. A member's `x`/`y`
   are relative to the group. The group's box always hugs its members: moving
-  or resizing a member recomputes it to the minimum bounds.
+  or resizing a **member** (not the group) recomputes it to the minimum bounds.
 - **Editing inside a group** — drilling in is **one level per double-click**:
   click a group, then double-click to descend past it — keep double-clicking to
   work your way down to the member you want. Gentle single clicks always
@@ -744,7 +750,10 @@ self.x += 2 // the group itself nudges over
   empty canvas steps all the way out. Gentle single clicks always select the
   whole group, so click-and-drag moves the group, never a member, unless you
   deliberately drilled in — and once a member is selected, dragging it moves
-  only that member, never its enclosing groups.
+  only that member, never its enclosing groups. Each group you are inside stays
+  **faintly outlined** on the canvas (a thin dashed box) so you can still see
+  the box you're working within; the group you actually have selected keeps the
+  normal bold selection box.
 - **Nesting** — groups can contain groups.
 - **Ungrouping** discards the group's own scripts — the editor asks first.
 
@@ -829,8 +838,9 @@ fields get the same pair** — ⤢ a Monaco window, ⇄ file a `.md`/`.html` lin
 ## Backgrounds
 
 A **background** is a shared page resource, in the grand ToolBook tradition: every
-object on a background appears on **all pages that use it**, and the background
-decides the **size of its pages**.
+object on a background appears on **all pages that use it**. Pages fill the window
+they are shown in (see [Page size](#page-size-dialogs)); a page can opt into a
+fixed size for a dialog.
 
 The **Backgrounds panel** (left sidebar) shows one group per background with its
 pages nested underneath:
@@ -842,41 +852,45 @@ pages nested underneath:
   A single click on the background does nothing — this is deliberate, so a stray
   click can't drop you onto an empty background. A click on any page always
   returns the canvas to that page.
-- **⚙** opens the background properties: name, colour, **page size** (including
-  *Height fits content*), and **Delete…** (backgrounds with pages take them
-  along — confirmed first)
+- **⚙** opens the background properties: name, colour and **Delete…**
+  (backgrounds with pages take them along — confirmed first)
 - **✎** renames it; ⧉ duplicates
 - **drag pages** to rearrange them, or drop them on another background to move
   them there
 - **+ Add background** / **+ Add page** — new pages join the background you're
   currently editing (or the current page's background)
 
-### Background properties & page size
+### Page size (dialogs)
 
-By default a page is as big as the **book** page size (set per breakpoint in the
-top-right Desktop/Tablet/Mobile switch). A background can override it per
-breakpoint — e.g. make a small **320 × 240** background; every page on it
-becomes a dialog-sized page. In the properties dialog, untick *"Use the book
-default page size"*, then pick a preset, type exact width/height, or **drag the
-corner of the preview** — the size follows your drag, snapped to the grid.
+Pages behave like web pages: a page is as **wide as the window** showing it — the
+editor's canvas area while designing, the browser at run time — and as **large as
+its content needs**, never smaller than the window. A control placed past the
+right or bottom edge grows the page in that direction by exactly that overflow
+and the window scrolls (the control can sit flush with the page edge); a control
+that sits inside does not. While designing, hiding a panel makes the canvas
+wider, so the page re-lays out live.
 
-**Height fits content (web page).** Tick the checkbox in the background
-properties to let a page grow downward like a web page: the width stays fixed
-and the height becomes *as tall as the lowest object, plus a 24px bottom gap* —
-never shorter than the configured page height. Add, move or enlarge an object
-past the old bottom and the page grows (on release while editing; on render at
-run time). The setting is a property of the background, so it applies at
-**every breakpoint**. Published books scroll when the grown page is taller than
-the window.
+A page can instead have a **fixed size** — the Page tab's *Page size* section:
 
-One subtlety: vertical **glue** (Responsive → Vertical: Bottom / Center /
-Both sides) is resolved against the **configured** page height, not the grown one.
-That's what stops the page height and the glue from chasing each other. It means
-a glued object is positioned against the configured height, so it doesn't
-stretch down with a page grown by *other* content — though a Bottom or Both
-sides object placed past the bottom does grow the page itself, just like any other.
-And only the page *layout* drives growth: a script that moves an object below
-the fold at run time does not re-grow the page.
+- **Fills the window (grows with content)** — the default (web page) behaviour.
+- **Fixed size (dialog / popup / plugin window)** — type a width and height, or
+  **drag the grip at the page's bottom-right corner** in the canvas; the page
+  becomes a fixed surface, used for popups, author plugin windows and any dialog
+  that should not resize with the browser. In the editor it is shown as a centred
+  surface at that size.
+
+A page's size belongs to the page, not the background. Vertical edges
+(Responsive → Vertical) are resolved against the **page box** — the page's real
+grown height, not just the visible viewport — so **Follows bottom** means a
+fixed distance from the page's bottom edge even when the page is taller than the
+window. Only **Follows top** objects drive growth, so the page height and its
+bottom-following controls never chase each other. Only the page *layout* drives
+growth: a script that moves an object below the fold at run time does not
+re-grow the page.
+
+To test a narrow layout, use the topbar's **preview width** control (Window ·
+Phone 390 · Tablet 768 · …). It only restricts the canvas viewport, exactly like
+Chrome's device toolbar — it is never stored in the book.
 
 ### Scripting backgrounds
 
@@ -925,14 +939,14 @@ page.popupCloseAll()
 page.popups                // names of the open popups (bottom → top)
 ```
 
-The **size of the popup comes from the page's background** — make a background
-with a small page size (e.g. 320 × 240, see [Backgrounds](#backgrounds)) and
-every page on it becomes a dialog-sized page. That's the whole trick:
+The **size of the popup comes from the popup page's own fixed size** — open the
+page, choose *Page size → Fixed size* in the Page tab and type e.g. **320 ×
+240**. A page with no fixed size opens at the default dialog size (640 × 480) and
+grows with its content. That's the whole trick:
 
-1. **Backgrounds → + Add background** (call it "Dialog"), open its ⚙
-   properties, untick *Use the book default page size* and drag the preview to
-   320 × 240
-2. build the dialog on a page using that background — inputs, buttons, scripts
+1. **+ Add page** (call it "Dialog") and give it a fixed size of 320 × 240 in the
+   Page tab (*Page size → Fixed size*)
+2. build the dialog on that page — inputs, buttons, scripts
 3. from anywhere: `page.popupOpen('Dialog')`
 
 Details worth knowing:
@@ -950,8 +964,8 @@ Details worth knowing:
 
 ### Recipe: a modal settings dialog
 
-**Dialog background** sized 320 × 240. Page **Settings** on it: a switch named
-`mode`, and an OK button with the click script:
+Page **Settings** with a fixed size of 320 × 240: a switch named `mode`, and an
+OK button with the click script:
 
 ```js
 store.set('applyTheme', controls.mode.value)
@@ -1044,8 +1058,8 @@ plugin floats on top.
 
 To make one:
 
-1. create a page (a compact one — put it on a small background like a
-   320 × 240 "Dialog" background), and tick **Plugin page** in the Page tab
+1. create a page (a compact one — give it a fixed 320 × 240 size in the Page
+   tab), and tick **Plugin page** in the Page tab
 2. build its UI: buttons, inputs, labels — all interactive while you author
 3. click **⚡** (top right) → the menu lists **only plugin pages** — pick yours
 
@@ -1136,7 +1150,7 @@ ids (the `id` field of any handle):
   (`Copy JSON` equivalent), rects and props included
 - `await author.getSelection()` — `{ ids, names, kinds, pageName, target }`
 - `await author.pageInfo()` — page/background names, plugin pages, object
-  count and the active breakpoint
+  count and the canvas size
 - `await author.command(action)` — also `'delete' | 'duplicate' | 'ungroup' |
   'front' | 'back' | 'forward' | 'backward'`; `ungroup` returns the freed ids
 
@@ -1147,7 +1161,7 @@ geometry is just properties, applied by `set`.
 
 ### Recipe: a "title card" stamper
 
-Plugin page **Stamper** (plugin-flagged, on a small background): an input
+Plugin page **Stamper** (plugin-flagged, with a small fixed size): an input
 named `titleIn`, and a button with the click script:
 
 ```js

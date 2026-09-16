@@ -44,7 +44,7 @@ describe('design-time store', () => {
       ['score', 3],
       ['title', 'Quiz'],
     ]
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     expect(handle.store.get('score')).toBe(3)
     expect(handle.store.get('title')).toBe('Quiz')
     // seeded keys render; unset keys still render empty
@@ -60,12 +60,12 @@ describe('design-time store', () => {
       objects: [{ name: 'btn', control: 'button', on: { click: `store.set('score', 99)` } }],
     })
     book.store = [['score', 1]]
-    const first = runBook(book, root, 'desktop')
+    const first = runBook(book, root)
     root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
     expect(first.store.get('score')).toBe(99)
     // the book's design-time store is untouched by running
     expect(book.store).toEqual([['score', 1]])
-    const second = runBook(book, root, 'desktop')
+    const second = runBook(book, root)
     expect(second.store.get('score')).toBe(1)
     second.stop()
     root.remove()
@@ -81,7 +81,7 @@ describe('design-time store', () => {
       ],
     })
     const page = book.pages[0]!
-    renderBookPage(book, 0, pageRoot, 'desktop')
+    renderBookPage(book, 0, pageRoot)
     renderDynamicText(
       pageRoot.querySelector('.tb-page')!,
       page,
@@ -104,7 +104,7 @@ describe('markdown & HTML viewers', () => {
     const book = makeBook({
       objects: [{ name: 'md', control: 'markdown', text: '# Score: {{score}}' }],
     })
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     expect(root.querySelector('.tb-markdown h1')?.textContent).toBe('Score:')
     handle.store.set('score', 3)
     expect(root.querySelector('.tb-markdown h1')?.textContent).toBe('Score: 3')
@@ -118,7 +118,7 @@ describe('markdown & HTML viewers', () => {
     const book = makeBook({
       objects: [{ name: 'h', control: 'html', props: { html: '<p>Hi <strong>{{who}}</strong></p>' } }],
     })
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     handle.store.set('who', 'Andy')
     expect(root.querySelector('.tb-html strong')?.textContent).toBe('Andy')
     handle.stop()
@@ -131,7 +131,7 @@ describe('markdown & HTML viewers', () => {
     const book = makeBook({
       objects: [{ name: 'md', control: 'markdown', text: 'old' }],
     })
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     expect(handle.controls['md']!.text).toBe('old')
     handle.controls['md']!.text = '## New'
     expect(handle.controls['md']!.text).toBe('## New')
@@ -149,7 +149,7 @@ describe('markdown & HTML viewers', () => {
         { name: 'c', control: 'card', props: { title: 'T', text: 'Body {{v}}' } },
       ],
     })
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     handle.store.set('state', 'on')
     handle.store.set('v', 1)
     const sw = root.querySelector('.tb-switch')!
@@ -168,7 +168,7 @@ describe('markdown & HTML viewers', () => {
     const book = makeBook({
       objects: [{ name: 'md', control: 'markdown', text: '## Hello {{name}}' }],
     })
-    renderBookPage(book, 0, pageRoot, 'desktop')
+    renderBookPage(book, 0, pageRoot)
     renderDynamicText(
       pageRoot.querySelector('.tb-page')!,
       book.pages[0]!,
@@ -193,7 +193,6 @@ describe('groups', () => {
     const book: Book = {
       id: 'bg',
       title: 'Groups',
-      canvas: { desktop: { width: 800, height: 600 } },
       backgrounds: [BG],
       pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [group] }],
     }
@@ -204,7 +203,7 @@ describe('groups', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
     const book = groupBook()
-    runBook(book, root, 'desktop')
+    runBook(book, root)
     const groupWrap = root.querySelector('[data-tb-name="myGroup"]')!
     expect(groupWrap.querySelector('.tb-group')).not.toBeNull()
     const kid = groupWrap.querySelector('[data-tb-name="kidBtn"]') as HTMLElement
@@ -223,7 +222,7 @@ describe('groups', () => {
       groupOn: { click: `store.set('groupSaw', 1)` },
       childOn: { click: `store.set('childSaw', 1)` },
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
     kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(errors).toEqual([])
@@ -242,7 +241,7 @@ describe('groups', () => {
       groupOn: { click: `store.set('groupSaw', 1)\nstore.set('who', target.name)\nstore.set('owner', self.name)` },
       childOn: { click: `store.set('childSaw', 1)\nforward()` },
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
     kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(errors).toEqual([])
@@ -262,7 +261,7 @@ describe('groups', () => {
       groupOn: { click: `store.set('groupSaw', 1)` },
       childOn: { click: `await Promise.resolve()\nforward()` },
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
     kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 20))
@@ -280,7 +279,7 @@ describe('groups', () => {
       groupOn: { click: `store.set('groupSelf', self.name)` },
       childOn: { click: `store.set('childSelf', self.name)` },
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
     kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(errors).toEqual([])
@@ -292,7 +291,7 @@ describe('groups', () => {
     const book2 = groupBook({
       groupOn: { click: `store.set('groupSelf', self.name)` },
     })
-    const handle2 = runBook(book2, root, 'desktop', (m) => errors.push(m))
+    const handle2 = runBook(book2, root, (m) => errors.push(m))
     // the re-render rebuilt the DOM — re-query the button
     const kid2 = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
     kid2.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -310,11 +309,38 @@ describe('groups', () => {
     const book = groupBook({
       childOn: { click: `store.set('who', this.name)` },
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
     kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(errors).toEqual([])
     expect(handle.store.get('who')).toBe('kidBtn')
+    stopRun()
+    root.remove()
+  })
+
+  it('writing group.width scales members live', async () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const errors: string[] = []
+    const book = groupBook({
+      groupOn: { click: `myGroup.width = 400` },
+    })
+    const handle = runBook(book, root, (m) => errors.push(m))
+    const groupWrap = root.querySelector('[data-tb-name="myGroup"]') as HTMLElement
+    const kid = groupWrap.querySelector('[data-tb-name="kidBtn"]') as HTMLElement
+    expect(kid.style.left).toBe('10px')
+    expect(kid.style.width).toBe('100px')
+    ;(kid.querySelector('button') as HTMLElement).dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    )
+    expect(errors).toEqual([])
+    expect(groupWrap.style.width).toBe('400px')
+    // 200 → 400 doubles the member's distance and size
+    expect(kid.style.left).toBe('20px')
+    expect(kid.style.width).toBe('200px')
+    const stored = book.pages[0]!.objects[0]!
+    expect(stored.x).toEqual({ mode: 'left', left: 40, width: 400 })
+    expect(stored.children![0]!.x).toEqual({ mode: 'left', left: 20, width: 200 })
     stopRun()
     root.remove()
   })
@@ -326,7 +352,7 @@ describe('groups', () => {
     const book = groupBook({
       groupOn: { click: `myGroup.x += 24\nmyGroup.text = 'oops'` },
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     const groupWrap = root.querySelector('[data-tb-name="myGroup"]') as HTMLElement
     expect(groupWrap.style.left).toBe('40px')
     const kid = groupWrap.querySelector('button') as HTMLElement
@@ -347,7 +373,7 @@ describe('groups', () => {
     const book = groupBook({
       groupOn: { click: `myGroup.visible = false` },
     })
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
     kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     const groupInner = root.querySelector('[data-tb-name="myGroup"] .tb-group') as HTMLElement
@@ -366,7 +392,7 @@ describe('groups', () => {
     const book = groupBook({
       groupOn: { click: `store.set('who', target.name)` },
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
     kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(errors).toEqual([])
@@ -382,7 +408,7 @@ describe('groups', () => {
     const book = groupBook({
       childOn: { click: `store.set('who', target.name)\nconsole.log('you clicked', target.name)` },
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
     kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(errors).toEqual([])
@@ -399,7 +425,7 @@ describe('groups', () => {
       groupOn: { click: `store.set('who', target.name)` },
     })
     book.pages[0]!.script = `function event() { store.set('ev', true) }\nfunction target() { store.set('tfn', true) }`
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     const kid = root.querySelector('[data-tb-name="kidBtn"] button') as HTMLElement
     kid.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(errors).toEqual([])
@@ -417,11 +443,10 @@ describe('groups', () => {
     const book: Book = {
       id: 'bn',
       title: 'N',
-      canvas: { desktop: { width: 400, height: 300 } },
       backgrounds: [BG],
       pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [outer] }],
     }
-    runBook(book, root, 'desktop')
+    runBook(book, root)
     const leafEl = root.querySelector('[data-tb-name="leaf"]') as HTMLElement
     expect(leafEl).not.toBeNull()
     // leaf sits inside the inner group wrapper, which sits inside the outer
@@ -438,7 +463,6 @@ function makeBook(opts: {
   return {
     id: 'book1',
     title: 'Test',
-    canvas: { desktop: { width: 1280, height: 800 } },
     backgrounds: [BG],
     pages: [
       {
@@ -479,7 +503,7 @@ describe('player', () => {
       ],
     })
 
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     const btn = root.querySelector('button.tb-button')!
     btn.dispatchEvent(new MouseEvent('click'))
     btn.dispatchEvent(new MouseEvent('click'))
@@ -497,7 +521,7 @@ describe('player', () => {
     const book = makeBook({
       objects: [{ name: 'out', control: 'label', text: 'A {{missing}} B {{...}} C {{ok}}' }],
     })
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     handle.store.set('ok', 7)
     expect(root.querySelector('.tb-label')?.textContent).toBe('A  B {{...}} C 7')
     handle.stop()
@@ -512,7 +536,7 @@ describe('player', () => {
         { name: 'tag', control: 'label', text: '{{this.name}}' },
       ],
     })
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     const buttons = root.querySelectorAll('button.tb-button')
     expect(buttons[0]!.textContent).toBe('I am button1')
     expect(buttons[1]!.textContent).toBe('I am button2')
@@ -527,7 +551,7 @@ describe('player', () => {
     const book = makeBook({
       objects: [{ name: 'out', control: 'label', text: 'A {{self.nme}} B {{who}}' }],
     })
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     handle.store.set('who', 'sam')
     expect(root.querySelector('.tb-label')?.textContent).toBe('A  B sam')
     handle.stop()
@@ -538,7 +562,7 @@ describe('player', () => {
     const book = makeBook({
       pageScript: `function pageEnter() { store.set('pg', self.name) }`,
     })
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     expect(handle.store.get('pg')).toBe('Page 1')
     handle.stop()
   })
@@ -551,7 +575,7 @@ describe('player', () => {
       objects: [{ name: 'btn', control: 'button', on: { click: 'bump(3)' } }],
     })
 
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
     expect(handle.store.get('n')).toBe(3)
 
@@ -564,7 +588,7 @@ describe('player', () => {
     const book = makeBook({
       pageScript: `function pageEnter() { store.set('greeting', 'hello') }`,
     })
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     expect(handle.store.get('greeting')).toBe('hello')
     handle.stop()
   })
@@ -578,7 +602,7 @@ describe('player', () => {
         { name: 'mirror', control: 'label', on: { click: 'controls.mirror.text = controls.source.text' } },
       ],
     })
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     root.querySelector('[data-tb-name="mirror"] div')!.dispatchEvent(new MouseEvent('click'))
     expect(handle.controls['mirror']!.text).toBe('hello')
     handle.stop()
@@ -601,7 +625,7 @@ describe('player', () => {
         },
       ],
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     expect(handle.controls['mode']!.value).toBe(true)
     const box = root.querySelector('[data-tb-name="mode"] input') as HTMLInputElement
     expect(box.checked).toBe(true)
@@ -623,7 +647,7 @@ describe('player', () => {
         { name: 'btn', control: 'button', on: { click: "chip.color = 'green'\nchip.fontFamily = 'mono'" } },
       ],
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     const cardEl = root.querySelector('[data-tb-name="chip"] .tb-card') as HTMLElement
     root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
     expect(errors).toEqual([])
@@ -640,7 +664,7 @@ describe('player', () => {
     const book = makeBook({
       objects: [{ name: 'btn', control: 'button', on: { click: `throw new Error('boom')` } }],
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
     await new Promise((r) => setTimeout(r, 40))
     expect(errors[0]).toContain('boom')
@@ -661,7 +685,7 @@ describe('player', () => {
         },
       ],
     })
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
     expect(handle.store.get('done')).toBeUndefined()
     await new Promise((r) => setTimeout(r, 80))
@@ -683,7 +707,7 @@ describe('player', () => {
         },
       ],
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
     await new Promise((r) => setTimeout(r, 40))
     expect(errors[0]).toContain('async boom')
@@ -697,7 +721,7 @@ describe('player', () => {
     const book = makeBook({
       pageScript: `async function pageEnter() { throw new Error('enter failed') }`,
     })
-    runBook(book, root, 'desktop', (m) => errors.push(m))
+    runBook(book, root, (m) => errors.push(m))
     await new Promise((r) => setTimeout(r, 40))
     expect(errors[0]).toContain('enter failed')
   })
@@ -713,7 +737,7 @@ describe('player', () => {
         { name: 'go', control: 'label', on: { click: `void 0` } },
       ],
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
 
     const btn = root.querySelector('button.tb-button')!
     btn.dispatchEvent(new MouseEvent('click'))
@@ -732,7 +756,7 @@ describe('player', () => {
       pageScript: `function pageEnter() { lbl.text = 'set by pageEnter' }`,
       objects: [{ name: 'lbl', control: 'label' }],
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     expect(errors).toEqual([])
     expect(handle.controls['lbl']!.text).toBe('set by pageEnter')
     handle.stop()
@@ -746,7 +770,7 @@ describe('player', () => {
       pageScript: `function pageEnter() { bump() }\nfunction bump() { store.set('bumped', true) }`,
       objects: [{ name: 'bump', control: 'label', text: 'collision test' }],
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     expect(errors).toEqual([])
     expect(handle.store.get('bumped')).toBe(true)
     handle.stop()
@@ -760,7 +784,7 @@ describe('player', () => {
     const book = makeBook({
       objects: [{ name: 'btn', control: 'button', text: 'orig', on: { click: `btn.text = 'self'` } }],
     })
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
     expect(errors).toEqual([])
     expect(handle.controls['btn']!.text).toBe('self')
@@ -774,7 +798,7 @@ describe('player', () => {
     const book = makeBook({
       objects: [{ name: 'btn', control: 'button', on: { click: `store.set('n', 1)` } }],
     })
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     handle.stop()
     root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
     expect(handle.store.get('n')).toBeUndefined()
@@ -787,8 +811,8 @@ describe('player', () => {
     const book = makeBook({
       objects: [{ name: 'btn', control: 'button', on: { click: `store.set('n', 1)` } }],
     })
-    runBook(book, root, 'desktop')
-    const second = runBook(book, root, 'desktop')
+    runBook(book, root)
+    const second = runBook(book, root)
     root.querySelectorAll('button.tb-button').forEach((b) => b.dispatchEvent(new MouseEvent('click')))
     expect(second.store.get('n')).toBe(1)
     stopRun()
@@ -800,7 +824,6 @@ describe('player', () => {
       return {
         id: 'book2',
         title: 'Quiz',
-        canvas: { desktop: { width: 1280, height: 800 } },
         backgrounds: [BG],
         pages: [
           {
@@ -837,7 +860,7 @@ describe('player', () => {
       const root = document.createElement('div')
       document.body.appendChild(root)
       const errors: string[] = []
-      const handle = runBook(makeTwoPageBook(), root, 'desktop', (m) => errors.push(m))
+      const handle = runBook(makeTwoPageBook(), root, (m) => errors.push(m))
 
       expect(root.querySelector('button.tb-button')).not.toBeNull()
       expect(root.querySelector('.tb-label')).toBeNull()
@@ -866,7 +889,7 @@ describe('player', () => {
       const errors: string[] = []
       const book = makeTwoPageBook()
       book.pages[0]!.objects[0]!.on['click'] = `page.go('Nope')`
-      const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+      const handle = runBook(book, root, (m) => errors.push(m))
 
       root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
       await tick()
@@ -882,7 +905,7 @@ describe('player', () => {
     it('starts on the requested page', () => {
       const root = document.createElement('div')
       document.body.appendChild(root)
-      const handle = runBook(makeTwoPageBook(), root, 'desktop', undefined, 1)
+      const handle = runBook(makeTwoPageBook(), root, undefined, 1)
       expect(root.querySelector('.tb-label')).not.toBeNull()
       expect(root.querySelector('button.tb-button')).toBeNull()
       expect(handle.store.get('entered2')).toBe(true)
@@ -898,7 +921,6 @@ describe('player', () => {
       const handle = runBook(
         book,
         root,
-        'desktop',
         undefined,
         resolveStartPageIndex(book),
       )
@@ -924,7 +946,7 @@ describe('player', () => {
     it('reads x/y/width/height from the object rect', () => {
       const book = rectBook()
       const root = document.createElement('div')
-      const handle = runBook(book, root, 'desktop')
+      const handle = runBook(book, root)
       const box = handle.controls['box']!
       expect(box.x).toBe(40)
       expect(box.y).toBe(60)
@@ -936,7 +958,7 @@ describe('player', () => {
     it('writes move/resize the object on screen and in the book data', () => {
       const book = rectBook()
       const root = document.createElement('div')
-      const handle = runBook(book, root, 'desktop')
+      const handle = runBook(book, root)
       const box = handle.controls['box']!
       box.x = 200
       box.y = 90
@@ -949,15 +971,16 @@ describe('player', () => {
       expect(wrapper.style.width).toBe('300px')
       expect(wrapper.style.height).toBe('40px')
 
-      const stored = book.pages[0]!.objects[0]!.rect
-      expect(stored).toEqual({ x: 200, y: 90, w: 300, h: 40 })
+      const stored = book.pages[0]!.objects[0]!
+      expect(stored.x).toEqual({ mode: 'left', left: 200, width: 300 })
+      expect(stored.y).toEqual({ mode: 'top', top: 90, height: 40 })
       handle.stop()
     })
 
     it('supports += and clamps size to a minimum of 1px', () => {
       const book = rectBook()
       const root = document.createElement('div')
-      const handle = runBook(book, root, 'desktop')
+      const handle = runBook(book, root)
       const box = handle.controls['box']!
       box.x += 10
       expect(box.x).toBe(50)
@@ -970,7 +993,7 @@ describe('player', () => {
     it('ignores non-finite values', () => {
       const book = rectBook()
       const root = document.createElement('div')
-      const handle = runBook(book, root, 'desktop')
+      const handle = runBook(book, root)
       const box = handle.controls['box']!
       box.x = Number.NaN
       box.y = 'abc' as unknown as number
@@ -987,7 +1010,7 @@ describe('player', () => {
       const root = document.createElement('div')
       document.body.appendChild(root)
       const errors: string[] = []
-      const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+      const handle = runBook(book, root, (m) => errors.push(m))
 
       ;(wrapperOf(root, 'box').firstElementChild as HTMLElement).dispatchEvent(new MouseEvent('click'))
       await new Promise((r) => setTimeout(r, 20))
@@ -999,30 +1022,30 @@ describe('player', () => {
       root.remove()
     })
 
-    it('a scripted write edits the one shared rect, whichever breakpoint runs', () => {
+    it('a scripted write edits the shared edge distance', () => {
       const book = rectBook()
       const root = document.createElement('div')
-      const handle = runBook(book, root, 'tablet')
+      const handle = runBook(book, root)
       handle.controls['box']!.x = 500
 
       const obj = book.pages[0]!.objects[0]!
-      expect(obj.rect.x).toBe(500)
+      expect(obj.x).toEqual({ mode: 'left', left: 500, width: 120 })
       handle.stop()
     })
 
-    it('reads x/y through the lens and writes the shared rect', () => {
+    it('reads x/y from the edges and writes the distance back', () => {
       const obj = createObject('label', 'box', { x: 40, y: 60, w: 120, h: 80 })
       const book = makeBook({ objects: [] })
       book.pages[0]!.objects = [{ ...obj, on: {} }]
       const root = document.createElement('div')
-      const handle = runBook(book, root, 'tablet')
+      const handle = runBook(book, root)
       const box = handle.controls['box']!
-      // free fit: the authored position applies at every size
+      // left/top by default: the authored distances apply at every size
       expect(box.x).toBe(40)
       expect(box.y).toBe(60)
       expect(box.width).toBe(120)
       box.x = 99
-      expect(book.pages[0]!.objects[0]!.rect.x).toBe(99)
+      expect(book.pages[0]!.objects[0]!.x).toMatchObject({ left: 99 })
       handle.stop()
     })
   })

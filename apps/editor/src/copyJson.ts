@@ -51,6 +51,10 @@ export function parseClipboardJson(text: string): PageObject[] | null {
   return objs as PageObject[]
 }
 
+function isEdgeLike(v: unknown): boolean {
+  return typeof v === 'object' && v !== null && typeof (v as { mode?: unknown }).mode === 'string'
+}
+
 function isPageObjectLike(v: unknown): boolean {
   if (typeof v !== 'object' || v === null) return false
   const o = v as Record<string, unknown>
@@ -58,8 +62,8 @@ function isPageObjectLike(v: unknown): boolean {
     typeof o['id'] === 'string' &&
     typeof o['name'] === 'string' &&
     typeof o['control'] === 'string' &&
-    typeof o['rect'] === 'object' &&
-    o['rect'] !== null
+    isEdgeLike(o['x']) &&
+    isEdgeLike(o['y'])
   )
 }
 

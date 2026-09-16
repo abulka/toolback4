@@ -8,7 +8,6 @@ function twoPageBook(page2Script: string): Book {
   return {
     id: 'b',
     title: 't',
-    canvas: { desktop: { width: 100, height: 100 } },
     backgrounds: [BG],
     pages: [
       {
@@ -40,7 +39,7 @@ describe('pageEnter double-fire regression', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
     const book = twoPageBook(`function pageEnter() { store.set('n', (store.get('n') ?? 0) + 1) }`)
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
 
     root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
     await tick()
@@ -55,7 +54,7 @@ describe('pageEnter double-fire regression', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
     const book = twoPageBook(`function pageEnter() { store.set('n', (store.get('n') ?? 0) + 1) }`)
-    const handle = runBook(book, root, 'desktop', undefined, 1)
+    const handle = runBook(book, root, undefined, 1)
     expect(handle.store.get('n')).toBe(1)
     handle.stop()
     root.remove()

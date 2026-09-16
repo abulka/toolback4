@@ -7,14 +7,13 @@ function twoObjectBook(): Book {
   return parseBook({
     id: 'b1',
     title: 'T',
-    canvas: { desktop: { width: 800, height: 600 } },
     pages: [
       {
         id: 'p1',
         name: 'P',
         objects: [
-          { id: 'a', name: 'labelA', control: 'label', rect: { x: 0, y: 0, w: 100, h: 50 } },
-          { id: 'b', name: 'labelB', control: 'label', rect: { x: 120, y: 40, w: 80, h: 60 } },
+          { id: 'a', name: 'labelA', control: 'label', x: { mode: 'left', left: 0, width: 100 }, y: { mode: 'top', top: 0, height: 50 } },
+          { id: 'b', name: 'labelB', control: 'label', x: { mode: 'left', left: 120, width: 80 }, y: { mode: 'top', top: 40, height: 60 } },
         ],
       },
     ],
@@ -177,7 +176,8 @@ describe('book store — undo/redo history', () => {
     store.applyRect('a', { x: 16, y: 16, w: 40, h: 40 })
 
     store.undo()
-    expect(store.book.pages[0]!.objects[0]!.rect).toEqual({ x: 0, y: 0, w: 100, h: 50 })
+    expect(store.book.pages[0]!.objects[0]!.x).toEqual({ mode: 'left', left: 0, width: 100 })
+    expect(store.book.pages[0]!.objects[0]!.y).toEqual({ mode: 'top', top: 0, height: 50 })
   })
 
   it('a new edit after an undo clears the redo stack', () => {
@@ -197,10 +197,12 @@ describe('book store — undo/redo history', () => {
     store.applyRect('a', { x: 16, y: 16, w: 40, h: 40 }) // original {0,0,100,50}
     store.undo() // → original
     store.redo() // → {16,16,40,40}
-    expect(store.book.pages[0]!.objects[0]!.rect).toEqual({ x: 16, y: 16, w: 40, h: 40 })
+    expect(store.book.pages[0]!.objects[0]!.x).toEqual({ mode: 'left', left: 16, width: 40 })
+    expect(store.book.pages[0]!.objects[0]!.y).toEqual({ mode: 'top', top: 16, height: 40 })
 
     store.undo()
-    expect(store.book.pages[0]!.objects[0]!.rect).toEqual({ x: 0, y: 0, w: 100, h: 50 })
+    expect(store.book.pages[0]!.objects[0]!.x).toEqual({ mode: 'left', left: 0, width: 100 })
+    expect(store.book.pages[0]!.objects[0]!.y).toEqual({ mode: 'top', top: 0, height: 50 })
   })
 
   it('does not record anything while running', () => {

@@ -1,9 +1,9 @@
-import type { Background, Book, Breakpoint, CanvasSize, Page, PageObject, Rect } from '@toolback/format'
-import { backgroundFor, resolveObjectRect, resolvePageSize, scaleRect } from '@toolback/format'
+import type { Background, Book, CanvasSize, Page, PageObject, Rect } from '@toolback/format'
+import { backgroundFor, contentExtent, rectForObject, resolvePageBox } from '@toolback/format'
 import { registerControls, renderObject } from '@toolback/controls'
 import { stylesCss } from './styles'
 
-export type { Breakpoint, Rect } from '@toolback/format'
+export type { Rect } from '@toolback/format'
 export { snap, snapRect, resizeRect, GRID, MIN_SIZE } from './design'
 export type { HandleDir, DesignController } from './design'
 export {
@@ -44,59 +44,78 @@ function injectStyles(doc: Document): void {
   stylesInjected = true
 }
 
-function rectFor(obj: PageObject): Rect {
-  return obj.rect
+/**
+ * Position an object wrapper from its edge constraints with pure CSS, so the
+ * browser repositions it on resize with no JavaScript. Percentages resolve
+ * against the containing box (the page, or the parent group wrapper).
+ */
+export function applyEdgeStyles(el: HTMLElement, obj: PageObject): void {
+  const s = el.style
+  s.left = ''
+  s.right = ''
+  s.width = ''
+  s.top = ''
+  s.bottom = ''
+  s.height = ''
+  switch (obj.x.mode) {
+    case 'left':
+      s.left = `${obj.x.left}px`
+      s.width = `${obj.x.width}px`
+      break
+    case 'right':
+      s.right = `${obj.x.right}px`
+      s.width = `${obj.x.width}px`
+      break
+    case 'both':
+      s.left = `${obj.x.left}px`
+      s.right = `${obj.x.right}px`
+      break
+    case 'center':
+      s.left = `calc(50% - ${obj.x.width / 2}px)`
+      s.width = `${obj.x.width}px`
+      break
+  }
+  switch (obj.y.mode) {
+    case 'top':
+      s.top = `${obj.y.top}px`
+      s.height = `${obj.y.height}px`
+      break
+    case 'bottom':
+      s.bottom = `${obj.y.bottom}px`
+      s.height = `${obj.y.height}px`
+      break
+    case 'both':
+      s.top = `${obj.y.top}px`
+      s.bottom = `${obj.y.bottom}px`
+      break
+    case 'center':
+      s.top = `calc(50% - ${obj.y.height / 2}px)`
+      s.height = `${obj.y.height}px`
+      break
+  }
 }
 
 export function renderObjectInto(
   pageRoot: HTMLElement,
   obj: PageObject,
-  breakpoint: Breakpoint,
-  opts?: { bg?: boolean; size?: { page: CanvasSize; ref: CanvasSize }; overrideRect?: Rect },
+  opts?: { bg?: boolean },
 ): HTMLElement {
   const wrapper = pageRoot.ownerDocument.createElement('div')
   wrapper.className = 'tb-object'
   wrapper.dataset.tbId = obj.id
   wrapper.dataset.tbName = obj.name
+  wrapper.dataset.tbEdgeX = obj.x.mode
+  wrapper.dataset.tbEdgeY = obj.y.mode
   if (opts?.bg) wrapper.dataset.tbBg = '1'
-  if (obj.fit?.x) wrapper.dataset.tbFitX = obj.fit.x
-  if (obj.fit?.y) wrapper.dataset.tbFitY = obj.fit.y
-  // which axes the glue lens actually produced — the design controller clamps
-  // drags on a locked Center axis only while the lens is live here
-  const lensLive = Boolean(opts?.size) && !opts?.overrideRect
-  if (lensLive && obj.fit?.x && obj.fit.x !== 'free') wrapper.dataset.tbLensX = '1'
-  if (lensLive && obj.fit?.y && obj.fit.y !== 'free') wrapper.dataset.tbLensY = '1'
-  const rect =
-    opts?.overrideRect ?? (opts?.size ? resolveObjectRect(obj, opts.size.page, opts.size.ref) : rectFor(obj))
-  wrapper.style.left = `${rect.x}px`
-  wrapper.style.top = `${rect.y}px`
-  wrapper.style.width = `${rect.w}px`
-  wrapper.style.height = `${rect.h}px`
+  applyEdgeStyles(wrapper, obj)
 
   if (obj.control === 'group' && obj.children?.length) {
-    // members render inside the group wrapper; their rects are relative to it.
-    // Members scale with the box ONLY for a real size change — a stretch/fill
-    // lens, or a parent scaling a nested group; an interactive resize already
-    // scaled the members in the store, so it is not applied twice.
-    const desktop = rectFor(obj)
-    const parentScaled = Boolean(opts?.overrideRect)
-    const stretchX = parentScaled || obj.fit?.x === 'stretch' || obj.fit?.x === 'fill'
-    const stretchY = parentScaled || obj.fit?.y === 'stretch' || obj.fit?.y === 'fill'
-    const fx = stretchX && desktop.w !== 0 ? rect.w / desktop.w : 1
-    const fy = stretchY && desktop.h !== 0 ? rect.h / desktop.h : 1
+    // members render inside the group wrapper and constrain to its box; the
+    // group box carries its own edges and members are never scaled with it
     wrapper.appendChild(renderObject(obj))
     const inner = wrapper.firstElementChild as HTMLElement
     for (const child of obj.children) {
-      const childRect = rectFor(child)
-      const scaled =
-        fx !== 1 && fy !== 1
-          ? scaleRect(childRect, { x: 0, y: 0 }, fx, fy)
-          : fx !== 1
-            ? { x: Math.round(childRect.x * fx), y: childRect.y, w: Math.max(1, Math.round(childRect.w * fx)), h: childRect.h }
-            : fy !== 1
-              ? { x: childRect.x, y: Math.round(childRect.y * fy), w: childRect.w, h: Math.max(1, Math.round(childRect.h * fy)) }
-              : null
-      renderObjectInto(inner, child, breakpoint, scaled ? { overrideRect: scaled } : undefined)
+      renderObjectInto(inner, child)
     }
   } else {
     wrapper.appendChild(renderObject(obj))
@@ -108,12 +127,10 @@ export function renderObjectInto(
 
 export function renderPage(
   page: Page,
-  breakpoint: Breakpoint,
   root: HTMLElement,
-  canvasSize?: { width: number; height: number },
-  background?: Background,
-  refSize?: { width: number; height: number },
-  boxHeight?: number,
+  container: CanvasSize | undefined,
+  background: Background | undefined,
+  objects: PageObject[],
 ): HTMLElement {
   const doc = root.ownerDocument
   injectStyles(doc)
@@ -122,92 +139,94 @@ export function renderPage(
   pageRoot.className = 'tb-page'
   pageRoot.dataset.tbPageId = page.id
   pageRoot.style.background = background?.color ?? '#ffffff'
-  if (canvasSize) {
-    pageRoot.style.width = `${canvasSize.width}px`
-    pageRoot.style.height = `${boxHeight ?? canvasSize.height}px`
+  if (page.size) {
+    pageRoot.style.width = `${page.size.width}px`
+    pageRoot.style.height = `${page.size.height}px`
+  } else {
+    // fluid: fill the container, grow to the content extent past the fold.
+    // `100vh` when the page is the root surface; `100%` inside a sized box.
+    const extent = contentExtent(objects)
+    pageRoot.style.width = '100%'
+    pageRoot.style.height = container ? '100%' : '100vh'
+    pageRoot.style.minWidth = `${Math.ceil(extent.right)}px`
+    pageRoot.style.minHeight = `${Math.ceil(extent.bottom)}px`
   }
 
-  // fit-aware render when both the target and the desktop reference sizes are
-  // known: page objects AND background objects react to the page size
-  const size =
-    canvasSize && refSize ? { page: canvasSize, ref: refSize } : null
   // background objects paint below the page's own objects and are tagged so
   // the editor can lock them (they belong to the background resource)
   if (background) {
     for (const obj of background.objects) {
-      renderObjectInto(pageRoot, obj, breakpoint, { bg: true, size: size ?? undefined })
+      renderObjectInto(pageRoot, obj, { bg: true })
     }
   }
   for (const obj of page.objects) {
-    renderObjectInto(pageRoot, obj, breakpoint, size ? { size } : undefined)
+    renderObjectInto(pageRoot, obj)
   }
 
   root.appendChild(pageRoot)
   return pageRoot
 }
 
-export function renderBook(
-  book: Book,
-  root: HTMLElement,
-  breakpoint: Breakpoint = 'desktop',
-): HTMLElement {
-  return renderBookPage(book, 0, root, breakpoint)
+/**
+ * The browser-like viewport the page is shown in: the document's client box
+ * (in the editor canvas iframe the canvas area, at runtime the browser
+ * window). Nested surfaces (popups, author windows) pass their own box as an
+ * explicit container instead.
+ */
+export function measureViewport(root: HTMLElement): CanvasSize {
+  const de = root.ownerDocument.documentElement
+  const win = root.ownerDocument.defaultView
+  return {
+    width: Math.max(1, de.clientWidth || win?.innerWidth || root.clientWidth || 1),
+    height: Math.max(1, de.clientHeight || win?.innerHeight || root.clientHeight || 1),
+  }
+}
+
+export function renderBook(book: Book, root: HTMLElement): HTMLElement {
+  return renderBookPage(book, 0, root)
 }
 
 export function renderBookPage(
   book: Book,
   pageIndex: number,
   root: HTMLElement,
-  breakpoint: Breakpoint = 'desktop',
+  container?: CanvasSize,
 ): HTMLElement {
   for (const child of Array.from(root.children)) {
     root.removeChild(child)
   }
   const page = book.pages[pageIndex] ?? book.pages[0]!
   const background = backgroundFor(book, page)
-  // the box can grow with content (auto-height) but the fit lens always uses
-  // the base sizes, so vertical glue never depends on the grown height
-  const baseSize = resolvePageSize(book, background, breakpoint)
-  const refSize = resolvePageSize(book, background, 'desktop')
-  const box = resolvePageSize(book, background, breakpoint, [
-    ...(background?.objects ?? []),
-    ...page.objects,
-  ])
-  return renderPage(page, breakpoint, root, baseSize, background, refSize, box.height)
+  const objects = [...(background?.objects ?? []), ...page.objects]
+  return renderPage(page, root, container, background, objects)
 }
 
 /**
  * Design view of a background: only the background's own objects, fully
- * editable (no `data-tb-bg` tagging). Sized per the background's override.
+ * editable (no `data-tb-bg` tagging). The background is a fluid page.
  */
 export function renderBackgroundView(
   book: Book,
   backgroundId: string,
   root: HTMLElement,
-  breakpoint: Breakpoint = 'desktop',
 ): HTMLElement {
   for (const child of Array.from(root.children)) {
     root.removeChild(child)
   }
   const background =
     book.backgrounds.find((b) => b.id === backgroundId) ?? book.backgrounds[0]!
-  const baseSize = resolvePageSize(book, background, breakpoint)
-  const refSize = resolvePageSize(book, background, 'desktop')
-  const box = resolvePageSize(book, background, breakpoint, background.objects)
-  const size = { page: baseSize, ref: refSize }
-  const pageRoot = renderPage(
-    { id: `bgview:${background.id}`, name: background.name, script: '', backgroundId: background.id, objects: [] },
-    breakpoint,
-    root,
-    baseSize,
-    undefined,
-    refSize,
-    box.height,
-  )
+  const synthetic: Page = {
+    id: `bgview:${background.id}`,
+    name: background.name,
+    script: '',
+    backgroundId: background.id,
+    objects: [],
+  }
+  const pageRoot = renderPage(synthetic, root, undefined, undefined, background.objects)
   pageRoot.style.background = background.color
   pageRoot.dataset.tbBackgroundId = background.id
   for (const obj of background.objects) {
-    renderObjectInto(pageRoot, obj, breakpoint, { size })
+    renderObjectInto(pageRoot, obj)
   }
   // corner badge so the author can tell they're editing a background
   const badge = root.ownerDocument.createElement('div')
@@ -215,6 +234,35 @@ export function renderBackgroundView(
   badge.textContent = `Background · ${background.name}`
   pageRoot.appendChild(badge)
   return pageRoot
+}
+
+/**
+ * The containing box each object's edge constraints resolve against: the page
+ * box for top-level objects, the resolved group box for members. Used by the
+ * ControlApi so `x`/`width` reads and writes agree with the render.
+ */
+export function parentBoxMap(objects: PageObject[], pageBox: CanvasSize): Map<string, CanvasSize> {
+  const out = new Map<string, CanvasSize>()
+  const walk = (objs: PageObject[], box: CanvasSize): void => {
+    for (const o of objs) {
+      out.set(o.id, box)
+      if (o.children?.length) {
+        const r = rectForObject(o, box)
+        walk(o.children, { width: r.w, height: r.h })
+      }
+    }
+  }
+  walk(objects, pageBox)
+  return out
+}
+
+/** the resolved page box for a page shown in `container` (see format) */
+export function pageBoxFor(
+  page: Page,
+  container: CanvasSize,
+  objects: PageObject[],
+): CanvasSize {
+  return resolvePageBox(page, container, objects)
 }
 
 export type ObjectRects = Record<string, Rect>

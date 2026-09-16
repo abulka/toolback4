@@ -10,7 +10,7 @@ describe('author smoke', () => {
     const holder = document.createElement('div')
     document.body.appendChild(holder)
     const book: Book = {
-      id: 'b', title: 'T', canvas: { desktop: { width: 800, height: 600 } },
+      id: 'b', title: 'T',
       backgrounds: [{ id: 'bg1', name: 'Main', color: '#fff', script: '', objects: [] }],
       pages: [
         { id: 'p1', name: 'Stage', script: '', backgroundId: 'bg1', objects: [] },
@@ -23,7 +23,7 @@ describe('author smoke', () => {
         },
       ],
     }
-    const handle = startAuthorMode(book, 1, holder, 'desktop')
+    const handle = startAuthorMode(book, 1, holder)
     expect(authorActive()).toBe(true)
     // the layer mounts next to the holder (holder.parentElement), not inside it
     const btn = document.body.querySelector('.tb-author [data-tb-name="pluginBtn"] button') as HTMLButtonElement

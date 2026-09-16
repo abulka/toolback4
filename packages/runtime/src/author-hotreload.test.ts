@@ -24,7 +24,7 @@ describe('repro: c is not defined', () => {
     const errors: string[] = []
     const calls: string[] = []
     const book: Book = {
-      id: 'b', title: 'T', canvas: { desktop: { width: 800, height: 600 } },
+      id: 'b', title: 'T',
       backgrounds: [{ id: 'bg1', name: 'M', color: '#fff', script: '', objects: [] }],
       pages: [
         { id: 'p1', name: 'C', script: '', backgroundId: 'bg1', objects: [createObject('label', 'target', { x: 0, y: 0, w: 50, h: 20 })] },
@@ -63,7 +63,7 @@ describe('repro: c is not defined', () => {
     try {
       window.dispatchEvent(
         new MessageEvent('message', {
-          data: { type: 'toolback:authorStart', book, pageIndex: 1, breakpoint: 'desktop' },
+          data: { type: 'toolback:authorStart', book, pageIndex: 1 },
         }),
       )
       await tick()
@@ -94,7 +94,7 @@ describe('repro: c is not defined', () => {
     const draftScript = `const objs = await author.selected()
 for (const o of objs) await o.set({ color: c })`
     const book: Book = {
-      id: 'b', title: 'T', canvas: { desktop: { width: 800, height: 600 } },
+      id: 'b', title: 'T',
       backgrounds: [{ id: 'bg1', name: 'M', color: '#fff', script: '', objects: [] }],
       pages: [
         { id: 'p1', name: 'C', script: '', backgroundId: 'bg1', objects: [createObject('label', 'target', { x: 0, y: 0, w: 50, h: 20 })] },
@@ -132,7 +132,7 @@ for (const o of objs) await o.set({ color: c })`
     try {
       window.dispatchEvent(
         new MessageEvent('message', {
-          data: { type: 'toolback:authorStart', book, pageIndex: 1, breakpoint: 'desktop' },
+          data: { type: 'toolback:authorStart', book, pageIndex: 1 },
         }),
       )
       await tick()

@@ -14,7 +14,6 @@ function pluginBook(pluginScript = '', buttonScript = ''): Book {
   return {
     id: 'b',
     title: 'T',
-    canvas: { desktop: { width: 800, height: 600 } },
     backgrounds: [{ id: 'bg1', name: 'Main', color: '#ffffff', script: '', objects: [] }],
     pages: [
       {
@@ -62,7 +61,7 @@ describe('author mode (M6c)', () => {
       // start the plugin
       window.dispatchEvent(
         new MessageEvent('message', {
-          data: { type: 'toolback:authorStart', book: pluginBook(), pageIndex: 1, breakpoint: 'desktop' },
+          data: { type: 'toolback:authorStart', book: pluginBook(), pageIndex: 1 },
         }),
       )
       await tick()
@@ -147,7 +146,7 @@ describe('author mode (M6c)', () => {
     try {
       window.dispatchEvent(
         new MessageEvent('message', {
-          data: { type: 'toolback:authorStart', book, pageIndex: 1, breakpoint: 'desktop' },
+          data: { type: 'toolback:authorStart', book, pageIndex: 1 },
         }),
       )
       await tick()
@@ -177,7 +176,7 @@ describe('author mode (M6c)', () => {
     try {
       window.dispatchEvent(
         new MessageEvent('message', {
-          data: { type: 'toolback:authorStart', book, pageIndex: 1, breakpoint: 'desktop' },
+          data: { type: 'toolback:authorStart', book, pageIndex: 1 },
         }),
       )
       await tick()

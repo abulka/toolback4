@@ -9,11 +9,18 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
   wired = true
   const store = useBookStore()
 
+  /** the rendered page's box within the iframe viewport (editor chrome tracks it) */
+  const measurePage = (): void => {
+    const page = iframe.contentDocument?.querySelector<HTMLElement>('.tb-page')
+    if (!page) return
+    const r = page.getBoundingClientRect()
+    store.setPageRect({ x: r.left, y: r.top, w: r.width, h: r.height })
+  }
+
   const sendLoad = (): void => {
     const msg: EditorToCanvasMessage = {
       type: 'toolback:load',
       book: JSON.parse(JSON.stringify(store.book)),
-      breakpoint: store.breakpoint,
       pageIndex: store.currentPageIndex,
       view:
         store.editing.kind === 'background'
@@ -21,7 +28,7 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
           : { kind: 'page', index: store.currentPageIndex },
       design: !store.isRunning,
       selection: [...store.selectionIds],
-      fitHints: store.fitHintMode,
+      fitHints: { ...store.fitHints },
     }
     iframe.contentWindow?.postMessage(msg, '*')
   }
@@ -51,9 +58,14 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
       case 'toolback:ready':
         sendLoad()
         break
+      case 'toolback:viewport':
+        store.setViewport({ width: msg.width, height: msg.height })
+        measurePage()
+        break
       case 'toolback:rects':
         store.rects = msg.rects
         store.canvasReady = true
+        measurePage()
         break
       case 'toolback:selection':
         store.applySelection(msg.ids)

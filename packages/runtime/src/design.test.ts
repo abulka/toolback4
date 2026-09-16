@@ -1,10 +1,91 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createGroup, createObject, type Book, type Rect } from '@toolback/format'
+import {
+  createGroup,
+  createObject,
+  DEFAULT_FIT_HINTS,
+  type Book,
+  type FitHintOptions,
+  type PageObject,
+  type Rect,
+  type XEdge,
+  type YEdge,
+} from '@toolback/format'
 import { sampleBook } from '@toolback/format/src/sample'
-import { createDesignController, isCornerHandle, resizeRect, resizeRectAspect, snap } from './design'
+import {
+  createDesignController,
+  groupOutlineIds,
+  isCornerHandle,
+  resizeRect,
+  resizeRectAspect,
+  snap,
+} from './design'
 import { listenForEditor } from './editorLink'
 
 const BG = { id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', objects: [] }
+
+/**
+ * happy-dom has no layout engine, so tests fake getBoundingClientRect from the
+ * inline styles the renderer sets. This resolves every edge-constraint shape
+ * (`left`/`top`, `right`/`bottom`, `both`, `calc(50% …)`) against a containing
+ * box, accumulating ancestor group offsets so members resolve inside their
+ * group's box.
+ */
+function styleRectOf(el: HTMLElement, pageW = 800, pageH = 600): DOMRect {
+  const px = (v: string): number => parseFloat(v) || 0
+  const rect = (left: number, top: number, width: number, height: number): DOMRect =>
+    ({
+      left,
+      top,
+      width,
+      height,
+      right: left + width,
+      bottom: top + height,
+      x: left,
+      y: top,
+      toJSON: () => ({}),
+    }) as DOMRect
+  const s = el.style
+  if (el.classList?.contains('tb-page')) {
+    return rect(0, 0, s.width.endsWith('px') ? px(s.width) : pageW, s.height.endsWith('px') ? px(s.height) : pageH)
+  }
+  // containing box: the nearest ancestor object's resolved rect, else the page
+  const parentObj = el.parentElement?.closest<HTMLElement>('.tb-object') ?? null
+  const box = parentObj ? styleRectOf(parentObj, pageW, pageH) : rect(0, 0, pageW, pageH)
+  const len = (v: string): number => (v.endsWith('px') ? px(v) : NaN)
+  const wAttr = len(s.width)
+  const hAttr = len(s.height)
+  let width: number
+  let left: number
+  if (s.left !== '' && s.right !== '') {
+    left = px(s.left)
+    width = box.width - px(s.left) - px(s.right)
+  } else if (s.left.includes('calc(50%')) {
+    width = Number.isNaN(wAttr) ? 0 : wAttr
+    left = (box.width - width) / 2
+  } else if (s.right !== '') {
+    width = Number.isNaN(wAttr) ? 0 : wAttr
+    left = box.width - px(s.right) - width
+  } else {
+    width = Number.isNaN(wAttr) ? 0 : wAttr
+    left = s.left !== '' ? px(s.left) : 0
+  }
+  let height: number
+  let top: number
+  if (s.top !== '' && s.bottom !== '') {
+    top = px(s.top)
+    height = box.height - px(s.top) - px(s.bottom)
+  } else if (s.top.includes('calc(50%')) {
+    height = Number.isNaN(hAttr) ? 0 : hAttr
+    top = (box.height - height) / 2
+  } else if (s.bottom !== '') {
+    height = Number.isNaN(hAttr) ? 0 : hAttr
+    top = box.height - px(s.bottom) - height
+  } else {
+    height = Number.isNaN(hAttr) ? 0 : hAttr
+    top = s.top !== '' ? px(s.top) : 0
+  }
+  return rect(box.left + left, box.top + top, width, height)
+}
 
 describe('design geometry helpers', () => {
   it('snaps to the grid', () => {
@@ -272,7 +353,6 @@ it('clicking a member selects the group; alt-click and double-click enter it', (
       const book: Book = {
         id: 'bg',
         title: 'G',
-        canvas: { desktop: { width: 800, height: 600 } },
         backgrounds: [BG],
         pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [group] }],
       }
@@ -319,7 +399,7 @@ it('clicking a member selects the group; alt-click and double-click enter it', (
     }
   })
 
-it('resizing a group scales member rects around the fixed corner (batched commit)', () => {
+it('resizing a group commits only the group box; members are not scaled', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
     const sent: Array<{ type: string; objects?: Array<{ id: string; rect: Rect }> }> = []
@@ -330,13 +410,11 @@ it('resizing a group scales member rects around the fixed corner (batched commit
       const book: Book = {
         id: 'bg',
         title: 'G',
-        canvas: { desktop: { width: 800, height: 600 } },
         backgrounds: [BG],
         pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [group] }],
       }
       load(root, book)
       const groupId = group.id
-      const childId = child.id
 
       // select the group, then grab the se handle at (200,100) and drag +40/+40
       pointer(root, 'pointerdown', 100, 50)
@@ -351,10 +429,10 @@ it('resizing a group scales member rects around the fixed corner (batched commit
       const commit = sent.filter((m) => m.type === 'toolback:commit').at(-1) as unknown as {
         objects: Array<{ id: string; rect: Rect }>
       }
-      const byId = Object.fromEntries(commit.objects.map((o) => [o.id, o.rect]))
-      expect(byId[groupId]).toEqual({ x: 0, y: 0, w: 240, h: 140 })
-      // fx = 240/200 = 1.2, fy = 140/100 = 1.4
-      expect(byId[childId]).toEqual({ x: 12, y: 14, w: 120, h: 56 })
+      // only the group's own box is committed — members resolve themselves
+      expect(commit.objects).toHaveLength(1)
+      expect(commit.objects[0]!.id).toBe(groupId)
+      expect(commit.objects[0]!.rect).toEqual({ x: 0, y: 0, w: 240, h: 140 })
     } finally {
       unpatchRects()
       cleanup()
@@ -369,7 +447,6 @@ it('resizing a group scales member rects around the fixed corner (batched commit
     const book: Book = {
       id: 'bg',
       title: 'G',
-      canvas: { desktop: { width: 800, height: 600 } },
       backgrounds: [BG],
       pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [group] }],
     }
@@ -393,27 +470,25 @@ it('resizing a group scales member rects around the fixed corner (batched commit
         new MouseEvent('pointermove', { clientX: 140, clientY: 150, bubbles: true }),
       )
 
-      // mid-drag: the layout box is untouched — only the CSS transform scales
+      // mid-drag: the layout box is untouched; a transform anchored on the
+      // fixed (right) edge previews the scaled subtree
       const gEl = root.querySelector<HTMLElement>('[data-tb-name="grp"]')!
       expect(gEl.style.width).toBe('200px')
-      expect(gEl.style.transform).toContain('scale(0.8')
+      expect(gEl.style.left).toBe('100px')
+      expect(gEl.style.transform).toBe('scale(0.8, 1)')
+      expect(gEl.style.transformOrigin).toBe('100% 0%')
 
       handle.dispatchEvent(new MouseEvent('pointerup', { clientX: 140, clientY: 150, bubbles: true }))
 
       const commit = sent.filter((m) => m.type === 'toolback:commit').at(-1) as unknown as {
         objects: Array<{ id: string; rect: Rect }>
       }
-      const byId = Object.fromEntries(commit.objects.map((o) => [o.id, o.rect]))
-      // ghost: x 100→140, w 200→160 (fx 0.8, fy 1), fixed edge = right (300)
-      expect(byId[groupId]).toEqual({ x: 140, y: 100, w: 160, h: 100 })
-      expect(byId[c1]).toEqual({ x: 140, y: 100, w: 80, h: 50 })
-      expect(byId[c2]).toEqual({ x: 220, y: 150, w: 80, h: 50 })
-      // every member inside the ghost, and the union is exactly the ghost
-      for (const id of [groupId, c1, c2]) {
-        const r = byId[id]!
-        expect(r.x).toBeGreaterThanOrEqual(140)
-        expect(r.x + r.w).toBeLessThanOrEqual(300)
-      }
+      // ghost: x 100→140, w 200→160 — only the group is committed
+      expect(commit.objects).toHaveLength(1)
+      expect(commit.objects[0]!.id).toBe(groupId)
+      expect(commit.objects[0]!.rect).toEqual({ x: 140, y: 100, w: 160, h: 100 })
+      void c1
+      void c2
     } finally {
       unpatchRects()
       cleanup()
@@ -421,7 +496,36 @@ it('resizing a group scales member rects around the fixed corner (batched commit
     }
   })
 
-  it('resizing from the N handle scales heights around the fixed bottom edge', () => {
+  it('a group resize previews a corner-anchored scale', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const sent: Array<{ type: string }> = []
+    const cleanup = listenForEditor(root, (m) => sent.push(m as never))
+    try {
+      const { book } = stackedGroupBook()
+      load(root, book)
+
+      pointer(root, 'pointerdown', 150, 120)
+      pointer(root, 'pointerup', 150, 120)
+      const handle = overlayOf(root).querySelector<HTMLElement>('.tb-handle[data-dir="se"]')!
+      handle.dispatchEvent(new MouseEvent('pointerdown', { clientX: 300, clientY: 200, button: 0, bubbles: true }))
+      overlayOf(root).dispatchEvent(
+        new MouseEvent('pointermove', { clientX: 400, clientY: 250, bubbles: true }),
+      )
+
+      const gEl = root.querySelector<HTMLElement>('[data-tb-name="grp"]')!
+      // ghost 200×100 → 304×148 (8px snap), fixed top-left corner
+      expect(gEl.style.transform).toBe('scale(1.52, 1.48)')
+      expect(gEl.style.transformOrigin).toBe('0% 0%')
+      expect(gEl.style.width).toBe('200px')
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('resizing from the N handle commits only the group box', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
     const sent: Array<{ type: string; objects?: Array<{ id: string; rect: Rect }> }> = []
@@ -442,16 +546,12 @@ it('resizing a group scales member rects around the fixed corner (batched commit
       const commit = sent.filter((m) => m.type === 'toolback:commit').at(-1) as unknown as {
         objects: Array<{ id: string; rect: Rect }>
       }
-      const byId = Object.fromEntries(commit.objects.map((o) => [o.id, o.rect]))
-      // ghost: y 100→164 (8px snap), h 100→36 (fy 0.36, fx 1), fixed edge = bottom (200)
-      expect(byId[groupId]).toEqual({ x: 100, y: 164, w: 200, h: 36 })
-      expect(byId[c1]).toEqual({ x: 100, y: 164, w: 100, h: 18 })
-      expect(byId[c2]).toEqual({ x: 200, y: 182, w: 100, h: 18 })
-      for (const id of [groupId, c1, c2]) {
-        const r = byId[id]!
-        expect(r.y).toBeGreaterThanOrEqual(160)
-        expect(r.y + r.h).toBeLessThanOrEqual(200)
-      }
+      // ghost: y 100→164 (8px snap), h 100→36 — only the group is committed
+      expect(commit.objects).toHaveLength(1)
+      expect(commit.objects[0]!.id).toBe(groupId)
+      expect(commit.objects[0]!.rect).toEqual({ x: 100, y: 164, w: 200, h: 36 })
+      void c1
+      void c2
     } finally {
       unpatchRects()
       cleanup()
@@ -470,7 +570,6 @@ it('resizing a group scales member rects around the fixed corner (batched commit
       const book: Book = {
         id: 'bg',
         title: 'G',
-        canvas: { desktop: { width: 800, height: 600 } },
         backgrounds: [BG],
         pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [group] }],
       }
@@ -579,7 +678,6 @@ describe('nested group drill-in', () => {
     return {
       id: 'bn',
       title: 'N',
-      canvas: { desktop: { width: 800, height: 600 } },
       backgrounds: [BG],
       pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [outer] }],
     }
@@ -779,7 +877,6 @@ describe('nested group drill-in', () => {
       const book: Book = {
         id: 'bg',
         title: 'G',
-        canvas: { desktop: { width: 800, height: 600 } },
         backgrounds: [BG],
         pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [group] }],
       }
@@ -810,7 +907,6 @@ describe('nested group drill-in', () => {
       const book: Book = {
         id: 'bg',
         title: 'G',
-        canvas: { desktop: { width: 800, height: 600 } },
         backgrounds: [
           {
             id: 'bg1',
@@ -967,6 +1063,21 @@ function reads(): unknown {
 }
 
 describe('design mode — clip indicators', () => {
+  // these tests assert against an 800×600 page, which is now the measured
+  // viewport rather than a stored breakpoint size
+  let prevW = 0
+  let prevH = 0
+  beforeEach(() => {
+    prevW = window.innerWidth
+    prevH = window.innerHeight
+    window.innerWidth = 800
+    window.innerHeight = 600
+  })
+  afterEach(() => {
+    window.innerWidth = prevW
+    window.innerHeight = prevH
+  })
+
   it('draws a clip outline for objects sticking out of the page', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
@@ -976,27 +1087,23 @@ describe('design mode — clip indicators', () => {
     // geometry from the inline styles the renderer sets (position/size)
     const real = HTMLElement.prototype.getBoundingClientRect
     HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
-      const s = (this as HTMLStyleElement & HTMLElement).style ?? ({} as CSSStyleDeclaration)
-      const l = parseFloat(s.left ?? '') || 0
-      const t = parseFloat(s.top ?? '') || 0
-      const w = parseFloat(s.width ?? '') || (this.classList?.contains?.('tb-page') ? 800 : 0)
-      const h = parseFloat(s.height ?? '') || (this.classList?.contains?.('tb-page') ? 600 : 0)
-      return { left: l, top: t, width: w, height: h } as DOMRect
+      return styleRectOf(this)
     }
 
     try {
-      // an 800x600 book with one object partially off the bottom edge
+      // a fixed 800x600 dialog with one object partially off both edges. A
+      // fluid page would instead grow to contain it (covered in background.test).
       const book = {
         id: 'b',
         title: 't',
-        canvas: { desktop: { width: 800, height: 600 } },
         backgrounds: [],
         pages: [
           {
             id: 'p',
             name: 'p',
+            size: { width: 800, height: 600 },
             objects: [
-              { id: 'o', name: 'o', control: 'button', rect: { x: 100, y: 580, w: 1200, h: 100 }, props: { text: 'x' }, on: {} },
+              { id: 'o', name: 'o', control: 'button', x: { mode: 'left', left: 100, width: 1200 }, y: { mode: 'top', top: 580, height: 100 }, props: { text: 'x' }, on: {} },
             ],
           },
         ],
@@ -1011,7 +1118,7 @@ describe('design mode — clip indicators', () => {
       const clip = root.querySelector<HTMLElement>('.tb-clip')
       expect(clip).not.toBeNull()
       expect(clip!.style.display).toBe('block')
-      // clip box = the visible overlap (clamped to the page, width 800-100)
+      // clip box = the visible overlap (clamped to the fixed page)
       expect(parseInt(clip!.style.width)).toBe(700)
       expect(parseInt(clip!.style.height)).toBe(20)
     } finally {
@@ -1028,12 +1135,7 @@ describe('design mode — clip indicators', () => {
 
     const real = HTMLElement.prototype.getBoundingClientRect
     HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
-      const s = (this as HTMLElement).style ?? ({} as CSSStyleDeclaration)
-      const l = parseFloat(s.left ?? '') || 0
-      const t = parseFloat(s.top ?? '') || 0
-      const w = parseFloat(s.width ?? '') || (this.classList?.contains?.('tb-page') ? 800 : 0)
-      const h = parseFloat(s.height ?? '') || (this.classList?.contains?.('tb-page') ? 600 : 0)
-      return { left: l, top: t, width: w, height: h } as DOMRect
+      return styleRectOf(this)
     }
 
     try {
@@ -1041,7 +1143,6 @@ describe('design mode — clip indicators', () => {
       const book = {
         id: 'b',
         title: 't',
-        canvas: { desktop: { width: 800, height: 600 } },
         backgrounds: [],
         pages: [
           {
@@ -1052,10 +1153,10 @@ describe('design mode — clip indicators', () => {
                 id: 'o',
                 name: 'o',
                 control: 'button',
-                rect: { x: 700, y: 100, w: 100, h: 50 },
+                x: { mode: 'right', right: 0, width: 100 },
+                y: { mode: 'bottom', bottom: 450, height: 50 },
                 props: { text: 'x' },
                 on: {},
-                fit: { x: 'right', y: 'bottom' },
               },
             ],
           },
@@ -1097,12 +1198,7 @@ describe('design mode — clip indicators', () => {
 
     const real = HTMLElement.prototype.getBoundingClientRect
     HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
-      const s = (this as HTMLElement).style ?? ({} as CSSStyleDeclaration)
-      const l = parseFloat(s.left ?? '') || 0
-      const t = parseFloat(s.top ?? '') || 0
-      const w = parseFloat(s.width ?? '') || (this.classList?.contains?.('tb-page') ? 800 : 0)
-      const h = parseFloat(s.height ?? '') || (this.classList?.contains?.('tb-page') ? 600 : 0)
-      return { left: l, top: t, width: w, height: h } as DOMRect
+      return styleRectOf(this)
     }
 
     try {
@@ -1110,7 +1206,6 @@ describe('design mode — clip indicators', () => {
       const book = {
         id: 'b',
         title: 't',
-        canvas: { desktop: { width: 800, height: 600 } },
         backgrounds: [],
         pages: [
           {
@@ -1121,10 +1216,10 @@ describe('design mode — clip indicators', () => {
                 id: 'o',
                 name: 'o',
                 control: 'button',
-                rect: { x: 320, y: 100, w: 160, h: 50 },
+                x: { mode: 'center', width: 160 },
+                y: { mode: 'bottom', bottom: 450, height: 50 },
                 props: { text: 'x' },
                 on: {},
-                fit: { x: 'center', y: 'bottom' },
               },
             ],
           },
@@ -1159,28 +1254,22 @@ describe('design mode — clip indicators', () => {
 
     const real = HTMLElement.prototype.getBoundingClientRect
     HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
-      const s = (this as HTMLElement).style ?? ({} as CSSStyleDeclaration)
-      const l = parseFloat(s.left ?? '') || 0
-      const t = parseFloat(s.top ?? '') || 0
-      const w = parseFloat(s.width ?? '') || (this.classList?.contains?.('tb-page') ? 800 : 0)
-      const h = parseFloat(s.height ?? '') || (this.classList?.contains?.('tb-page') ? 600 : 0)
-      return { left: l, top: t, width: w, height: h } as DOMRect
+      return styleRectOf(this)
     }
 
     try {
       const book = {
         id: 'b',
         title: 't',
-        canvas: { desktop: { width: 800, height: 600 } },
         backgrounds: [],
         pages: [
           {
             id: 'p',
             name: 'p',
             objects: [
-              { id: 'a', name: 'a', control: 'button', rect: { x: 700, y: 40, w: 100, h: 50 }, props: { text: 'a' }, on: {}, fit: { x: 'right' } },
-              { id: 'b', name: 'b', control: 'label', rect: { x: 40, y: 500, w: 200, h: 40 }, props: { text: 'b' }, on: {}, fit: { y: 'bottom' } },
-              { id: 'c', name: 'c', control: 'button', rect: { x: 300, y: 160, w: 100, h: 50 }, props: { text: 'c' }, on: {} }, // default — no spring
+              { id: 'a', name: 'a', control: 'button', x: { mode: 'right', right: 0, width: 100 }, y: { mode: 'top', top: 40, height: 50 }, props: { text: 'a' }, on: {} },
+              { id: 'b', name: 'b', control: 'label', x: { mode: 'left', left: 40, width: 200 }, y: { mode: 'bottom', bottom: 60, height: 40 }, props: { text: 'b' }, on: {} },
+              { id: 'c', name: 'c', control: 'button', x: { mode: 'left', left: 300, width: 100 }, y: { mode: 'top', top: 160, height: 50 }, props: { text: 'c' }, on: {} }, // default — no spring
             ],
           },
         ],
@@ -1197,12 +1286,11 @@ describe('design mode — clip indicators', () => {
       const springs = Array.from(hint!.querySelectorAll<SVGElement>('svg.tb-fithint-spring'))
       const stubs = Array.from(hint!.querySelectorAll<HTMLElement>('.tb-fithint-line'))
       const anchors = Array.from(hint!.querySelectorAll<HTMLElement>('.tb-fithint-anchor'))
-      // a-right (flush with the page edge): coil → stub + anchor
-      // b-bottom: coil + anchor
+      // every object draws a spring for each edge it follows:
+      // a → flush right stub + top spring; b → left + bottom; c → left + top
       expect(stubs.length).toBe(1)
-      expect(springs.length).toBe(1)
-      expect(anchors.length).toBe(2)
-      // c (default) contributes nothing
+      expect(springs.length).toBe(5)
+      expect(anchors.length).toBe(6)
     } finally {
       HTMLElement.prototype.getBoundingClientRect = real
       cleanup()
@@ -1225,14 +1313,13 @@ describe('design mode — clip indicators', () => {
       const book = {
         id: 'b',
         title: 't',
-        canvas: { desktop: { width: 800, height: 600 } },
         backgrounds: [],
         pages: [
           {
             id: 'p',
             name: 'p',
             objects: [
-              { id: 'a', name: 'a', control: 'button', rect: { x: 700, y: 40, w: 100, h: 50 }, props: { text: 'a' }, on: {}, fit: { x: 'right' } },
+              { id: 'a', name: 'a', control: 'button', x: { mode: 'right', right: 0, width: 100 }, y: { mode: 'top', top: 40, height: 50 }, props: { text: 'a' }, on: {} },
             ],
           },
         ],
@@ -1255,26 +1342,20 @@ describe('design mode — clip indicators', () => {
 
     const real = HTMLElement.prototype.getBoundingClientRect
     HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
-      const s = (this as HTMLElement).style ?? ({} as CSSStyleDeclaration)
-      const l = parseFloat(s.left ?? '') || 0
-      const t = parseFloat(s.top ?? '') || 0
-      const w = parseFloat(s.width ?? '') || (this.classList?.contains?.('tb-page') ? 800 : 0)
-      const h = parseFloat(s.height ?? '') || (this.classList?.contains?.('tb-page') ? 600 : 0)
-      return { left: l, top: t, width: w, height: h } as DOMRect
+      return styleRectOf(this)
     }
 
     try {
       const book = {
         id: 'b',
         title: 't',
-        canvas: { desktop: { width: 800, height: 600 } },
         backgrounds: [],
         pages: [
           {
             id: 'p',
             name: 'p',
             objects: [
-              { id: 'o', name: 'o', control: 'button', rect: { x: 320, y: 276, w: 160, h: 48 }, props: { text: 'x' }, on: {}, fit: { x: 'center', y: 'center' } },
+              { id: 'o', name: 'o', control: 'button', x: { mode: 'center', width: 160 }, y: { mode: 'center', height: 48 }, props: { text: 'x' }, on: {} },
             ],
           },
         ],
@@ -1312,12 +1393,7 @@ describe('glue-spring hint modes', () => {
     cleanup = listenForEditor(root, () => {})
     real = HTMLElement.prototype.getBoundingClientRect
     HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
-      const s = (this as HTMLElement).style ?? ({} as CSSStyleDeclaration)
-      const l = parseFloat(s.left ?? '') || 0
-      const t = parseFloat(s.top ?? '') || 0
-      const w = parseFloat(s.width ?? '') || (this.classList?.contains?.('tb-page') ? 800 : 0)
-      const h = parseFloat(s.height ?? '') || (this.classList?.contains?.('tb-page') ? 600 : 0)
-      return { left: l, top: t, width: w, height: h } as DOMRect
+      return styleRectOf(this)
     }
   })
 
@@ -1333,16 +1409,15 @@ describe('glue-spring hint modes', () => {
     return {
       id: 'b',
       title: 't',
-      canvas: { desktop: { width: 800, height: 600 } },
       backgrounds: [],
       pages: [
         {
           id: 'p',
           name: 'p',
           objects: [
-            { id: 'a', name: 'a', control: 'button', rect: { x: 700, y: 40, w: 100, h: 50 }, props: { text: 'a' }, on: {}, fit: { x: 'right' } },
-            { id: 'b', name: 'b', control: 'label', rect: { x: 40, y: 500, w: 200, h: 40 }, props: { text: 'b' }, on: {}, fit: { y: 'bottom' } },
-            { id: 'c', name: 'c', control: 'button', rect: { x: 300, y: 160, w: 100, h: 50 }, props: { text: 'c' }, on: {} },
+            { id: 'a', name: 'a', control: 'button', x: { mode: 'right', right: 0, width: 100 }, y: { mode: 'top', top: 40, height: 50 }, props: { text: 'a' }, on: {} },
+            { id: 'b', name: 'b', control: 'label', x: { mode: 'left', left: 40, width: 200 }, y: { mode: 'bottom', bottom: 60, height: 40 }, props: { text: 'b' }, on: {} },
+            { id: 'c', name: 'c', control: 'button', x: { mode: 'left', left: 300, width: 100 }, y: { mode: 'top', top: 160, height: 50 }, props: { text: 'c' }, on: {} },
           ],
         },
       ],
@@ -1368,8 +1443,8 @@ describe('glue-spring hint modes', () => {
 
   it('selected mode draws springs only for the selected object', () => {
     load({ fitHints: 'selected', selection: ['a'] })
-    // only a's flush right spring: stub + anchor, no coil; b contributes nothing
-    expect(counts()).toEqual({ stubs: 1, springs: 0, anchors: 1 })
+    // a: flush right stub + a top spring
+    expect(counts()).toEqual({ stubs: 1, springs: 1, anchors: 2 })
   })
 
   it('selected mode with an empty selection draws nothing', () => {
@@ -1377,23 +1452,76 @@ describe('glue-spring hint modes', () => {
     expect(root.querySelector('.tb-fithint')).toBeNull()
   })
 
-  it('explicit "all" draws springs for every glued object', () => {
+  it('explicit "all" draws springs for every edge of every object', () => {
     load({ fitHints: 'all' })
-    expect(counts()).toEqual({ stubs: 1, springs: 1, anchors: 2 })
+    expect(counts()).toEqual({ stubs: 1, springs: 5, anchors: 6 })
+  })
+
+  it('labels each spring with the edge word and its pixel distance', () => {
+    load({ fitHints: 'all' })
+    const labels = [...root.querySelectorAll<HTMLElement>('.tb-fithint-label')].map((e) => e.textContent)
+    expect(labels).toEqual(
+      expect.arrayContaining(['top 40', 'left 40', 'bottom 60', 'left 300', 'top 160']),
+    )
+    // a flush (0 px) distance is the default that skipZeroLabels hides
+    expect(labels).not.toContain('right 0')
+  })
+
+  it('draws springs inside groups, measured against the group box', () => {
+    const book = {
+      id: 'b',
+      title: 't',
+      backgrounds: [],
+      pages: [
+        {
+          id: 'p',
+          name: 'p',
+          objects: [
+            {
+              id: 'g',
+              name: 'g',
+              control: 'group',
+              x: { mode: 'left', left: 100, width: 200 },
+              y: { mode: 'top', top: 100, height: 100 },
+              props: {},
+              on: {},
+              children: [
+                {
+                  id: 'm',
+                  name: 'm',
+                  control: 'button',
+                  x: { mode: 'left', left: 10, width: 40 },
+                  y: { mode: 'top', top: 10, height: 20 },
+                  props: { text: 'm' },
+                  on: {},
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    } as unknown as Book
+    window.dispatchEvent(
+      new MessageEvent('message', { data: { type: 'toolback:load', book, design: true } }),
+    )
+    const labels = [...root.querySelectorAll<HTMLElement>('.tb-fithint-label')].map((e) => e.textContent)
+    // the member's distances are to the group box (10), not the page (110)
+    expect(labels).toContain('left 10')
+    expect(labels).toContain('top 10')
+    expect(labels).not.toContain('left 110')
   })
 
   it('a later load with a new selection swaps which object is shown', () => {
     load({ fitHints: 'selected', selection: ['a'] })
-    expect(counts()).toEqual({ stubs: 1, springs: 0, anchors: 1 })
+    expect(counts()).toEqual({ stubs: 1, springs: 1, anchors: 2 })
     load({ fitHints: 'selected', selection: ['b'] })
-    expect(counts()).toEqual({ stubs: 0, springs: 1, anchors: 1 })
+    expect(counts()).toEqual({ stubs: 0, springs: 2, anchors: 2 })
   })
 
-  function loadBook(fit: Record<string, string>): void {
+  function loadBook(x: XEdge, y: YEdge): void {
     const book = {
       id: 'b',
       title: 't',
-      canvas: { desktop: { width: 800, height: 600 } },
       backgrounds: [],
       pages: [
         {
@@ -1404,10 +1532,10 @@ describe('glue-spring hint modes', () => {
               id: 'o',
               name: 'o',
               control: 'button',
-              rect: { x: 320, y: 276, w: 160, h: 48 },
+              x,
+              y,
               props: { text: 'x' },
               on: {},
-              fit,
             },
           ],
         },
@@ -1428,7 +1556,7 @@ describe('glue-spring hint modes', () => {
   })
 
   it('center draws plain straight connector lines with circle anchors and no arrows', () => {
-    loadBook({ x: 'center', y: 'center' })
+    loadBook({ mode: 'center', width: 160 }, { mode: 'center', height: 48 })
     const springs = root.querySelectorAll('svg.tb-fithint-spring--center')
     expect(springs.length).toBe(4) // two per axis
     expect(root.querySelectorAll('.tb-fithint-anchor--center').length).toBe(4)
@@ -1438,27 +1566,225 @@ describe('glue-spring hint modes', () => {
     expect((d.match(/ L /g) ?? []).length).toBe(1)
   })
 
-  it('stretch draws dashed edge springs from both sides (scaled)', () => {
-    loadBook({ x: 'stretch', y: 'stretch' })
+  it('follows-both draws solid edge springs from both sides', () => {
+    loadBook({ mode: 'both', left: 100, right: 100 }, { mode: 'both', top: 100, bottom: 100 })
     expect(root.querySelectorAll('svg.tb-fithint-spring--edge').length).toBe(4)
-    expect(root.querySelectorAll('svg.tb-fithint-spring--scaled').length).toBe(4)
-    expect(root.querySelectorAll('svg.tb-fithint-spring--fixed').length).toBe(0)
+    expect(root.querySelectorAll('svg.tb-fithint-spring--fixed').length).toBe(4)
     expect(root.querySelectorAll('.tb-fithint-anchor--edge').length).toBe(4)
     expect(root.querySelectorAll('.tb-fithint-arrow').length).toBeGreaterThan(0)
   })
 
-  it('fill draws solid edge springs from both sides (fixed)', () => {
-    loadBook({ x: 'fill', y: 'fill' })
-    expect(root.querySelectorAll('svg.tb-fithint-spring--edge').length).toBe(4)
-    expect(root.querySelectorAll('svg.tb-fithint-spring--fixed').length).toBe(4)
-    expect(root.querySelectorAll('svg.tb-fithint-spring--scaled').length).toBe(0)
+  it('right + top draw solid edge springs with end anchors', () => {
+    loadBook({ mode: 'right', right: 100, width: 160 }, { mode: 'top', top: 276, height: 48 })
+    expect(root.querySelectorAll('svg.tb-fithint-spring--edge').length).toBe(2)
+    expect(root.querySelectorAll('svg.tb-fithint-spring--fixed').length).toBe(2)
+    expect(root.querySelectorAll('.tb-fithint-anchor--edge').length).toBe(2)
+  })
+})
+
+describe('spring display options', () => {
+  function opts(patch: Partial<FitHintOptions>): FitHintOptions {
+    return { ...DEFAULT_FIT_HINTS, ...patch }
+  }
+
+  function flatBook(objects: PageObject[]): Book {
+    return {
+      id: 'b',
+      title: 't',
+      backgrounds: [BG],
+      pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects }],
+    }
+  }
+
+  function button(
+    id: string,
+    x: PageObject['x'],
+    y: PageObject['y'],
+  ): PageObject {
+    return { id, name: id, control: 'button', x, y, props: { text: id }, on: {} }
+  }
+
+  function mount(
+    book: Book,
+    fitHints: FitHintOptions,
+    selection: string[] = [],
+  ): { root: HTMLElement; cleanup: () => void } {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const cleanup = listenForEditor(root, () => {})
+    // styleRectOf resolves every constraint shape from the inline styles, so
+    // right/bottom and the page box measure correctly (happy-dom has no layout)
+    if (!savedGBCR) savedGBCR = HTMLElement.prototype.getBoundingClientRect
+    HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+      return styleRectOf(this)
+    }
+    window.dispatchEvent(
+      new MessageEvent('message', { data: { type: 'toolback:load', book, design: true, fitHints, selection } }),
+    )
+    return { root, cleanup }
+  }
+
+  function labelEls(root: HTMLElement): HTMLElement[] {
+    return [...root.querySelectorAll<HTMLElement>('.tb-fithint-label')]
+  }
+
+  function labels(root: HTMLElement): string[] {
+    return labelEls(root).map((e) => e.textContent ?? '')
+  }
+
+  it('labels:false draws the springs but no captions', () => {
+    const book = flatBook([
+      button('o', { mode: 'left', left: 40, width: 100 }, { mode: 'top', top: 40, height: 50 }),
+    ])
+    const { root, cleanup } = mount(book, opts({ labels: false }))
+    try {
+      expect(labels(root)).toHaveLength(0)
+      expect(root.querySelectorAll('svg.tb-fithint-spring, .tb-fithint-line').length).toBeGreaterThan(0)
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
   })
 
-  it('pin-right draws a solid edge spring with an end anchor', () => {
-    loadBook({ x: 'pin-right' })
-    expect(root.querySelectorAll('svg.tb-fithint-spring--edge').length).toBe(1)
-    expect(root.querySelectorAll('svg.tb-fithint-spring--fixed').length).toBe(1)
-    expect(root.querySelectorAll('.tb-fithint-anchor--edge').length).toBe(1)
+  it('lengths:false keeps the edge word but drops the pixel number', () => {
+    const book = flatBook([
+      button('o', { mode: 'left', left: 40, width: 100 }, { mode: 'top', top: 40, height: 50 }),
+    ])
+    const { root, cleanup } = mount(book, opts({ lengths: false }))
+    try {
+      expect(labels(root).sort()).toEqual(['left', 'top'])
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('nonDefaultOnly hides objects that are only default left + top', () => {
+    const book = flatBook([
+      button('a', { mode: 'left', left: 40, width: 100 }, { mode: 'top', top: 40, height: 50 }),
+      button('b', { mode: 'right', right: 100, width: 100 }, { mode: 'bottom', bottom: 60, height: 50 }),
+    ])
+    const { root, cleanup } = mount(book, opts({ nonDefaultOnly: true }))
+    try {
+      const text = labels(root)
+      expect(text).toEqual(expect.arrayContaining(['right 100', 'bottom 60']))
+      expect(text).not.toContain('left 40')
+      expect(text).not.toContain('top 40')
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('hiding member springs (groupMembers / nonDefaultOnly) keeps the group outline', () => {
+    const member = button('m', { mode: 'left', left: 7, width: 40 }, { mode: 'top', top: 9, height: 20 })
+    const group = createGroup('g', { x: 100, y: 100, w: 200, h: 100 }, [member])
+    const book = flatBook([group])
+
+    const on = mount(book, opts({ groupMembers: true }))
+    try {
+      expect(labels(on.root)).toEqual(expect.arrayContaining(['left 7', 'top 9', 'left 100', 'top 100']))
+      const outlines = [...on.root.querySelectorAll<HTMLElement>('.tb-group-outline')].filter(
+        (e) => e.style.display === 'block',
+      )
+      expect(outlines).toHaveLength(1)
+    } finally {
+      unpatchRects()
+      on.cleanup()
+      on.root.remove()
+    }
+
+    // both display filters hide member springs; neither may hide the group box
+    for (const patch of [{ groupMembers: false }, { nonDefaultOnly: true }]) {
+      const off = mount(book, opts(patch))
+      try {
+        expect(labels(off.root)).not.toContain('left 7')
+        expect(labels(off.root)).not.toContain('top 9')
+        const outlines = [...off.root.querySelectorAll<HTMLElement>('.tb-group-outline')].filter(
+          (e) => e.style.display === 'block',
+        )
+        expect(outlines).toHaveLength(1)
+      } finally {
+        unpatchRects()
+        off.cleanup()
+        off.root.remove()
+      }
+    }
+  })
+
+  it('skipZeroLabels drops flush (0 px) captions but keeps the spring', () => {
+    const book = flatBook([
+      button('o', { mode: 'left', left: 0, width: 100 }, { mode: 'top', top: 10, height: 50 }),
+    ])
+    const show = mount(book, opts({ skipZeroLabels: false }))
+    try {
+      expect(labels(show.root)).toContain('left 0')
+    } finally {
+      unpatchRects()
+      show.cleanup()
+      show.root.remove()
+    }
+
+    const skip = mount(book, opts({ skipZeroLabels: true }))
+    try {
+      expect(labels(skip.root)).not.toContain('left 0')
+      expect(skip.root.querySelectorAll('.tb-fithint-anchor').length).toBeGreaterThan(0)
+    } finally {
+      unpatchRects()
+      skip.cleanup()
+      skip.root.remove()
+    }
+  })
+
+  it('moves a group with its members’ springs following the ghost (no lag)', () => {
+    const member = button('m', { mode: 'left', left: 10, width: 40 }, { mode: 'top', top: 10, height: 20 })
+    const group = createGroup('g', { x: 40, y: 40, w: 200, h: 100 }, [member])
+    const book = flatBook([group])
+    const { root, cleanup } = mount(book, opts({}))
+    const at = (type: string, x: number, y: number): void => {
+      overlayOf(root).dispatchEvent(new MouseEvent(type, { clientX: x, clientY: y, button: 0, bubbles: true }))
+    }
+    const stubLefts = (): number[] =>
+      [...root.querySelectorAll<HTMLElement>('.tb-fithint-line')].map((e) => parseFloat(e.style.left))
+    try {
+      // the member's short left spring is a stub at the group's left edge (40)
+      expect(stubLefts()).toContain(40)
+
+      // grab the group's empty area (the member sits at page 50,50..90,70) and
+      // drag in two steps — a member's cached rect must track the *cumulative*
+      // ghost, not compound the delta on each move
+      at('pointerdown', 150, 120)
+      at('pointermove', 174, 144) // +24/+24
+      at('pointermove', 198, 168) // +48/+48 total
+      expect(stubLefts()).toContain(88)
+      expect(stubLefts()).not.toContain(112)
+      at('pointerup', 198, 168)
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('clamps a flush page-edge caption back inside the page box', () => {
+    const book = flatBook([
+      button('o', { mode: 'left', left: 40, width: 100 }, { mode: 'top', top: 0, height: 50 }),
+    ])
+    const { root, cleanup } = mount(book, opts({ skipZeroLabels: false }))
+    try {
+      const top = labelEls(root).find((e) => e.textContent === 'top 0')
+      expect(top).toBeTruthy()
+      // a 0-length vertical spring would otherwise sit on y=0; the clamp
+      // pushes it below the page's top edge
+      expect(parseFloat(top!.style.top)).toBeGreaterThanOrEqual(8)
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
   })
 })
 
@@ -1515,6 +1841,146 @@ describe('design mode — viewer scrolling', () => {
       overlayOf(root).dispatchEvent(ev)
       // not cancelled → the canvas (or page) keeps the scroll
       expect(ev.defaultPrevented).toBe(false)
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+})
+
+describe('group outlines', () => {
+  const BTN = { x: 55, y: 75 }
+
+  function nestedBook(): Book {
+    const btn = createObject('button', 'btn', { x: 10, y: 30, w: 40, h: 20 })
+    const inner = createGroup('inner', { x: 40, y: 40, w: 200, h: 100 }, [btn])
+    const outer = createGroup('outer', { x: 0, y: 0, w: 300, h: 300 }, [inner])
+    return {
+      id: 'bn',
+      title: 'N',
+      backgrounds: [BG],
+      pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [outer] }],
+    }
+  }
+
+  function loadBook(root: HTMLElement, book: Book, extra: Record<string, unknown> = {}): void {
+    patchRects()
+    window.dispatchEvent(
+      new MessageEvent('message', { data: { type: 'toolback:load', book, design: true, ...extra } }),
+    )
+  }
+
+  function dbl(root: HTMLElement, x = BTN.x, y = BTN.y): void {
+    overlayOf(root).dispatchEvent(new MouseEvent('dblclick', { clientX: x, clientY: y, bubbles: true }))
+  }
+
+  function outlineIds(root: HTMLElement): string[] {
+    return Array.from(root.querySelectorAll<HTMLElement>('.tb-group-outline'))
+      .filter((el) => el.style.display === 'block')
+      .map((el) => el.dataset.tbGroupOutlineId!)
+      .sort()
+  }
+
+  it('computes the outline set from drill path and spring parents, minus selected groups', () => {
+    expect(
+      groupOutlineIds({
+        drillPath: ['outer', 'inner'],
+        selected: [],
+        hintParentIds: [],
+        mode: 'off',
+      }),
+    ).toEqual(['outer', 'inner'])
+    expect(
+      groupOutlineIds({ drillPath: [], selected: ['grp'], hintParentIds: ['grp'], mode: 'all' }),
+    ).toEqual([])
+    expect(
+      groupOutlineIds({ drillPath: [], selected: [], hintParentIds: ['g1'], mode: 'off' }),
+    ).toEqual([])
+  })
+
+  it('outlines every drilled ancestor, but never the selected group or leaf', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const sent: Array<{ type: string; ids?: string[] }> = []
+    const cleanup = listenForEditor(root, (m) => sent.push(m as never))
+    try {
+      const book = nestedBook()
+      const outer = book.pages[0]!.objects[0]!
+      const inner = outer.children![0]!
+      const btn = inner.children![0]!
+
+      // hints off so only the drill context can drive outlines
+      loadBook(root, book, { fitHints: 'off' })
+      expect(outlineIds(root)).toEqual([])
+
+      dbl(root) // selects the outer group: selected groups get the loud box
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([outer.id])
+      expect(outlineIds(root)).toEqual([])
+
+      dbl(root) // descends to the inner group: outer stays quietly outlined
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([inner.id])
+      expect(outlineIds(root)).toEqual([outer.id])
+
+      dbl(root) // descends to the leaf: both ancestor groups outlined
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([btn.id])
+      expect(outlineIds(root)).toEqual([inner.id, outer.id].sort())
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('outlines groups whose members have springs showing, with no selection', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const cleanup = listenForEditor(root, () => {})
+    try {
+      const book = nestedBook()
+      const outer = book.pages[0]!.objects[0]!
+      const inner = outer.children![0]!
+
+      loadBook(root, book) // default All hints
+      expect(outlineIds(root)).toEqual([inner.id, outer.id].sort())
+
+      // the outline tracks the group's box
+      const box = root.querySelector<HTMLElement>(
+        `.tb-group-outline[data-tb-group-outline-id="${inner.id}"]`,
+      )!
+      expect(box.style.left).toBe('40px')
+      expect(box.style.top).toBe('40px')
+      expect(box.style.width).toBe('200px')
+      expect(box.style.height).toBe('100px')
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('drops the outline for a selected group, and shows none when hints are off', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const sent: Array<{ type: string; ids?: string[] }> = []
+    const cleanup = listenForEditor(root, (m) => sent.push(m as never))
+    try {
+      const book = nestedBook()
+      const outer = book.pages[0]!.objects[0]!
+      const inner = outer.children![0]!
+
+      loadBook(root, book) // All: both groups outlined
+      expect(outlineIds(root)).toEqual([inner.id, outer.id].sort())
+
+      // click outer's empty lower area (below the inner group) to select it
+      pointer(root, 'pointerdown', 150, 250)
+      pointer(root, 'pointerup', 150, 250)
+      expect(selectionMsgs(sent).at(-1)!.ids).toEqual([outer.id])
+      expect(outlineIds(root)).toEqual([inner.id])
+
+      // hints off: selection still drops its outline, and the rest clear too
+      loadBook(root, book, { fitHints: 'off', selection: [outer.id] })
+      expect(outlineIds(root)).toEqual([])
     } finally {
       unpatchRects()
       cleanup()

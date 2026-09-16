@@ -8,7 +8,6 @@ describe('collectStoreKeys', () => {
     const book: Book = {
       id: 'b',
       title: 't',
-      canvas: { desktop: { width: 10, height: 10 } },
       backgrounds: [BG],
       pages: [
         {
@@ -21,7 +20,7 @@ describe('collectStoreKeys', () => {
               id: 'o1',
               name: 'a',
               control: 'label',
-              rect: { x: 0, y: 0, w: 1, h: 1 },
+              x: { mode: 'left', left: 0, width: 1 }, y: { mode: 'top', top: 0, height: 1 },
               props: { text: 'Score: {{score}} of {{max}}' },
               on: { click: "store.set('clicked', true); store.set('score', 1)" },
             },
@@ -43,7 +42,6 @@ describe('collectStoreKeys', () => {
     const book: Book = {
       id: 'b',
       title: 't',
-      canvas: { desktop: { width: 10, height: 10 } },
       backgrounds: [BG],
       pages: [
         {
@@ -62,7 +60,6 @@ describe('collectStoreKeys', () => {
     const book: Book = {
       id: 'b',
       title: 't',
-      canvas: { desktop: { width: 10, height: 10 } },
       backgrounds: [BG],
       store: [
         ['total', 0],

@@ -14,42 +14,87 @@ export const CONTROL_KINDS = [
 ] as const
 export type ControlKind = (typeof CONTROL_KINDS)[number]
 
-export const BREAKPOINTS = ['desktop', 'tablet', 'mobile'] as const
-export type Breakpoint = (typeof BREAKPOINTS)[number]
-
 /**
- * Responsive ("glue") modes. The stored desktop rect is the reference; when a
- * breakpoint has no explicit rect of its own, the renderer derives one from
- * the desktop rect + the fit spec against the page sizes.
+ * Edge constraints: a control stores the distance(s) it keeps from the page
+ * edges it follows, like CSS `left`/`right`/`top`/`bottom`.
  *
  * Horizontal:
- *   free     x stays at the authored px (the default — absolute from left)
- *   left     x scales with the page: x·(W/W₀) — the left ratio is preserved
- *   center   x = (W − w)/2
- *   right    the gap to the right edge scales: x = (r.x+r.w)·(W/W₀) − w
- *   stretch  both margins scale: x = r.x·(W/W₀), w = r.w·(W/W₀) — a true scale
- *   pin-right the right-margin gap stays a constant px: x = r.x + (W − W₀)
- *   fill     both margins stay constant px (the size grows): x = r.x,
- *            w = r.w + (W − W₀) — the fixed-gutter content panel / Dock-Fill
+ *   left   keeps `left` px from the left edge and its own width
+ *   right  keeps `right` px from the right edge and its own width
+ *   both   keeps both margins, so the width grows/shrinks with the page
+ *   center keeps its width and stays in the middle
  *
- * Vertical mirrors with free / top / center / bottom / stretch / pin-bottom /
- * fill on y/h.
- *
- * `left`/`right`/`top`/`bottom`/`stretch` keep the VISUAL PROPORTION of the
- * anchored margin (it scales with the page); `pin-*` and `fill` keep a
- * CONSTANT-pixel margin.
+ * Vertical mirrors with top / bottom / both / center on the height. Member
+ * objects constrain against their group box instead of the page.
  */
-export const FIT_H_MODES = ['free', 'left', 'center', 'right', 'stretch', 'pin-right', 'fill'] as const
-export const FIT_V_MODES = ['free', 'top', 'center', 'bottom', 'stretch', 'pin-bottom', 'fill'] as const
-export type FitHMode = (typeof FIT_H_MODES)[number]
-export type FitVMode = (typeof FIT_V_MODES)[number]
-export interface FitSpec {
-  x?: FitHMode
-  y?: FitVMode
+export type XEdge =
+  | { mode: 'left'; left: number; width: number }
+  | { mode: 'right'; right: number; width: number }
+  | { mode: 'both'; left: number; right: number }
+  | { mode: 'center'; width: number }
+
+export type YEdge =
+  | { mode: 'top'; top: number; height: number }
+  | { mode: 'bottom'; bottom: number; height: number }
+  | { mode: 'both'; top: number; bottom: number }
+  | { mode: 'center'; height: number }
+
+export type XEdgeMode = XEdge['mode']
+export type YEdgeMode = YEdge['mode']
+
+/** which objects show edge-spring hints in the editor (persisted UI state) */
+export type FitHintMode = 'all' | 'selected' | 'off'
+
+/** how the edge-spring hints are drawn (the all/sel/off toggle plus its options) */
+export interface FitHintOptions {
+  mode: FitHintMode
+  /** draw the edge-word captions at all */
+  labels: boolean
+  /** include the pixel distance in each caption (`left 198`, not just `left`) */
+  lengths: boolean
+  /** in `all` mode, also draw springs for objects inside groups */
+  groupMembers: boolean
+  /** hide objects whose constraints are the default left + top */
+  nonDefaultOnly: boolean
+  /** omit a caption when its distance rounds to zero (flush with the edge) */
+  skipZeroLabels: boolean
 }
 
-/** which objects show glue-spring hints in the editor (persisted UI state) */
-export type FitHintMode = 'all' | 'selected' | 'off'
+export const DEFAULT_FIT_HINTS: FitHintOptions = {
+  mode: 'all',
+  labels: true,
+  lengths: true,
+  groupMembers: true,
+  nonDefaultOnly: false,
+  skipZeroLabels: true,
+}
+
+const FIT_HINT_MODES: FitHintMode[] = ['all', 'selected', 'off']
+
+/**
+ * Coerce whatever the UI (or an older stored value) hands us into a complete
+ * options object: a bare mode string, the legacy `'1'`/`'0'` values, or a
+ * partial object. Unknown fields fall back to the defaults.
+ */
+export function normalizeFitHints(
+  raw?: FitHintOptions | FitHintMode | string | number | null,
+): FitHintOptions {
+  if (raw === null || raw === undefined || raw === '') return { ...DEFAULT_FIT_HINTS }
+  if (typeof raw === 'number') raw = raw === 0 ? 'off' : 'all'
+  if (typeof raw === 'string') {
+    const mode = raw === '1' ? 'all' : raw === '0' ? 'off' : raw
+    return { ...DEFAULT_FIT_HINTS, mode: FIT_HINT_MODES.includes(mode as FitHintMode) ? (mode as FitHintMode) : 'all' }
+  }
+  const mode = FIT_HINT_MODES.includes(raw.mode) ? raw.mode : DEFAULT_FIT_HINTS.mode
+  return {
+    mode,
+    labels: raw.labels ?? DEFAULT_FIT_HINTS.labels,
+    lengths: raw.lengths ?? DEFAULT_FIT_HINTS.lengths,
+    groupMembers: raw.groupMembers ?? DEFAULT_FIT_HINTS.groupMembers,
+    nonDefaultOnly: raw.nonDefaultOnly ?? DEFAULT_FIT_HINTS.nonDefaultOnly,
+    skipZeroLabels: raw.skipZeroLabels ?? DEFAULT_FIT_HINTS.skipZeroLabels,
+  }
+}
 
 const RectSchema = z.object({
   x: z.number(),
@@ -59,18 +104,32 @@ const RectSchema = z.object({
 })
 export type Rect = z.infer<typeof RectSchema>
 
+const XEdgeSchema: z.ZodType<XEdge> = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('left'), left: z.number(), width: z.number().positive() }),
+  z.object({ mode: z.literal('right'), right: z.number(), width: z.number().positive() }),
+  z.object({ mode: z.literal('both'), left: z.number(), right: z.number() }),
+  z.object({ mode: z.literal('center'), width: z.number().positive() }),
+])
+
+const YEdgeSchema: z.ZodType<YEdge> = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('top'), top: z.number(), height: z.number().positive() }),
+  z.object({ mode: z.literal('bottom'), bottom: z.number(), height: z.number().positive() }),
+  z.object({ mode: z.literal('both'), top: z.number(), bottom: z.number() }),
+  z.object({ mode: z.literal('center'), height: z.number().positive() }),
+])
+
 export interface PageObject {
   id: string
   name: string
   control: ControlKind
-  /** the object's one authored layout; `fit` adapts it to each page size */
-  rect: Rect
+  /** horizontal edge constraint (against the page or the parent group box) */
+  x: XEdge
+  /** vertical edge constraint (against the page or the parent group box) */
+  y: YEdge
   props: Record<string, unknown>
   on: Record<string, string>
-  /** groups only: member objects, positioned relative to the group */
+  /** groups only: member objects, constrained to the group box */
   children?: PageObject[]
-  /** responsive glue: how `rect` adapts at each breakpoint page size */
-  fit?: FitSpec
 }
 
 // recursive schema (groups contain groups) — explicit interface + z.lazy
@@ -79,16 +138,11 @@ const PageObjectSchema: z.ZodType<PageObject, z.ZodTypeDef, unknown> = z.lazy(()
     id: z.string().min(1),
     name: z.string().min(1),
     control: z.enum(CONTROL_KINDS),
-    rect: RectSchema,
+    x: XEdgeSchema,
+    y: YEdgeSchema,
     props: z.record(z.unknown()).default({}),
     on: z.record(z.string()).default({}),
     children: z.array(PageObjectSchema).optional(),
-    fit: z
-      .object({
-        x: z.enum(FIT_H_MODES).optional(),
-        y: z.enum(FIT_V_MODES).optional(),
-      })
-      .optional(),
   }),
 )
 
@@ -97,21 +151,13 @@ export type CanvasSize = z.infer<typeof CanvasSizeSchema>
 
 /**
  * Background: the ToolBook-style shared page resource. Objects live under
- * every member page; `size` overrides the page size per breakpoint (absent
- * breakpoint = book default). Pages no longer carry a fill color — the
- * background paints.
+ * every member page. Pages no longer carry a fill color — the background
+ * paints.
  */
 export interface Background {
   id: string
   name: string
   color: string
-  size?: Partial<Record<Breakpoint, CanvasSize>>
-  /**
-   * "Height fits content" (web page): the page's height derives from its
-   * objects (floored at `size`/book height) at every breakpoint instead of
-   * being fixed. Width is unaffected. The stored height is the minimum.
-   */
-  autoHeight?: boolean
   /** shared functions + backgroundEnter() hook, compiled like a page script */
   script: string
   objects: PageObject[]
@@ -122,14 +168,6 @@ const BackgroundSchema = z.object({
   name: z.string().min(1),
   color: z.string().default('#ffffff'),
   script: z.string().default(''),
-  size: z
-    .object({
-      desktop: CanvasSizeSchema.optional(),
-      tablet: CanvasSizeSchema.optional(),
-      mobile: CanvasSizeSchema.optional(),
-    })
-    .optional(),
-  autoHeight: z.boolean().optional(),
   objects: z.array(PageObjectSchema).default([]),
 })
 
@@ -138,6 +176,11 @@ const PageSchema = z.object({
   name: z.string().min(1),
   script: z.string().default(''),
   backgroundId: z.string().default(''),
+  /**
+   * fixed page size: a dialog / popup / author window. An ordinary page has
+   * no size and fills the window it is shown in, growing with its content.
+   */
+  size: CanvasSizeSchema.optional(),
   /** plugin page: offered in the editor's Author menu, runs with the author API */
   author: z.boolean().optional(),
   objects: z.array(PageObjectSchema).default([]),
@@ -158,13 +201,6 @@ export type StoreEntry = z.infer<typeof StoreEntrySchema>
 const BookSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
-  canvas: z
-    .object({
-      desktop: CanvasSizeSchema,
-      tablet: CanvasSizeSchema.optional(),
-      mobile: CanvasSizeSchema.optional(),
-    })
-    .default({ desktop: { width: 1280, height: 800 } }),
   backgrounds: z.array(BackgroundSchema).default([]),
   pages: z.array(PageSchema).min(1),
   /** page the app opens on (a spawned/published run, and the editor on load);
@@ -216,33 +252,134 @@ function migrateBackgrounds(data: unknown): unknown {
       if (!known) page['backgroundId'] = backgrounds[0]!.id
     }
   }
-  // auto-height used to be per breakpoint — collapse any object form to a
-  // single boolean (true if any breakpoint was on)
+  return data
+}
+
+/**
+ * Legacy size upgrade, run after {@link migrateBackgrounds}:
+ *  - `book.canvas` (a size per breakpoint) becomes a temporary `book.design`
+ *    reference (the desktop size) that {@link migrateConstraints} measures the
+ *    old fitted rects against before it is dropped.
+ *  - a background that carried a `size` hands its desktop override to every
+ *    page that uses it as `Page.size` (a fixed dialog surface) and loses it.
+ *  - the old `Background.autoHeight` flag is dropped: pages are fluid now.
+ */
+function migrateSizes(data: unknown): unknown {
+  if (!data || typeof data !== 'object') return data
+  const raw = data as Record<string, unknown>
+  const canvas = raw['canvas']
+  if (canvas && typeof canvas === 'object') {
+    const sizes = canvas as Record<string, unknown>
+    const desktop = (sizes['desktop'] ?? sizes['tablet'] ?? sizes['mobile']) as
+      | Record<string, unknown>
+      | undefined
+    if (desktop && typeof desktop['width'] === 'number' && typeof desktop['height'] === 'number') {
+      raw['design'] = { width: desktop['width'], height: desktop['height'] }
+    }
+    delete raw['canvas']
+  }
+  if (!raw['design']) raw['design'] = { width: 1280, height: 800 }
+  const pages = Array.isArray(raw['pages']) ? (raw['pages'] as Array<Record<string, unknown>>) : []
   const bgs = Array.isArray(raw['backgrounds'])
     ? (raw['backgrounds'] as Array<Record<string, unknown>>)
     : []
   for (const bg of bgs) {
-    const ah = bg['autoHeight']
-    if (ah && typeof ah === 'object') {
-      if (Object.values(ah as Record<string, unknown>).some(Boolean)) bg['autoHeight'] = true
-      else delete bg['autoHeight']
+    const size = bg['size']
+    if (size && typeof size === 'object') {
+      const sizes = size as Record<string, unknown>
+      const desktop = (sizes['desktop'] ?? sizes['tablet'] ?? sizes['mobile']) as
+        | Record<string, unknown>
+        | undefined
+      if (desktop && typeof desktop['width'] === 'number' && typeof desktop['height'] === 'number') {
+        for (const page of pages) {
+          if (page['backgroundId'] === bg['id'] && !page['size']) {
+            page['size'] = { width: desktop['width'], height: desktop['height'] }
+          }
+        }
+      }
+      delete bg['size']
     }
+    delete bg['autoHeight']
   }
   return data
 }
 
 export function parseBook(data: unknown): Book {
-  return BookSchema.parse(migrateObjects(migrateBackgrounds(data)))
+  return BookSchema.parse(migrateConstraints(migrateSizes(migrateObjects(migrateBackgrounds(data)))))
+}
+
+/**
+ * Edge-constraint upgrade, run last (after {@link migrateSizes} has produced
+ * the reference `design` size): each object's one `rect` + `fit` pair becomes
+ * fixed edge distances that freeze its appearance at the reference size.
+ *
+ *   free / left / top / stretch      -> follows the near edge (left / top)
+ *   right / bottom / pin-right / -bottom -> follows the far edge
+ *   fill                             -> follows both edges (stretches)
+ *   center                           -> centred
+ *
+ * Objects that already carry `x`/`y` constraints pass through untouched, and
+ * `design` is deleted once every object has been measured.
+ */
+function migrateConstraints(data: unknown): unknown {
+  if (!data || typeof data !== 'object') return data
+  const raw = data as Record<string, unknown>
+  const rawDesign = raw['design'] as Record<string, unknown> | undefined
+  const design: CanvasSize = {
+    width: typeof rawDesign?.['width'] === 'number' ? (rawDesign['width'] as number) : 1280,
+    height: typeof rawDesign?.['height'] === 'number' ? (rawDesign['height'] as number) : 800,
+  }
+  const mapObjects = (objs: unknown): void => {
+    if (!Array.isArray(objs)) return
+    for (const o of objs) {
+      if (!o || typeof o !== 'object') continue
+      const obj = o as Record<string, unknown>
+      const rect = obj['rect']
+      if (rect && typeof rect === 'object' && !obj['x'] && !obj['y']) {
+        const r = rect as Rect
+        const fit = obj['fit'] as Record<string, unknown> | undefined
+        const fx = typeof fit?.['x'] === 'string' ? (fit['x'] as string) : 'free'
+        const fy = typeof fit?.['y'] === 'string' ? (fit['y'] as string) : 'free'
+        const right = Math.round(design.width - (r.x + r.w))
+        const bottom = Math.round(design.height - (r.y + r.h))
+        obj['x'] =
+          fx === 'right' || fx === 'pin-right'
+            ? { mode: 'right', right, width: r.w }
+            : fx === 'center'
+              ? { mode: 'center', width: r.w }
+              : fx === 'fill'
+                ? { mode: 'both', left: Math.round(r.x), right }
+                : { mode: 'left', left: Math.round(r.x), width: r.w }
+        obj['y'] =
+          fy === 'bottom' || fy === 'pin-bottom'
+            ? { mode: 'bottom', bottom, height: r.h }
+            : fy === 'center'
+              ? { mode: 'center', height: r.h }
+              : fy === 'fill'
+                ? { mode: 'both', top: Math.round(r.y), bottom }
+                : { mode: 'top', top: Math.round(r.y), height: r.h }
+      }
+      delete obj['rect']
+      delete obj['fit']
+      mapObjects(obj['children'])
+    }
+  }
+  if (Array.isArray(raw['pages'])) {
+    for (const p of raw['pages'] as Array<Record<string, unknown>>) mapObjects(p['objects'])
+  }
+  if (Array.isArray(raw['backgrounds'])) {
+    for (const b of raw['backgrounds'] as Array<Record<string, unknown>>) mapObjects(b['objects'])
+  }
+  delete raw['design']
+  return data
 }
 
 /**
  * Legacy object upgrade, applied recursively before validation:
  *  - `rects.tablet` / `rects.mobile` are dropped; the authored layout is
- *    `rect = rects.desktop` (constraints-only model — per-breakpoint rects are
- *    no longer supported).
+ *    `rect = rects.desktop` (per-breakpoint rects are no longer supported).
  *  - legacy fit tokens: `prop`→`left`/`top`, `middle`→`center`. `left`/`top`
- *    are NOT rewritten — they are first-class modes in the current model
- *    (proportional left/top margins) and the editor writes them directly.
+ *    are kept — they name the near edge in the current model.
  */
 const FIT_TOKEN_MAP: Record<'x' | 'y', Record<string, string>> = {
   x: { prop: 'left' },
@@ -405,7 +542,9 @@ export function randomImageUrl(
 }
 
 export function safeParseBook(data: unknown) {
-  return BookSchema.safeParse(migrateObjects(migrateBackgrounds(data)))
+  return BookSchema.safeParse(
+    migrateConstraints(migrateSizes(migrateObjects(migrateBackgrounds(data)))),
+  )
 }
 
 let idCounter = 0
@@ -429,7 +568,8 @@ export function createObject(
     id: newId('obj'),
     name,
     control,
-    rect,
+    x: { mode: 'left', left: rect.x, width: rect.w },
+    y: { mode: 'top', top: rect.y, height: rect.h },
     props,
   })
 }
@@ -468,58 +608,212 @@ export function resolveStartPageIndex(book: Book): number {
   return i === -1 ? 0 : i
 }
 
-/**
- * Bottom breathing room left below the lowest object on an auto-height page.
- */
-export const AUTO_HEIGHT_MARGIN = 24
+/** default size of a dialog surface when a page declares none */
+export const DEFAULT_DIALOG_SIZE: CanvasSize = { width: 640, height: 480 }
 
-/**
- * Content height for an auto-height page: the bottom of the lowest top-level
- * object (fit-aware for the base page size), plus {@link AUTO_HEIGHT_MARGIN}
- * when that content passes the minimum — never shorter than `minHeight`.
- *
- * Measured against the BASE page size, so vertical glue never depends on the
- * grown height (no circularity): it is positioned relative to the configured
- * page, not the grown box.
- */
-export function contentHeightFor(
-  objects: PageObject[],
-  baseSize: CanvasSize,
-  refSize: CanvasSize,
-  minHeight: number,
-): number {
-  if (objects.length === 0) return minHeight
-  let bottom = 0
-  for (const obj of objects) {
-    const r = resolveObjectRect(obj, baseSize, refSize)
-    bottom = Math.max(bottom, r.y + r.h)
+/** resolve a horizontal edge constraint against a containing box width */
+export function resolveX(c: XEdge, boxWidth: number): { left: number; width: number } {
+  switch (c.mode) {
+    case 'left':
+      return { left: c.left, width: c.width }
+    case 'right':
+      return { left: boxWidth - c.right - c.width, width: c.width }
+    case 'both':
+      return { left: c.left, width: Math.max(1, boxWidth - c.left - c.right) }
+    case 'center':
+      return { left: (boxWidth - c.width) / 2, width: c.width }
   }
-  return bottom > minHeight ? bottom + AUTO_HEIGHT_MARGIN : minHeight
+}
+
+/** resolve a vertical edge constraint against a containing box height */
+export function resolveY(c: YEdge, boxHeight: number): { top: number; height: number } {
+  switch (c.mode) {
+    case 'top':
+      return { top: c.top, height: c.height }
+    case 'bottom':
+      return { top: boxHeight - c.bottom - c.height, height: c.height }
+    case 'both':
+      return { top: c.top, height: Math.max(1, boxHeight - c.top - c.bottom) }
+    case 'center':
+      return { top: (boxHeight - c.height) / 2, height: c.height }
+  }
+}
+
+/** the rect an object renders at inside `box` (its page or its group box) */
+export function rectForObject(obj: PageObject, box: CanvasSize): Rect {
+  const x = resolveX(obj.x, box.width)
+  const y = resolveY(obj.y, box.height)
+  return {
+    x: Math.round(x.left),
+    y: Math.round(y.top),
+    w: Math.max(1, Math.round(x.width)),
+    h: Math.max(1, Math.round(y.height)),
+  }
+}
+
+/** build a horizontal constraint for a rendered rect in `box`, keeping `mode` */
+export function xEdgeFromRect(rect: Rect, boxWidth: number, mode: XEdgeMode): XEdge {
+  const left = Math.round(rect.x)
+  const width = Math.max(1, Math.round(rect.w))
+  const right = Math.round(boxWidth - (rect.x + rect.w))
+  switch (mode) {
+    case 'left':
+      return { mode: 'left', left, width }
+    case 'right':
+      return { mode: 'right', right, width }
+    case 'both':
+      return { mode: 'both', left, right }
+    case 'center':
+      return { mode: 'center', width }
+  }
+}
+
+/** build a vertical constraint for a rendered rect in `box`, keeping `mode` */
+export function yEdgeFromRect(rect: Rect, boxHeight: number, mode: YEdgeMode): YEdge {
+  const top = Math.round(rect.y)
+  const height = Math.max(1, Math.round(rect.h))
+  const bottom = Math.round(boxHeight - (rect.y + rect.h))
+  switch (mode) {
+    case 'top':
+      return { mode: 'top', top, height }
+    case 'bottom':
+      return { mode: 'bottom', bottom, height }
+    case 'both':
+      return { mode: 'both', top, bottom }
+    case 'center':
+      return { mode: 'center', height }
+  }
 }
 
 /**
- * Page size for a page in a breakpoint: the background's size override for
- * that breakpoint, else the book canvas, else the desktop book size.
- *
- * When `objects` is given and the background turns on "height fits content",
- * only the height is derived (width stays the base width, and the setting
- * applies to every breakpoint); every other call site keeps the fixed size.
+ * Write a rendered rect back onto an object's constraints, keeping the current
+ * edge choices unless an override mode is given (e.g. a width write on a
+ * follows-both control switches that axis to a fixed size held to the left).
  */
-export function resolvePageSize(
-  book: Book,
-  background: Background | undefined,
-  breakpoint: Breakpoint,
-  objects?: PageObject[],
+export function applyRectToObject(
+  obj: PageObject,
+  rect: Rect,
+  box: CanvasSize,
+  modes?: { x?: XEdgeMode; y?: YEdgeMode },
+): void {
+  obj.x = xEdgeFromRect(rect, box.width, modes?.x ?? obj.x.mode)
+  obj.y = yEdgeFromRect(rect, box.height, modes?.y ?? obj.y.mode)
+}
+
+/**
+ * Move or resize one rendered coordinate while keeping the edges the control
+ * follows (see the script geometry rules): `x`/`y` on a follows-both control
+ * translates it, on a centred control drops the centring for a near edge, and
+ * a `width`/`height` write on a follows-both control switches it to a fixed
+ * size held to the left/top.
+ */
+export function writeRectPart(
+  obj: PageObject,
+  part: 'x' | 'y' | 'w' | 'h',
+  value: number,
+  box: CanvasSize,
+): void {
+  const r = rectForObject(obj, box)
+  const axis: 'x' | 'y' = part === 'x' || part === 'w' ? 'x' : 'y'
+  const mode = obj[axis].mode
+  if (part === 'x' || part === 'y') {
+    const n = Math.round(value)
+    if (mode === 'center') {
+      r[part] = n
+      applyRectToObject(obj, r, box, axis === 'x' ? { x: 'left' } : { y: 'top' })
+    } else if (mode === 'both') {
+      const delta = n - r[part]
+      if (part === 'x') r.x += delta
+      else r.y += delta
+      applyRectToObject(obj, r, box)
+    } else {
+      r[part] = n
+      applyRectToObject(obj, r, box)
+    }
+    return
+  }
+  r[part] = Math.max(1, Math.round(value))
+  if (mode === 'both') applyRectToObject(obj, r, box, axis === 'x' ? { x: 'left' } : { y: 'top' })
+  else applyRectToObject(obj, r, box)
+}
+
+/** Scale one horizontal edge constraint by `fx` (its distance and size). */
+export function scaleXEdge(c: XEdge, fx: number): XEdge {
+  const s = (n: number): number => Math.round(n * fx)
+  switch (c.mode) {
+    case 'left':
+      return { mode: 'left', left: s(c.left), width: Math.max(1, s(c.width)) }
+    case 'right':
+      return { mode: 'right', right: s(c.right), width: Math.max(1, s(c.width)) }
+    case 'both':
+      return { mode: 'both', left: s(c.left), right: s(c.right) }
+    case 'center':
+      return { mode: 'center', width: Math.max(1, s(c.width)) }
+  }
+}
+
+/** Scale one vertical edge constraint by `fy` (its distance and size). */
+export function scaleYEdge(c: YEdge, fy: number): YEdge {
+  const s = (n: number): number => Math.round(n * fy)
+  switch (c.mode) {
+    case 'top':
+      return { mode: 'top', top: s(c.top), height: Math.max(1, s(c.height)) }
+    case 'bottom':
+      return { mode: 'bottom', bottom: s(c.bottom), height: Math.max(1, s(c.height)) }
+    case 'both':
+      return { mode: 'both', top: s(c.top), bottom: s(c.bottom) }
+    case 'center':
+      return { mode: 'center', height: Math.max(1, s(c.height)) }
+  }
+}
+
+/**
+ * Scale one object's edge constraints by (fx, fy) — the stored form of a group
+ * resize: a follows-both axis scales both margins, a centred axis its size, a
+ * near/far axis its distance and size.
+ */
+export function scaleEdges(obj: PageObject, fx: number, fy: number): void {
+  obj.x = scaleXEdge(obj.x, fx)
+  obj.y = scaleYEdge(obj.y, fy)
+}
+
+/** Scale an object and every descendant it contains (nested groups included). */
+export function scaleSubtreeEdges(obj: PageObject, fx: number, fy: number): void {
+  scaleEdges(obj, fx, fy)
+  for (const child of obj.children ?? []) scaleSubtreeEdges(child, fx, fy)
+}
+
+/**
+ * The content extent a page must be large enough to hold. Only top/left
+ * anchored objects (near-edge distances) can extend the page — a right/bottom,
+ * follows-both or centred object sits inside the page box by definition, so it
+ * cannot drive the size without becoming circular.
+ */
+export function contentExtent(objects: PageObject[]): { right: number; bottom: number } {
+  let right = 0
+  let bottom = 0
+  for (const obj of objects) {
+    if (obj.x.mode === 'left') right = Math.max(right, obj.x.left + obj.x.width)
+    if (obj.y.mode === 'top') bottom = Math.max(bottom, obj.y.top + obj.y.height)
+  }
+  return { right, bottom }
+}
+
+/**
+ * The size a page renders at: a fixed page (`Page.size`) is its own box; an
+ * ordinary page fills `container` and grows on either axis by the content
+ * extent placed past the fold.
+ */
+export function resolvePageBox(
+  page: Page,
+  container: CanvasSize,
+  objects: PageObject[],
 ): CanvasSize {
-  const base =
-    background?.size?.[breakpoint] ??
-    book.canvas[breakpoint] ??
-    book.canvas.desktop
-  if (!objects || !background?.autoHeight) return base
-  const ref = background.size?.desktop ?? book.canvas.desktop
+  if (page.size) return { width: page.size.width, height: page.size.height }
+  const extent = contentExtent(objects)
   return {
-    width: base.width,
-    height: contentHeightFor(objects, base, ref, base.height),
+    width: Math.max(Math.max(1, Math.round(container.width)), Math.ceil(extent.right)),
+    height: Math.max(Math.max(1, Math.round(container.height)), Math.ceil(extent.bottom)),
   }
 }
 
@@ -528,11 +822,6 @@ export function createBook(title: string): Book {
   return BookSchema.parse({
     id: newId('book'),
     title,
-    canvas: {
-      desktop: { width: 1280, height: 800 },
-      tablet: { width: 768, height: 1024 },
-      mobile: { width: 390, height: 844 },
-    },
     backgrounds: [bg],
     pages: [createPage('Page 1', bg.id)],
   })
@@ -543,7 +832,8 @@ export function createGroup(name: string, rect: Rect, children: PageObject[]): P
     id: newId('obj'),
     name,
     control: 'group',
-    rect,
+    x: { mode: 'left', left: rect.x, width: rect.w },
+    y: { mode: 'top', top: rect.y, height: rect.h },
     props: {},
     on: {},
     children,
@@ -733,136 +1023,4 @@ export function matchSizeRects(rects: Rect[], dim: MatchDim): Rect[] {
   }))
 }
 
-const DEFAULT_FIT: FitSpec = { x: 'free', y: 'free' }
 
-/**
- * The rect an object renders at for a page size — the responsive "lens".
- *
- * The object has ONE authored `rect`; `fit` derives the constrained axes for
- * the target page size while free axes keep their authored coordinate. At the
- * base size (page size == the desktop reference) Free/Left/Right/Top/Bottom/
- * Stretch are identity and only Center visibly moves — so setting Center shows
- * the object centered where you are, without writing anything.
- */
-export function resolveObjectRect(
-  obj: PageObject,
-  pageSize: CanvasSize,
-  refSize: CanvasSize,
-): Rect {
-  const r = obj.rect
-  const fit = obj.fit ?? DEFAULT_FIT
-  const W = pageSize.width
-  const H = pageSize.height
-  const W0 = refSize.width
-  const H0 = refSize.height
-  const ratioX = W0 === 0 ? 1 : W / W0
-  const ratioY = H0 === 0 ? 1 : H / H0
-  const round = (n: number): number => Math.max(1, Math.round(n))
-  // stretch keeps BOTH margins proportional, so the size scales by the same
-  // ratio as the page (and the position rides with the left/top margin);
-  // fill keeps BOTH margins fixed, so the size grows by the page delta
-  const w =
-    fit.x === 'stretch'
-      ? round(r.w * ratioX)
-      : fit.x === 'fill'
-        ? Math.max(1, Math.round(r.w + (W - W0)))
-        : r.w
-  const h =
-    fit.y === 'stretch'
-      ? round(r.h * ratioY)
-      : fit.y === 'fill'
-        ? Math.max(1, Math.round(r.h + (H - H0)))
-        : r.h
-  const x =
-    fit.x === 'center'
-      ? (W - w) / 2
-      : fit.x === 'left' || fit.x === 'stretch'
-        ? r.x * ratioX
-        : fit.x === 'right'
-          ? (r.x + r.w) * ratioX - w
-          : fit.x === 'pin-right'
-            ? r.x + (W - W0)
-            : r.x // free / fill
-  const y =
-    fit.y === 'center'
-      ? (H - h) / 2
-      : fit.y === 'top' || fit.y === 'stretch'
-        ? r.y * ratioY
-        : fit.y === 'bottom'
-          ? (r.y + r.h) * ratioY - h
-          : fit.y === 'pin-bottom'
-            ? r.y + (H - H0)
-            : r.y // free / fill
-  return { x: Math.round(x), y: Math.round(y), w, h }
-}
-
-/**
- * Inverse of the position/size lens: given the rect the author DRAGGED at the
- * current breakpoint, derive the base rect that produces it.
- *
- * This is what makes a glued object draggable: the drag edits the reference
- * (the free parameter behind the constraint) at every breakpoint instead of
- * being rejected. `center` has no free parameter (its position is fully
- * determined), so its reference axis is left untouched. At desktop the page
- * size equals the reference, so every inverse is the identity.
- */
-export function unlensObjectRect(
-  ref: Rect,
-  dragged: Rect,
-  fit: FitSpec | undefined,
-  pageSize: CanvasSize,
-  refSize: CanvasSize,
-): Rect {
-  const W = pageSize.width
-  const H = pageSize.height
-  const W0 = refSize.width
-  const H0 = refSize.height
-  const ratioX = W === 0 ? 1 : W0 / W
-  const ratioY = H === 0 ? 1 : H0 / H
-  const round = (n: number): number => Math.max(1, Math.round(n))
-  const fx = fit?.x
-  const fy = fit?.y
-  const w =
-    fx === 'stretch'
-      ? round(dragged.w * ratioX)
-      : fx === 'fill'
-        ? round(dragged.w - (W - W0))
-        : dragged.w
-  const h =
-    fy === 'stretch'
-      ? round(dragged.h * ratioY)
-      : fy === 'fill'
-        ? round(dragged.h - (H - H0))
-        : dragged.h
-  const x =
-    fx === 'left' || fx === 'stretch'
-      ? dragged.x * ratioX
-      : fx === 'right'
-        ? (dragged.x + dragged.w) * ratioX - dragged.w
-        : fx === 'pin-right'
-          ? dragged.x + (W0 - W)
-          : fx === 'center'
-            ? ref.x // rigid: centered is fully determined
-            : dragged.x // free / fill
-  const y =
-    fy === 'top' || fy === 'stretch'
-      ? dragged.y * ratioY
-      : fy === 'bottom'
-        ? (dragged.y + dragged.h) * ratioY - dragged.h
-        : fy === 'pin-bottom'
-          ? dragged.y + (H0 - H)
-          : fy === 'center'
-            ? ref.y
-            : dragged.y // free / fill
-  return { x: Math.round(x), y: Math.round(y), w, h }
-}
-
-/** does the object declare a real constraint on the horizontal axis? */
-export function constrainsX(obj: PageObject): boolean {
-  return obj.fit?.x !== undefined && obj.fit.x !== 'free'
-}
-
-/** does the object declare a real constraint on the vertical axis? */
-export function constrainsY(obj: PageObject): boolean {
-  return obj.fit?.y !== undefined && obj.fit.y !== 'free'
-}

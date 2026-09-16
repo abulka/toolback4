@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import type { Background, Breakpoint } from '@toolback/format'
+import type { Background, Page } from '@toolback/format'
 import { useBookStore } from '../stores/book'
 import HelpButton from './HelpButton.vue'
 
@@ -54,20 +54,9 @@ const activePageBgId = computed<string | null>(() => {
   return known ? page.backgroundId : (store.book.backgrounds[0]?.id ?? null)
 })
 
-/** label when the background overrides the page size / auto-heights */
-function sizeLabel(bg: Background): string {
-  const parts: string[] = []
-  for (const breakpoint of ['desktop', 'tablet', 'mobile'] as Breakpoint[]) {
-    const size = bg.size?.[breakpoint]
-    if (!size) continue
-    parts.push(
-      bg.autoHeight
-        ? `${breakpoint[0]}:${size.width}×auto`
-        : `${breakpoint[0]}:${size.width}×${size.height}`,
-    )
-  }
-  if (bg.autoHeight) parts.push('auto height')
-  return parts.join(' ')
+/** label for a page with a fixed (dialog) size */
+function fixedLabel(page: Page): string {
+  return page.size ? `fixed ${page.size.width}×${page.size.height}` : ''
 }
 
 function editingBg(id: string): boolean {
@@ -217,11 +206,10 @@ function bgDropClass(id: string): Record<string, boolean> {
           <span class="page-actions">
             <button title="Edit this background's own objects (or double-click the row)" @click.stop="store.editBackground(g.bg.id)" @dblclick.stop>👁</button>
             <button title="Rename background" @click.stop="startBgRename(g.bg)" @dblclick.stop>✎</button>
-            <button title="Background properties (name, colour, page size, delete)" @click.stop="store.backgroundDialogId = g.bg.id" @dblclick.stop>⚙</button>
+            <button title="Background properties (name, colour, delete)" @click.stop="store.backgroundDialogId = g.bg.id" @dblclick.stop>⚙</button>
             <button title="Duplicate background" @click.stop="store.duplicateBackground(g.bg.id)" @dblclick.stop>⧉</button>
           </span>
         </span>
-        <span class="bg-size">page size · {{ sizeLabel(g.bg) || 'book default' }}</span>
       </template>
       <ul class="pages">
         <li
@@ -254,6 +242,7 @@ function bgDropClass(id: string): Record<string, boolean> {
           </template>
           <template v-else>
             <span class="page-name">{{ entry.p.name }}</span>
+            <span v-if="fixedLabel(entry.p)" class="fixed-tag" :title="`Fixed-size page (dialog / popup): ${entry.p.size!.width}×${entry.p.size!.height}`">▢ {{ fixedLabel(entry.p) }}</span>
             <span class="page-actions">
               <button
                 class="start"
@@ -411,6 +400,16 @@ function bgDropClass(id: string): Record<string, boolean> {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fixed-tag {
+  font: 500 10px/1 ui-monospace, 'SF Mono', Menlo, monospace;
+  color: var(--ed-text-dim);
+  border: 1px solid var(--ed-border);
+  border-radius: 4px;
+  padding: 2px 5px;
+  white-space: nowrap;
+  flex: none;
 }
 
 .page-actions {

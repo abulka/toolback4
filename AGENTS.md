@@ -63,19 +63,28 @@ the usual suspect.
 Full list in [`docs/runtime-internals.md` §10](docs/runtime-internals.md); the
 ones most easily broken:
 
-- **The responsive "glue" (`fit`) is a render lens, never a write.**
-  `PageObject.fit` (`x`/`y` modes: free/left/top · right/bottom · center ·
-  stretch) is the internal data behind the user-facing **Responsive** section in
-  the properties panel (the Horizontal/Vertical dropdowns —
-  `apps/editor/src/components/PropertiesPanel.vue:419`) and the "glue"/"spring"
-  language in the docs. It is declarative: `resolveObjectRect` is the only source
-  of rects at render/read time and never touches `rect` (the one authored
-  layout). Never bake a lensed rect back into `rect` — that freezes the glue, so
-  later breakpoints derive from an already-derived value. Deliberate geometry
-  writes (drag, typed X/Y/W/H, script setter, author bridge) fold the rendered
-  target back through `unlensObjectRect` onto the base `rect`.
-- **Group members are relative.** Fit is top-level only; a group's box carries
-  the glue and members ride/scale with it.
+- **Edge distances are the stored geometry.** `PageObject.x`/`.y` store the
+  fixed distance(s) to the page (or parent-group) edges a control follows:
+  `left`+`width`, `right`+`width`, `both`, or `center` (and the vertical
+  equivalents) — the internal data behind the user-facing **Responsive** section
+  in the properties panel (the Horizontal/Vertical dropdowns —
+  `apps/editor/src/components/PropertiesPanel.vue`) and the "spring" language in
+  the docs. `resolveX`/`resolveY` (via `rectForObject`) derive a rect against the
+  containing box and `applyEdgeStyles` writes it straight to CSS, so the browser
+  repositions controls on resize with no re-render. Never bake a resolved rect
+  back into `x`/`y`; deliberate geometry writes (drag, typed X/Y/W/H, script
+  setter, author bridge) keep the mode through `writeRectPart`.
+- **A fluid page's extent is driven only by near edges.** `resolvePageBox` grows
+  the page past the viewport with `contentExtent`, which counts only objects
+  following left/top. Right/bottom/both/centred objects sit inside the page box
+  (that is what makes "follows bottom" mean N from the page's bottom edge). A
+  fluid page uses `width:100%` + content `min-width`/`min-height`; the editor
+  wrapper toggles `.tb-canvas-root--fluid` so it spans the viewport.
+- **A group scales when you size it, not when the page reflows.** Each member
+  carries its own `x`/`y` against the group box. A handle drag (and a typed W/H
+  or a scripted `group.width`/`height`) scales every descendant's edges
+  (`scaleSubtreeEdges`) around the fixed corner; a page/window resize just
+  re-resolves each member's own edges in CSS, with no scaling.
 - **Pinia proxies are not structured-cloneable** — the book always crosses the
   iframe as `JSON.parse(JSON.stringify(book))`.
 - **Page ↔ background share one naming namespace** (`controls[name]`).

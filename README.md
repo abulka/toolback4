@@ -176,6 +176,7 @@ server of any kind.
 
 M0–M6c (core authoring, scripting, pages/popups/backgrounds, groups, store,
 npm-in-books, author plugins) are complete, along with copy/paste, responsive
-constraints ("glue") and npm library support. The full plan, architecture and
-milestone log live in [plans/PLAN.md](plans/PLAN.md); not-yet-built designs live
-alongside it in [plans/](plans/).
+edge constraints (follows left/right/both/centred) and npm library support. The
+full plan, architecture and milestone log live in
+[plans/PLAN.md](plans/PLAN.md); the architecture reference is
+[docs/runtime-internals.md](docs/runtime-internals.md).

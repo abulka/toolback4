@@ -15,10 +15,25 @@ body {
   padding: 0;
 }
 
+/* the page is centred in the window; a fluid page fills it (no visible gutter),
+   a fixed-size page reads as a centred surface. auto margins collapse when the
+   page outgrows the window, so it top-aligns and the window scrolls instead. */
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #e9ecf1;
+}
+
+body > .tb-page {
+  margin: auto;
+}
+
 .tb-page {
   position: relative;
   overflow: hidden;
   box-sizing: border-box;
+  box-shadow: 0 1px 5px rgba(15, 23, 42, 0.18);
 }
 
 .tb-object {
@@ -419,6 +434,25 @@ body {
 
 .tb-canvas-root {
   position: relative;
+  z-index: 1;
+  width: max-content;
+  margin: auto;
+}
+
+/* a fluid page fills the viewport and can grow past it with content. The
+   wrapper spans max(viewport, page extent): min-width 100% covers the empty
+   case (plain max-content would collapse to the content extent), while the
+   inherited max-content lets the wrapper/overlay cover horizontal overflow so
+   objects past the right edge stay selectable. */
+.tb-canvas-root--fluid {
+  min-width: 100%;
+}
+
+/* the empty area around a fixed-size page: clicking it deselects */
+.tb-canvas-gutter {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
 }
 
 .tb-page-holder {
@@ -482,6 +516,19 @@ body {
   z-index: 21;
 }
 
+/* a quiet box tracing a group we're inside, or whose members' edge springs
+   are showing — so members' springs land on a visible edge. Selected groups
+   keep the louder .tb-sel box and draw no outline. */
+.tb-group-outline {
+  position: absolute;
+  border: 1px dashed rgba(100, 116, 139, 0.55);
+  border-radius: 2px;
+  box-sizing: border-box;
+  pointer-events: none;
+  display: none;
+  z-index: 20;
+}
+
 /* object sticking out of the page at the current breakpoint — the visible
    part gets a dashed red outline so clipping is seen, not guessed */
 .tb-clip {
@@ -493,10 +540,10 @@ body {
   z-index: 21;
 }
 
-/* responsive glue ("spring") hints: shape + muted colour per constraint kind.
-   edge = solid zigzag, square anchor; center = plain dashed line, circle
-   anchor; stretch = dashed circular coil, triangle anchor. Sits as the page's
-   first child so it paints above the page background but UNDER the controls. */
+/* responsive edge ("spring") hints: shape + muted colour per constraint kind.
+   edge = solid zigzag, square anchor; center = plain straight line, circle
+   anchor. Sits as the page's first child so it paints above the page
+   background but UNDER the controls. */
 .tb-fithint {
   position: absolute;
   pointer-events: none;
@@ -519,10 +566,16 @@ body {
   background: rgba(148, 163, 184, 0.9);
 }
 
-/* scaled margins render dashed; fixed margins stay solid */
-.tb-fithint-spring--scaled .tb-fithint-halo,
-.tb-fithint-spring--scaled .tb-fithint-spring-path {
-  stroke-dasharray: 5 4;
+/* short caption on a spring: the edge word + its pixel distance */
+.tb-fithint-label {
+  position: absolute;
+  font: 600 9px/1 var(--tb-font);
+  color: #475569;
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: 3px;
+  padding: 1px 3px;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .tb-fithint-spring--edge {

@@ -1,7 +1,7 @@
-import type { Background, Book, Breakpoint, PageObject, Rect } from '@toolback/format'
-import { backgroundFor, flattenObjects, FONT_STACKS, resolveColor, resolveObjectRect, unlensObjectRect, resolvePageSize } from '@toolback/format'
+import type { Background, Book, CanvasSize, PageObject, Rect } from '@toolback/format'
+import { backgroundFor, DEFAULT_DIALOG_SIZE, flattenObjects, FONT_STACKS, rectForObject, resolveColor, scaleSubtreeEdges, writeRectPart } from '@toolback/format'
 import { applyContent, contentKeyFor } from '@toolback/controls'
-import { renderBookPage } from './index'
+import { applyEdgeStyles, measureViewport, pageBoxFor, parentBoxMap, renderBookPage } from './index'
 import { rewriteLibImports, toolbackImport } from './libs'
 
 export interface ToolbackStore {
@@ -73,7 +73,7 @@ export function makeControlApi(
   el: HTMLElement,
   wrapper: HTMLElement,
   listeners: Array<() => void>,
-  size?: { page: { width: number; height: number }; ref: { width: number; height: number } },
+  parentBox?: CanvasSize,
 ): ControlApi {
   const input = el instanceof HTMLInputElement ? el : null
   const checkbox = el instanceof HTMLInputElement ? null : (el.querySelector?.('input[type="checkbox"]') as HTMLInputElement | null)
@@ -84,44 +84,42 @@ export function makeControlApi(
   const contentKey = contentKeyFor(obj.control)
   const isViewer = obj.control === 'markdown' || obj.control === 'html'
 
-  const rectNow = (): Rect =>
-    size ? resolveObjectRect(obj, size.page, size.ref) : obj.rect
-  /**
-   * A scripted write to a glued axis releases that axis — deliberate acts win
-   * over the constraint. Position writes (x/y) always release; size writes
-   * (width/height) release only a STRETCH axis, whose size IS the constraint —
-   * for center/right/bottom the size stays authored and the position simply
-   * re-derives around it.
-   */
-  const releaseForWrite = (part: 'x' | 'y' | 'w' | 'h'): void => {
-    const fit = obj.fit
-    if (!fit) return
-    const axis: 'x' | 'y' = part === 'x' || part === 'w' ? 'x' : 'y'
-    const mode = fit[axis]
-    if (mode === undefined || mode === 'free') return
-    const sizeWrite = part === 'w' || part === 'h'
-    if (sizeWrite && mode !== 'stretch') return
-    const next = { ...fit }
-    delete next[axis]
-    if (Object.keys(next).length === 0) delete obj.fit
-    else obj.fit = next
-  }
-  const writeRendered = (r: Rect): void => {
-    // fold the rendered target back onto the one authored rect (free axes take
-    // it directly; constrained axes derive the reference that produces it)
-    obj.rect = size ? unlensObjectRect(obj.rect, r, obj.fit, size.page, size.ref) : r
-    wrapper.style.left = `${r.x}px`
-    wrapper.style.top = `${r.y}px`
-    wrapper.style.width = `${r.w}px`
-    wrapper.style.height = `${r.h}px`
+  const box = (): CanvasSize => parentBox ?? { width: 0, height: 0 }
+  const rectNow = (): Rect => rectForObject(obj, box())
+  /** re-stamp a descendant object's wrapper after its edges changed */
+  const restampSubtree = (node: PageObject): void => {
+    const w = el.querySelector<HTMLElement>(`[data-tb-id="${CSS.escape(node.id)}"]`)
+    if (w) {
+      w.dataset.tbEdgeX = node.x.mode
+      w.dataset.tbEdgeY = node.y.mode
+      applyEdgeStyles(w, node)
+    }
+    for (const child of node.children ?? []) restampSubtree(child)
   }
   const setRectPart = (part: 'x' | 'y' | 'w' | 'h', v: unknown): void => {
     const n = typeof v === 'number' ? v : Number(v)
     if (!Number.isFinite(n)) return
-    const r = { ...rectNow() }
-    r[part] = part === 'x' || part === 'y' ? Math.round(n) : Math.max(1, Math.round(n))
-    releaseForWrite(part)
-    writeRendered(r)
+    // keep which edges the control follows; the free distance is adjusted so
+    // the control lands at the requested position/size. Sizing a group scales
+    // its descendants, so the box and its contents grow together.
+    if (isGroup && (part === 'w' || part === 'h')) {
+      const before = rectNow()
+      writeRectPart(obj, part, n, box())
+      const after = rectNow()
+      const fx = part === 'w' && before.w > 0 ? after.w / before.w : 1
+      const fy = part === 'h' && before.h > 0 ? after.h / before.h : 1
+      if (fx !== 1 || fy !== 1) {
+        for (const child of obj.children ?? []) {
+          scaleSubtreeEdges(child, fx, fy)
+          restampSubtree(child)
+        }
+      }
+    } else {
+      writeRectPart(obj, part, n, box())
+    }
+    wrapper.dataset.tbEdgeX = obj.x.mode
+    wrapper.dataset.tbEdgeY = obj.y.mode
+    applyEdgeStyles(wrapper, obj)
   }
 
   return {
@@ -314,12 +312,14 @@ export interface PopupHandle {
 
 /**
  * One execution context: the base page (scopes[0]) or an open popup.
- * Controls/listeners/page functions are per scope; book/store/breakpoint
+ * Controls/listeners/page functions are per scope; book/store
  * are shared through the RunState.
  */
 interface Scope {
   idx: number
   root: HTMLElement
+  /** explicit box for a nested surface (popup); the base page measures the window */
+  container?: CanvasSize
   controls: Record<string, ControlApi>
   listeners: Array<() => void>
   pageFns: Record<string, (e?: unknown) => unknown>
@@ -330,7 +330,6 @@ interface Scope {
 interface RunState {
   book: Book
   root: HTMLElement
-  breakpoint: Breakpoint
   onError?: (message: string) => void
   onPopups?: (open: string[]) => void
   store: ToolbackStore
@@ -460,22 +459,26 @@ function runPage(st: RunState, scope: Scope, idx: number): void {
     scope.idx = idx
     const page = st.book.pages[idx] ?? st.book.pages[0]!
     const bg = backgroundFor(st.book, page)
-    renderBookPage(st.book, idx, scope.root, st.breakpoint)
+    renderBookPage(st.book, idx, scope.root, scope.container)
     const pageRoot = scope.root.querySelector<HTMLElement>('.tb-page')!
-    // the page sizes that make fit-aware ControlApi reads agree with render
-    const apiSize =
-      bg ? { page: resolvePageSize(st.book, bg, st.breakpoint), ref: resolvePageSize(st.book, bg, 'desktop') } : null
     // background objects are first-class at run time: they get ControlApis,
     // can carry event scripts, and are addressable as controls[name] (names
     // are unique across the page and its background)
-    const flat = flattenObjects([...(bg?.objects ?? []), ...page.objects])
+    const topLevel = [...(bg?.objects ?? []), ...page.objects]
+    const flat = flattenObjects(topLevel)
+    // the containing box each control's edges resolve against (used so
+    // ControlApi reads agree with the render)
+    const boxes = parentBoxMap(
+      topLevel,
+      pageBoxFor(page, scope.container ?? measureViewport(scope.root), topLevel),
+    )
 
     for (const k of Object.keys(scope.controls)) delete scope.controls[k]
     for (const obj of flat) {
       const wrapper = controlWrapper(pageRoot, obj.name)
       const el = (wrapper?.firstElementChild as HTMLElement | null) ?? null
       if (el && wrapper) {
-        scope.controls[obj.name] = makeControlApi(obj, el, wrapper, scope.listeners, apiSize ?? undefined)
+        scope.controls[obj.name] = makeControlApi(obj, el, wrapper, scope.listeners, boxes.get(obj.id))
       }
     }
 
@@ -728,13 +731,11 @@ function makePageApi(st: RunState, scope: Scope) {
       content.className = 'tb-popup-content'
       box.appendChild(content)
 
-      // size + position: the popup page's background decides the size (the
-      // M6a override), placement defaults to centred over the base page
-      const bg = backgroundFor(st.book, page)
-      const size = resolvePageSize(st.book, bg, st.breakpoint, [
-        ...(bg?.objects ?? []),
-        ...page.objects,
-      ])
+      // size + position: a fixed page uses its own size, otherwise a sensible
+      // default dialog size; placement defaults to centred over the base page
+      const size = page.size ?? DEFAULT_DIALOG_SIZE
+      content.style.width = `${size.width}px`
+      content.style.height = `${size.height}px`
       const holder = st.root
       const x = opts.x ?? Math.round((holder.offsetWidth - size.width) / 2)
       const y = opts.y ?? Math.round((holder.offsetHeight - size.height) / 2)
@@ -745,6 +746,7 @@ function makePageApi(st: RunState, scope: Scope) {
       const popupScope: Scope = {
         idx: i,
         root: content,
+        container: size,
         controls: {},
         listeners: [],
         pageFns: {},
@@ -792,7 +794,6 @@ export function stopRun(): void {
 export function runBook(
   book: Book,
   root: HTMLElement,
-  breakpoint: Breakpoint = 'desktop',
   onError?: (message: string) => void,
   startPageIndex = 0,
   onPopups?: (open: string[]) => void,
@@ -814,7 +815,6 @@ export function runBook(
   const st: RunState = {
     book,
     root,
-    breakpoint,
     onError,
     onPopups,
     store,

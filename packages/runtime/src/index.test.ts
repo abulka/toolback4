@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BREAKPOINTS, createBook, createObject, type Book } from '@toolback/format'
+import { createBook, createObject, type Book, type XEdge, type YEdge } from '@toolback/format'
 import { sampleBook } from '@toolback/format/src/sample'
 import { getObjectRects, isCopyKey, isCutKey, isGroupKey, isPasteKey, listenForEditor, renderBook, renderBookPage, renderObjectInto, shouldToggleRun } from './index'
 
@@ -34,7 +34,7 @@ describe('runtime', () => {
       ...createObject('image', 'pic', { x: 0, y: 0, w: 100, h: 100 }),
       control: 'wombat',
     } as never
-    const pageRoot = renderObjectInto(root, unregistered, 'desktop')
+    const pageRoot = renderObjectInto(root, unregistered)
     expect(pageRoot.querySelector('.tb-missing')?.textContent).toContain('wombat')
   })
 
@@ -65,6 +65,46 @@ describe('runtime', () => {
       )
       expect(root.querySelector('button.tb-button')).not.toBeNull()
       expect(sent.some((m) => m.type === 'toolback:rects')).toBe(true)
+    } finally {
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('applies the fluid wrapper class before measuring rects (fixed → fluid navigation)', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const fluidAtRects: boolean[] = []
+    const send = (msg: { type: string }) => {
+      if (msg.type !== 'toolback:rects') return
+      const wrapper = root.querySelector('.tb-canvas-root')
+      fluidAtRects.push(!!wrapper?.classList.contains('tb-canvas-root--fluid'))
+    }
+    const cleanup = listenForEditor(root, send)
+    const book = (id: string, fixed: boolean): Book =>
+      ({
+        id,
+        title: 't',
+        backgrounds: [BG],
+        pages: [
+          {
+            id: `${id}_p`,
+            name: 'P',
+            script: '',
+            backgroundId: 'bg1',
+            ...(fixed ? { size: { width: 400, height: 300 } } : {}),
+            objects: [],
+          },
+        ],
+      }) as Book
+    try {
+      // a fixed page first, then a fluid one: the rects sent on the fluid load
+      // must already have been measured against the full-width fluid wrapper
+      // (otherwise right/bottom-anchored objects measure against a collapsed
+      // root and render offset until the next navigation)
+      window.dispatchEvent(new MessageEvent('message', { data: { type: 'toolback:load', book: book('fx', true), design: true } }))
+      window.dispatchEvent(new MessageEvent('message', { data: { type: 'toolback:load', book: book('fl', false), design: true } }))
+      expect(fluidAtRects).toEqual([false, true])
     } finally {
       cleanup()
       root.remove()
@@ -136,7 +176,6 @@ describe('runtime', () => {
       return {
         id: 'b',
         title: 'T',
-        canvas: { desktop: { width: 400, height: 300 } },
         backgrounds: [BG],
         pages: [
           {
@@ -191,7 +230,6 @@ describe('runtime', () => {
       const book: Book = {
         id: 'b',
         title: 'T',
-        canvas: { desktop: { width: 400, height: 300 } },
         backgrounds: [BG],
         store: [['score', 3]],
         pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [obj] }],
@@ -219,7 +257,6 @@ describe('runtime', () => {
       const book: Book = {
         id: 'b2',
         title: 'T',
-        canvas: { desktop: { width: 400, height: 300 } },
         backgrounds: [BG],
         pages: [
           {
@@ -287,177 +324,135 @@ describe('runtime', () => {
     })
   })
 
-  describe('responsive glue at render time', () => {
-    /** a mini book: one page on a default book → 1280x800 desktop */
-    type FMX = 'free' | 'left' | 'center' | 'right' | 'stretch' | 'pin-right' | 'fill'
-    type FMY = 'free' | 'top' | 'center' | 'bottom' | 'stretch' | 'pin-bottom' | 'fill'
-    function fitBook(fit?: { x?: FMX; y?: FMY }) {
+  describe('edge constraints at render time', () => {
+    const L: XEdge = { mode: 'left', left: 1080, width: 176 }
+    const R: XEdge = { mode: 'right', right: 24, width: 176 }
+    const BOTH: XEdge = { mode: 'both', left: 1080, right: 24 }
+    const CX: XEdge = { mode: 'center', width: 176 }
+    const T: YEdge = { mode: 'top', top: 24, height: 48 }
+    const BOT: YEdge = { mode: 'bottom', bottom: 24, height: 48 }
+    const BY: YEdge = { mode: 'both', top: 24, bottom: 24 }
+    const CY: YEdge = { mode: 'center', height: 48 }
+
+    function edgeBook(x: XEdge, y: YEdge, control = 'button') {
       const book = createBook('fit')
-      const menu = createObject(
-        'button',
-        'menu',
-        { x: 1080, y: 24, w: 176, h: 48 },
-        { text: 'Menu' },
-      )
-      if (fit) menu.fit = fit
+      const menu = createObject(control as never, 'menu', { x: 1080, y: 24, w: 176, h: 48 })
+      menu.x = x
+      menu.y = y
       book.pages[0]!.objects.push(menu)
       return book
     }
 
-    function firstObjectStyle(book: Book, bp: 'desktop' | 'tablet' | 'mobile') {
+    function firstStyle(book: Book, container?: { width: number; height: number }) {
       const root = document.createElement('div')
-      renderBookPage(book, 0, root, bp)
+      renderBookPage(book, 0, root, container)
       const el = root.querySelector<HTMLElement>('.tb-object')!
       return {
-        left: parseInt(el.style.left),
-        top: parseInt(el.style.top),
-        width: parseInt(el.style.width),
-        height: parseInt(el.style.height),
+        left: el.style.left,
+        right: el.style.right,
+        top: el.style.top,
+        bottom: el.style.bottom,
+        width: el.style.width,
+        height: el.style.height,
       }
     }
 
-    it('default (free/free) keeps desktop px on mobile', () => {
-      const style = firstObjectStyle(fitBook(), 'mobile')
-      expect(style.left).toBe(1080)
-      expect(style.top).toBe(24)
-      expect(firstObjectStyle(fitBook({ x: 'free', y: 'free' }), 'mobile').left).toBe(1080)
+    it('renders left + top as fixed near-edge distances', () => {
+      expect(firstStyle(edgeBook(L, T))).toMatchObject({
+        left: '1080px',
+        top: '24px',
+        width: '176px',
+        height: '48px',
+      })
     })
 
-    it('left keeps the left proportion on mobile', () => {
-      const style = firstObjectStyle(fitBook({ x: 'left' }), 'mobile')
-      expect(style.left).toBe(Math.round(1080 * (390 / 1280)))
+    it('renders right + bottom as fixed far-edge distances', () => {
+      expect(firstStyle(edgeBook(R, BOT))).toMatchObject({
+        right: '24px',
+        bottom: '24px',
+        width: '176px',
+        height: '48px',
+      })
     })
 
-    it('right keeps the right proportion on mobile (the gap scales)', () => {
-      const style = firstObjectStyle(fitBook({ x: 'right' }), 'mobile')
-      // desktop gap to the right edge was 24; it scales with the page
-      expect(style.left).toBe(Math.round((1080 + 176) * (390 / 1280)) - 176)
-      expect(Math.abs(390 - (style.left + style.width) - 24 * (390 / 1280))).toBeLessThanOrEqual(1)
+    it('renders follows-both as both margins (stretches, no size)', () => {
+      const s = firstStyle(edgeBook(BOTH, BY))
+      expect(s.left).toBe('1080px')
+      expect(s.right).toBe('24px')
+      expect(s.top).toBe('24px')
+      expect(s.bottom).toBe('24px')
+      expect(s.width).toBe('')
+      expect(s.height).toBe('')
     })
 
-    it('center centers horizontally on mobile', () => {
-      const style = firstObjectStyle(fitBook({ x: 'center' }), 'mobile')
-      expect(style.left).toBe((390 - 176) / 2)
+    it('renders centred with calc offsets', () => {
+      expect(firstStyle(edgeBook(CX, CY))).toMatchObject({
+        left: 'calc(50% - 88px)',
+        width: '176px',
+        top: 'calc(50% - 24px)',
+        height: '48px',
+      })
     })
 
-    it('pin-right keeps the gap a fixed px on mobile (size fixed)', () => {
-      const style = firstObjectStyle(fitBook({ x: 'pin-right' }), 'mobile')
-      expect(style.left).toBe(1080 + (390 - 1280))
-      expect(style.width).toBe(176)
-      expect(390 - (style.left + style.width)).toBe(24)
+    it('a fluid page fills the container and grows to the near-edge content extent', () => {
+      const root = document.createElement('div')
+      renderBookPage(edgeBook(L, T), 0, root, { width: 800, height: 600 })
+      const page = root.querySelector<HTMLElement>('.tb-page')!
+      expect(page.style.width).toBe('100%')
+      expect(page.style.height).toBe('100%')
+      expect(page.style.minWidth).toBe('1256px')
+      expect(page.style.minHeight).toBe('72px')
     })
 
-    it('fill keeps both margins fixed and grows the width', () => {
-      const book = fitBook({ x: 'fill' })
-      book.canvas.tablet = { width: 1920, height: 1024 }
-      const style = firstObjectStyle(book, 'tablet')
-      expect(style.left).toBe(1080)
-      expect(style.width).toBe(176 + (1920 - 1280))
-      expect(1920 - (style.left + style.width)).toBe(24)
+    it('a fixed page keeps its declared size', () => {
+      const root = document.createElement('div')
+      const book = edgeBook(L, T)
+      book.pages[0]!.size = { width: 360, height: 420 }
+      renderBookPage(book, 0, root, { width: 800, height: 600 })
+      const page = root.querySelector<HTMLElement>('.tb-page')!
+      expect(page.style.width).toBe('360px')
+      expect(page.style.height).toBe('420px')
     })
 
-    it('filling a group scales its members', () => {
+    it('a bottom/right control sits inside the page and does not grow it', () => {
+      const root = document.createElement('div')
+      renderBookPage(edgeBook(R, BOT), 0, root, { width: 800, height: 600 })
+      const page = root.querySelector<HTMLElement>('.tb-page')!
+      expect(page.style.minWidth).toBe('0px')
+      expect(page.style.minHeight).toBe('0px')
+    })
+
+    it('renders group members relative to the group box without scaling', () => {
       const book = createBook('fit')
       const member = createObject('button', 'm', { x: 10, y: 10, w: 100, h: 40 })
+      member.x = { mode: 'both', left: 10, right: 10 }
       const group = createObject('group', 'g1', { x: 100, y: 0, w: 200, h: 60 })
-      group.fit = { x: 'fill' }
+      group.x = { mode: 'both', left: 100, right: 100 }
       group.children = [member]
       book.pages[0]!.objects.push(group)
-      book.canvas.tablet = { width: 1920, height: 1024 }
       const root = document.createElement('div')
-      renderBookPage(book, 0, root, 'tablet')
-      const memberEl = root.querySelector<HTMLElement>('.tb-group [data-tb-id]')!
-      const fx = (200 + (1920 - 1280)) / 200
-      expect(parseInt(memberEl.style.left)).toBe(Math.round(10 * fx))
-      expect(parseInt(memberEl.style.width)).toBe(Math.max(1, Math.round(100 * fx)))
-    })
-
-    it('stretch grows width with the page on a wider canvas', () => {
-      const book = createBook('fit')
-      const bar = createObject(
-        'container',
-        'bar',
-        { x: 0, y: 0, w: 1280, h: 40 },
-      )
-      bar.fit = { x: 'stretch' }
-      book.pages[0]!.objects.push(bar)
-      book.canvas.desktop = { width: 1280, height: 800 }
-      book.canvas.tablet = { width: 1920, height: 1024 }
-      const root = document.createElement('div')
-      renderBookPage(book, 0, root, 'tablet')
-      const el = root.querySelector<HTMLElement>('.tb-object')!
-      expect(parseInt(el.style.width)).toBe(Math.round(1280 * (1920 / 1280)))
-    })
-
-    it('at the base size the authored position is used', () => {
-      const style = firstObjectStyle(fitBook({ x: 'right' }), 'desktop')
-      expect(style.left).toBe(1080)
-    })
-
-    it('stretching a group scales its members', () => {
-      const book = createBook('fit')
-      const button = createObject('button', 'member', { x: 10, y: 10, w: 100, h: 40 })
-      const group = createObject('group', 'g1', { x: 0, y: 0, w: 200, h: 60 })
-      group.fit = { x: 'stretch' }
-      group.children = [button]
-      book.pages[0]!.objects.push(group)
-      book.canvas.desktop = { width: 1280, height: 800 }
-      book.canvas.tablet = { width: 640, height: 1024 }
-      const root = document.createElement('div')
-      renderBookPage(book, 0, root, 'tablet')
-      const member = root.querySelector<HTMLElement>('.tb-group [data-tb-id]')!
-      // group scales 200 → 200·(640/1280) = 100; fx = 100/200 = 0.5
-      const fx = (200 * (640 / 1280)) / 200
-      expect(parseInt(member.style.left)).toBe(Math.round(10 * fx))
-      expect(parseInt(member.style.width)).toBe(Math.max(1, Math.round(100 * fx)))
-    })
-
-    it('a glued group lenses its box and its members ride without scaling', () => {
-      const book = createBook('fit')
-      const ok = createObject('button', 'ok', { x: 10, y: 10, w: 80, h: 40 })
-      const cancel = createObject('button', 'cancel', { x: 110, y: 10, w: 80, h: 40 })
-      const group = createObject('group', 'g1', { x: 600, y: 100, w: 200, h: 100 })
-      group.fit = { x: 'right' }
-      group.children = [ok, cancel]
-      book.pages[0]!.objects.push(group)
-      const root = document.createElement('div')
-      renderBookPage(book, 0, root, 'mobile')
+      renderBookPage(book, 0, root, { width: 800, height: 600 })
       const groupEl = root.querySelector<HTMLElement>('.tb-object')!
-      // right, proportional: (600+200)·390/1280 − 200 = 44
-      expect(parseInt(groupEl.style.left)).toBe(Math.round((600 + 200) * (390 / 1280)) - 200)
-      const members = root.querySelectorAll<HTMLElement>('.tb-group [data-tb-id]')
-      // non-stretch glue: members keep their authored relative positions
-      expect(parseInt(members[0]!.style.left)).toBe(10)
-      expect(parseInt(members[1]!.style.left)).toBe(110)
-    })
-
-    it('a non-stretch glued group lenses its box; members ride at their authore size', () => {
-      const book = createBook('fit')
-      const member = createObject('button', 'm', { x: 10, y: 10, w: 100, h: 40 })
-      const group = createObject('group', 'g1', { x: 0, y: 0, w: 200, h: 60 })
-      group.fit = { x: 'center' }
-      group.children = [member]
-      book.pages[0]!.objects.push(group)
-      const root = document.createElement('div')
-      renderBookPage(book, 0, root, 'tablet')
+      expect(groupEl.style.left).toBe('100px')
+      expect(groupEl.style.right).toBe('100px')
       const memberEl = root.querySelector<HTMLElement>('.tb-group [data-tb-id]')!
-      // non-stretch: the member keeps its authored relative box
-      expect(parseInt(memberEl.style.left)).toBe(10)
-      expect(parseInt(memberEl.style.width)).toBe(100)
+      // follows-both stretches with the group box; no JS scaling
+      expect(memberEl.style.left).toBe('10px')
+      expect(memberEl.style.right).toBe('10px')
+      expect(memberEl.style.width).toBe('')
     })
 
-    it('background objects glue to the edge too', () => {
+    it('background objects carry their own edges too', () => {
       const book = createBook('fit')
       const nav = createObject('button', 'nav', { x: 1200, y: 0, w: 80, h: 40 })
-      nav.fit = { x: 'right' }
+      nav.x = R
       book.backgrounds[0]!.objects.push(nav)
       const root = document.createElement('div')
-      renderBookPage(book, 0, root, 'mobile')
-      const all = root.querySelectorAll<HTMLElement>('.tb-object')
-      // both page (none here) and background objects render — find the nav
-      const navEl = Array.from(all).find((el) => el.dataset.tbName === 'nav')!
-      // desktop right edge was 1280 → scales to the mobile right edge (390)
-      expect(parseInt(navEl.style.left)).toBe(390 - 80)
+      renderBookPage(book, 0, root, { width: 800, height: 600 })
+      const navEl = Array.from(root.querySelectorAll<HTMLElement>('.tb-object')).find(
+        (el) => el.dataset.tbName === 'nav',
+      )!
+      expect(navEl.style.right).toBe('24px')
     })
   })
 

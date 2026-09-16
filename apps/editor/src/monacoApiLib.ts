@@ -112,8 +112,8 @@ declare const author: {
   /** 'delete' | 'duplicate' | 'group' | 'ungroup' | 'front' | 'back' | 'forward' | 'backward'.
    * 'group' returns the new group as a live handle (it also becomes the selection). */
   command(action: string): Promise<{ ok: boolean; id?: string; name?: string; control?: string; ids?: string[] }>
-  /** editing context: page/background names, plugin pages, object count, active breakpoint */
-  pageInfo(): Promise<{ editing: string; pageName?: string; pageIndex?: number; backgroundName?: string; pageNames: string[]; backgroundNames: string[]; pluginPages: string[]; objectCount: number; canvas: { width: number; height: number }; breakpoint: string }>
+  /** editing context: page/background names, plugin pages, object count, canvas size */
+  pageInfo(): Promise<{ editing: string; pageName?: string; pageIndex?: number; backgroundName?: string; pageNames: string[]; backgroundNames: string[]; pluginPages: string[]; objectCount: number; canvas: { width: number; height: number } }>
   /** flash a note in the editor status bar */
   message(text: string): Promise<{ ok: boolean }>
 }

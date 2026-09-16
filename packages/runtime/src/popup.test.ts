@@ -5,7 +5,7 @@ import { popupEscape, runBook, stopRun } from './player'
 import { listenForEditor } from './editorLink'
 
 function popupBook(opts?: {
-  dialogBg?: { size?: { width: number; height: number }; script?: string; autoHeight?: boolean }
+  dialogSize?: { width: number; height: number }
   modal?: boolean
   chrome?: 'auto' | 'none'
   openScript?: string
@@ -17,7 +17,6 @@ function popupBook(opts?: {
   return {
     id: 'b',
     title: 'T',
-    canvas: { desktop: { width: 800, height: 600 } },
     backgrounds: [
       {
         id: 'bg1',
@@ -30,9 +29,7 @@ function popupBook(opts?: {
         id: 'bgDialog',
         name: 'Dialog',
         color: '#f0f0ff',
-        script: opts?.dialogBg?.script ?? '',
-        ...(opts?.dialogBg?.size ? { size: { desktop: opts.dialogBg.size } } : {}),
-        ...(opts?.dialogBg?.autoHeight ? { autoHeight: true } : {}),
+        script: '',
         objects: [],
       },
     ],
@@ -54,6 +51,7 @@ function popupBook(opts?: {
         name: 'Dialog',
         script: '',
         backgroundId: 'bgDialog',
+        ...(opts?.dialogSize ? { size: opts.dialogSize } : {}),
         objects: [
           {
             ...createObject('button', 'okBtn', { x: 8, y: 8, w: 80, h: 30 }, { text: 'OK' }),
@@ -71,11 +69,11 @@ function popupBook(opts?: {
 const tick = () => new Promise((r) => setTimeout(r, 20))
 
 describe('popups', () => {
-  it('popupOpen renders the page in a chrome box sized by its background; close removes it', async () => {
+  it('popupOpen renders the page in a chrome box sized by the page; close removes it', async () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
-    const book = popupBook({ dialogBg: { size: { width: 320, height: 240 } } })
-    const handle = runBook(book, root, 'desktop', (m) => {
+    const book = popupBook({ dialogSize: { width: 320, height: 240 } })
+    const handle = runBook(book, root, (m) => {
       throw new Error(`script error: ${m}`)
     })
     const btn = root.querySelector('button.tb-button') as HTMLButtonElement
@@ -103,20 +101,19 @@ describe('popups', () => {
     root.remove()
   })
 
-  it('a popup inherits auto-height from its background', async () => {
+  it('a fluid popup fills the default dialog size and grows to fit tall content', async () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
-    const book = popupBook({
-      dialogBg: { size: { width: 320, height: 240 }, autoHeight: true },
-    })
+    const book = popupBook()
     book.pages[1]!.objects.push(createObject('card', 'tall', { x: 0, y: 500, w: 100, h: 50 }))
-    runBook(book, root, 'desktop')
+    runBook(book, root)
     ;(root.querySelector('button.tb-button') as HTMLButtonElement).click()
     await tick()
 
     const page = document.querySelector<HTMLElement>('.tb-popup .tb-page')!
-    expect(page.style.width).toBe('320px')
-    expect(page.style.height).toBe(`${550 + 24}px`)
+    expect(page.style.width).toBe('100%')
+    expect(page.style.height).toBe('100%')
+    expect(page.style.minHeight).toBe('550px')
     stopRun()
     root.remove()
   })
@@ -126,7 +123,7 @@ describe('popups', () => {
     document.body.appendChild(root)
     root.style.position = 'relative'
     const book = popupBook({ chrome: 'none', openScript: `page.popupOpen('Dialog', { chrome: 'none', x: 40, y: 30 })` })
-    runBook(book, root, 'desktop')
+    runBook(book, root)
     ;(root.querySelector('[data-tb-name="openBtn"] button') as HTMLElement).click()
     await tick()
     const box = document.querySelector<HTMLElement>('.tb-popup')!
@@ -142,7 +139,7 @@ describe('popups', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
     const book = popupBook()
-    runBook(book, root, 'desktop')
+    runBook(book, root)
     ;(root.querySelector('[data-tb-name="openBtn"] button') as HTMLElement).click()
     await tick()
     const box = document.querySelector<HTMLElement>('.tb-popup')!
@@ -166,7 +163,7 @@ describe('popups', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
     const book = popupBook()
-    runBook(book, root, 'desktop')
+    runBook(book, root)
     ;(root.querySelector('[data-tb-name="openBtn"] button') as HTMLElement).click()
     await tick()
     expect(document.querySelector('.tb-popup-backdrop')).not.toBeNull()
@@ -177,7 +174,7 @@ describe('popups', () => {
 
     // non-modal: no backdrop
     const book2 = popupBook({ modal: false })
-    runBook(book2, root, 'desktop')
+    runBook(book2, root)
     ;(root.querySelector('[data-tb-name="openBtn"] button') as HTMLElement).click()
     await tick()
     expect(document.querySelector('.tb-popup')).not.toBeNull()
@@ -185,7 +182,7 @@ describe('popups', () => {
     stopRun()
 
     // Esc closes a modal popup (player-level Esc contract)
-    runBook(book, root, 'desktop')
+    runBook(book, root)
     ;(root.querySelector('[data-tb-name="openBtn"] button') as HTMLElement).click()
     await tick()
     expect(popupEscape()).toBe(true)
@@ -217,7 +214,7 @@ describe('popups', () => {
       on: { click: `page.popupOpen('Dialog2', { chrome: 'none' })` },
     })
     // open two DIFFERENT popups — they stack
-    const handle = runBook(book, root, 'desktop')
+    const handle = runBook(book, root)
     ;(root.querySelector('[data-tb-name="openBtn"] button') as HTMLElement).click()
     await tick()
     ;(root.querySelector('[data-tb-name="openBtn2"] button') as HTMLElement).click()
@@ -255,7 +252,7 @@ describe('popups', () => {
       ...createObject('button', 'navAway', { x: 200, y: 0, w: 100, h: 30 }),
       on: { click: `page.go('Other')` },
     })
-    const handle = runBook(book, root, 'desktop', (m) => {
+    const handle = runBook(book, root, (m) => {
       throw new Error(`script error: ${m}`)
     })
     ;(root.querySelector('[data-tb-name="openBtn"] button') as HTMLElement).click()
@@ -274,7 +271,7 @@ describe('popups', () => {
     document.body.appendChild(root)
     const book = popupBook({ openScript: `page.popupOpen('Dialog', { chrome: 'none' })` })
     const seenOpen: string[][] = []
-    runBook(book, root, 'desktop', undefined, 0, (open) => seenOpen.push([...open]))
+    runBook(book, root, undefined, 0, (open) => seenOpen.push([...open]))
     ;(root.querySelector('[data-tb-name="openBtn"] button') as HTMLElement).click()
     await tick()
     expect(seenOpen.at(-1)).toEqual(['Dialog'])
@@ -293,7 +290,6 @@ describe('background scripts', () => {
     const book: Book = {
       id: 'b',
       title: 'T',
-      canvas: { desktop: { width: 400, height: 300 } },
       backgrounds: [
         {
           id: 'bg1',
@@ -324,7 +320,7 @@ describe('background scripts', () => {
       ],
     }
     const errors: string[] = []
-    const handle = runBook(book, root, 'desktop', (m) => errors.push(m))
+    const handle = runBook(book, root, (m) => errors.push(m))
     await tick()
     expect(errors).toEqual([])
     expect(handle.store.get('bg')).toBe(1)
@@ -341,7 +337,6 @@ describe('background scripts', () => {
     const book: Book = {
       id: 'b',
       title: 'T',
-      canvas: { desktop: { width: 400, height: 300 } },
       backgrounds: [
         { id: 'bg1', name: 'B', color: '#fff', script: '', objects: [nav] },
       ],
@@ -350,7 +345,7 @@ describe('background scripts', () => {
         { id: 'p2', name: 'Two', script: '', backgroundId: 'bg1', objects: [] },
       ],
     }
-    const handle = runBook(book, root, 'desktop', (m) => {
+    const handle = runBook(book, root, (m) => {
       throw new Error(`script error: ${m}`)
     })
     ;(root.querySelector('[data-tb-name="navBtn"] button') as HTMLElement).click()
