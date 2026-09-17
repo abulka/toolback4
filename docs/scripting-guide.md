@@ -17,9 +17,10 @@ dispatch chain, the editor↔canvas protocol — see
 
 There are two places a script can live:
 
-- **Object script** — select an object on the canvas, open the **Script** section in
-  the properties panel, pick an **event** (click, change, input…), and write the
-  handler body. It runs every time that event fires on that object.
+- **Object script** — select an object on the canvas, open the **Script** sub-tab
+  in the properties panel's Selection view (the **Script** label is marked • when
+  the object already has scripts), pick an **event** (click, change, input…), and
+  write the handler body. It runs every time that event fires on that object.
 - **Page script** — the **Page script** panel in the properties sidebar. Define
   functions once here and call them from any object script. Also the home of
   `pageEnter()`, which runs when you press **Run** (shortcut: `F3` or `⌥3`).
@@ -715,7 +716,7 @@ become the natural home for global imports.
 Select several objects (shift-click, or drag a box on empty canvas) and press
 **Group** in the Selection panel (or `⌥G` / Alt+G — works with the canvas
 focused too). The group is a parent object: it has a name
-(`group1`, …), a position, and its own Script section. **Ungroup** (`⌥U` /
+(`group1`, …), a position, and its own Script sub-tab. **Ungroup** (`⌥U` /
 Alt+U) releases the members back.
 
 What a group gives you:

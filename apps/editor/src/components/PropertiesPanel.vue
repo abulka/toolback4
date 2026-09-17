@@ -52,6 +52,13 @@ function hasScript(e: (typeof EVENTS)[number]): boolean {
   return Boolean(sel.value?.on[e]?.trim())
 }
 
+// ---- Selection sub-tabs ----
+const subTab = ref<'general' | 'script'>('general')
+// any event handler carries code — marks the Script tab when true
+const hasAnyScript = computed(() =>
+  Object.values(sel.value?.on ?? {}).some((v) => typeof v === 'string' && v.trim() !== ''),
+)
+
 function onScript(code: string): void {
   if (sel.value) store.setEventScript(sel.value.id, currentEvent.value, code)
 }
@@ -356,6 +363,14 @@ function onPaste(): void {
       >{{ copied ? '✓ Copied' : '{ } JSON' }}</button>
     </div>
 
+    <div class="subtabs">
+      <button :class="{ on: subTab === 'general' }" @click="subTab = 'general'">General</button>
+      <button :class="{ on: subTab === 'script' }" @click="subTab = 'script'">
+        Script<span v-if="hasAnyScript" class="tab-mark" title="This object has scripts">•</span>
+      </button>
+    </div>
+
+    <div v-show="subTab === 'general'">
     <div class="actions">
       <button class="action" @click="onCopy">Copy</button>
       <button class="action" @click="onCut">Cut</button>
@@ -454,7 +469,9 @@ function onPaste(): void {
     <p v-if="textFields.length === 0 || isGroupSel()" class="hint">
       {{ isGroupSel() ? 'Groups have no content — members do. Use Script for shared behaviour.' : 'No content properties.' }}
     </p>
+    </div>
 
+    <div v-show="subTab === 'script'">
     <div class="row">
       <h2>Script</h2>
       <HelpButton anchor="object-scripts" />
@@ -465,22 +482,26 @@ function onPaste(): void {
         <option v-for="e in EVENTS" :key="e" :value="e" :class="{ scripted: hasScript(e) }">{{ hasScript(e) ? e + ' •' : e }}</option>
       </select>
     </div>
-    <ScriptEditor
-      :key="sel ? `${sel.id}:${currentEvent}` : 'none'"
-      editor-class="obj-script"
-      kind="object"
-      :title="sel ? `Script · ${sel.name} · ${currentEvent}` : 'Object script'"
-      :link-key="sel ? `obj:${sel.id}:${currentEvent}` : ''"
-      :model-value="eventScript"
-      height="150px"
-      @update:model-value="onScript"
-    />
+    <div class="script-fill">
+      <ScriptEditor
+        :key="sel ? `${sel.id}:${currentEvent}` : 'none'"
+        editor-class="obj-script"
+        kind="object"
+        :title="sel ? `Script · ${sel.name} · ${currentEvent}` : 'Object script'"
+        :link-key="sel ? `obj:${sel.id}:${currentEvent}` : ''"
+        :model-value="eventScript"
+        height="100%"
+        @update:model-value="onScript"
+      />
+    </div>
     <p v-if="isGroupSel()" class="hint">
       A group handler runs when a member without its own handler is clicked, or
       when a member's script ends with <code>forward()</code>. Here
       <code>target</code> is the member, <code>self</code> the group.
     </p>
+    </div>
 
+    <div v-show="subTab === 'general'">
     <h2>Arrange</h2>
     <div class="actions">
       <button class="action" title="Bring to front (⌘⇧])" @click="store.reorderSelection('front')">⤒ Front</button>
@@ -556,6 +577,7 @@ function onPaste(): void {
     </div>
 
     <button class="delete" @click="store.removeSelected()">Delete object</button>
+    </div>
   </div>
 </template>
 
@@ -984,6 +1006,51 @@ function onPaste(): void {
 
 .row h2 {
   margin-bottom: 4px;
+}
+
+.subtabs {
+  display: flex;
+  gap: 2px;
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 8px;
+  padding: 2px;
+  margin: 8px 0 12px;
+}
+
+.subtabs button {
+  flex: 1;
+  font: 500 12px/1 system-ui, sans-serif;
+  color: var(--ed-text-dim);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 6px;
+  cursor: pointer;
+}
+
+.subtabs button:hover {
+  color: var(--ed-text);
+}
+
+.subtabs button.on {
+  color: #fff;
+  background: var(--ed-accent);
+}
+
+.subtabs button.on .tab-mark {
+  color: #fff;
+}
+
+.tab-mark {
+  color: var(--ed-accent);
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.script-fill {
+  height: calc(100vh - 260px);
+  min-height: 260px;
 }
 
 .event-row {
