@@ -394,6 +394,38 @@ describe('runtime', () => {
       })
     })
 
+    it('a margin offsets the control and grows the page past a near-edge control', () => {
+      const book = edgeBook(L, T)
+      book.pages[0]!.objects[0]!.margin = { top: 5, right: 10, bottom: 24, left: 3 }
+      expect(firstStyle(book)).toMatchObject({ left: '1083px', top: '29px', width: '176px' })
+      const root = document.createElement('div')
+      renderBookPage(book, 0, root, { width: 800, height: 600 })
+      const page = root.querySelector<HTMLElement>('.tb-page')!
+      // extent.right = 1080 + 3 + 176 + 10; extent.bottom = 24 + 5 + 48 + 24
+      expect(page.style.minWidth).toBe('1269px')
+      expect(page.style.minHeight).toBe('101px')
+    })
+
+    it('a uniform margin keeps a centred control centred', () => {
+      const book = edgeBook(CX, CY)
+      book.pages[0]!.objects[0]!.margin = { top: 8, right: 8, bottom: 8, left: 8 }
+      expect(firstStyle(book)).toMatchObject({
+        left: 'calc(50% - 88px)',
+        top: 'calc(50% - 24px)',
+      })
+    })
+
+    it('a far-edge margin offsets the control but does not grow the page', () => {
+      const book = edgeBook(R, BOT)
+      book.pages[0]!.objects[0]!.margin = { top: 5, right: 10, bottom: 24, left: 3 }
+      expect(firstStyle(book)).toMatchObject({ right: '34px', bottom: '48px' })
+      const root = document.createElement('div')
+      renderBookPage(book, 0, root, { width: 800, height: 600 })
+      const page = root.querySelector<HTMLElement>('.tb-page')!
+      expect(page.style.minWidth).toBe('0px')
+      expect(page.style.minHeight).toBe('0px')
+    })
+
     it('a fluid page fills the container and grows to the near-edge content extent', () => {
       const root = document.createElement('div')
       renderBookPage(edgeBook(L, T), 0, root, { width: 800, height: 600 })

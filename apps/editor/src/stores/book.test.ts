@@ -834,6 +834,64 @@ describe('book store — responsive edges', () => {
   })
 })
 
+describe('book store — outer margin', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('setObjectMargin stores sides and offsets the control', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    store.setObjectMargin(id, { top: 4, right: 10, bottom: 24, left: 6 })
+    const o = store.book.pages[0]!.objects[0]!
+    expect(o.margin).toEqual({ top: 4, right: 10, bottom: 24, left: 6 })
+    expect(store.effectiveRectOf(id)).toMatchObject({ x: 6, y: 4 })
+  })
+
+  it('a bottom margin grows the page past a near-edge control', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    store.setObjectMargin(id, { bottom: 900 })
+    // object top 0 + height 50 + margin 900, past the 800 viewport
+    expect(store.activeCanvasSize.height).toBe(950)
+  })
+
+  it('a zero side is dropped and an all-zero margin is removed', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    store.setObjectMargin(id, { top: 5 })
+    expect(store.book.pages[0]!.objects[0]!.margin).toEqual({ top: 5 })
+    store.setObjectMargin(id, { top: 0 })
+    expect(store.book.pages[0]!.objects[0]!.margin).toBeUndefined()
+  })
+
+  it('fill clears the margin on the axes it sets', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    store.setObjectMargin(id, { top: 5, right: 10, bottom: 24, left: 3 })
+    store.fillObjectToPage(id, 8)
+    const o = store.book.pages[0]!.objects[0]!
+    expect(o.margin).toBeUndefined()
+    expect(o.x).toEqual({ mode: 'both', left: 8, right: 8 })
+  })
+
+  it('dragging a margined object keeps the margin without double-counting', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const o = store.book.pages[0]!.objects[0]!
+    o.margin = { left: 6, top: 4 }
+    // rendered border box is at 6,4; drag it +40,+10
+    store.applyRects([{ id: o.id, rect: { x: 46, y: 14, w: 100, h: 50 } }])
+    expect(o.x).toEqual({ mode: 'left', left: 40, width: 100 })
+    expect(o.y).toEqual({ mode: 'top', top: 10, height: 50 })
+    expect(o.margin).toEqual({ left: 6, top: 4 })
+  })
+})
+
 describe('book store — edge writes', () => {
   beforeEach(() => {
     setActivePinia(createPinia())

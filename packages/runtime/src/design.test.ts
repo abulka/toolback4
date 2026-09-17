@@ -12,6 +12,7 @@ import {
 } from '@toolback/format'
 import { sampleBook } from '@toolback/format/src/sample'
 import {
+  badgePosition,
   createDesignController,
   groupOutlineIds,
   isCornerHandle,
@@ -131,6 +132,23 @@ describe('design geometry helpers', () => {
     expect(isCornerHandle('se')).toBe(true)
     expect(isCornerHandle('n')).toBe(false)
     expect(isCornerHandle('e')).toBe(false)
+  })
+
+  it('badgePosition sits below an object when there is room', () => {
+    expect(badgePosition({ x: 96, y: 96, w: 176, h: 48 }, { width: 1280, height: 800 }, { width: 60, height: 18 })).toEqual({ x: 96, y: 152 })
+  })
+
+  it('badgePosition flips above a bottom-edge object so it stays on the page', () => {
+    // object flush with the 800-high page: below would be 776+8+18 > 800
+    expect(badgePosition({ x: 96, y: 752, w: 176, h: 48 }, { width: 1280, height: 800 }, { width: 60, height: 18 })).toEqual({ x: 96, y: 726 })
+  })
+
+  it('badgePosition clamps inside the page on the right and bottom edges', () => {
+    expect(badgePosition({ x: 1220, y: 40, w: 176, h: 48 }, { width: 1280, height: 800 }, { width: 60, height: 18 })).toEqual({ x: 1216, y: 96 })
+  })
+
+  it('badgePosition clamps to the inset when the object is off-page', () => {
+    expect(badgePosition({ x: -500, y: 900, w: 176, h: 48 }, { width: 800, height: 600 }, { width: 60, height: 18 })).toEqual({ x: 4, y: 578 })
   })
 })
 

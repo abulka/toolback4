@@ -1,5 +1,5 @@
 import type { Background, Book, CanvasSize, Page, PageObject, Rect } from '@toolback/format'
-import { backgroundFor, contentExtent, rectForObject, resolvePageBox } from '@toolback/format'
+import { backgroundFor, contentExtent, marginOf, rectForObject, resolvePageBox } from '@toolback/format'
 import { registerControls, renderObject } from '@toolback/controls'
 import { stylesCss } from './styles'
 
@@ -57,41 +57,49 @@ export function applyEdgeStyles(el: HTMLElement, obj: PageObject): void {
   s.top = ''
   s.bottom = ''
   s.height = ''
+  const m = marginOf(obj)
   switch (obj.x.mode) {
     case 'left':
-      s.left = `${obj.x.left}px`
+      s.left = `${obj.x.left + m.left}px`
       s.width = `${obj.x.width}px`
       break
     case 'right':
-      s.right = `${obj.x.right}px`
+      s.right = `${obj.x.right + m.right}px`
       s.width = `${obj.x.width}px`
       break
     case 'both':
-      s.left = `${obj.x.left}px`
-      s.right = `${obj.x.right}px`
+      s.left = `${obj.x.left + m.left}px`
+      s.right = `${obj.x.right + m.right}px`
       break
-    case 'center':
-      s.left = `calc(50% - ${obj.x.width / 2}px)`
+    case 'center': {
+      // centre the margin box: equal left/right margins cancel out
+      const half = obj.x.width / 2 - (m.left - m.right) / 2
+      s.left =
+        half < 0 ? `calc(50% + ${-half}px)` : `calc(50% - ${half}px)`
       s.width = `${obj.x.width}px`
       break
+    }
   }
   switch (obj.y.mode) {
     case 'top':
-      s.top = `${obj.y.top}px`
+      s.top = `${obj.y.top + m.top}px`
       s.height = `${obj.y.height}px`
       break
     case 'bottom':
-      s.bottom = `${obj.y.bottom}px`
+      s.bottom = `${obj.y.bottom + m.bottom}px`
       s.height = `${obj.y.height}px`
       break
     case 'both':
-      s.top = `${obj.y.top}px`
-      s.bottom = `${obj.y.bottom}px`
+      s.top = `${obj.y.top + m.top}px`
+      s.bottom = `${obj.y.bottom + m.bottom}px`
       break
-    case 'center':
-      s.top = `calc(50% - ${obj.y.height / 2}px)`
+    case 'center': {
+      const half = obj.y.height / 2 - (m.top - m.bottom) / 2
+      s.top =
+        half < 0 ? `calc(50% + ${-half}px)` : `calc(50% - ${half}px)`
       s.height = `${obj.y.height}px`
       break
+    }
   }
 }
 

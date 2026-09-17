@@ -16,6 +16,27 @@ export function snapRect(r: Rect, grid = GRID): Rect {
   return { x: snap(r.x, grid), y: snap(r.y, grid), w: snap(r.w, grid), h: snap(r.h, grid) }
 }
 
+/**
+ * Where the selection size badge sits relative to an object's rect: just below
+ * it when there is room, flipped above when there is not, and clamped inside
+ * the page either way — so a control on the bottom/right page edge keeps its
+ * badge on the page instead of clipping it away.
+ */
+export function badgePosition(
+  r: Rect,
+  page: { width: number; height: number },
+  badge: { width: number; height: number },
+  gap = 8,
+): { x: number; y: number } {
+  const inset = 4
+  let x = r.x
+  let y = r.y + r.h + gap
+  if (y + badge.height > page.height) y = r.y - badge.height - gap
+  x = Math.min(Math.max(x, inset), Math.max(inset, page.width - badge.width - inset))
+  y = Math.min(Math.max(y, inset), Math.max(inset, page.height - badge.height - inset))
+  return { x, y }
+}
+
 export function resizeRect(start: Rect, dir: HandleDir, dx: number, dy: number, min = MIN_SIZE): Rect {
   let { x, y, w, h } = start
   const ddx = snap(dx)
@@ -920,7 +941,7 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   }
 
   function redrawSelection(override?: Rect): void {
-    if (!wrapper || !marquee || !badge) return
+    if (!wrapper || !overlay || !marquee || !badge) return
     // create boxes lazily for the current selection, hide stale ones
     for (const id of selected) selBoxFor(id)
     for (const [id, box] of selBoxes) {
@@ -957,9 +978,16 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
           h.style.top = `${cy - HANDLE_OFFSET}px`
         }
         badge.style.display = 'block'
-        badge.style.left = `${r.x}px`
-        badge.style.top = `${r.y + r.h + 8}px`
         badge.textContent = `${Math.round(r.w)} × ${Math.round(r.h)}`
+        // keep the badge on the page (the overlay clips to it) — flip it above
+        // a bottom-edge object and clamp it inside the page box
+        const at = badgePosition(
+          r,
+          { width: overlay.clientWidth, height: overlay.clientHeight },
+          { width: badge.offsetWidth, height: badge.offsetHeight },
+        )
+        badge.style.left = `${at.x}px`
+        badge.style.top = `${at.y}px`
         drawFitHints()
         redrawGroupOutlines()
         return

@@ -303,6 +303,12 @@ and communicates with the editor only through messages (`toolback:selection`,
   of the page. The controller's `rects` map is always the source of truth for
   these — it reads rendered DOM positions, so CSS edge rendering is
   automatically reflected.
+- **Selection chrome**: the `.tb-sel` outline, the eight resize handles and the
+  `w × h` size badge are drawn in the overlay. The badge prefers just below the
+  selected object, flips above it when there is no room, and is clamped inside
+  the page box (`badgePosition`, `design.ts`) — so a control on the bottom/right
+  page edge keeps its size label visible instead of clipping it against the
+  overlay's `overflow: hidden`.
 - **Edge springs**: the `.tb-fithint` overlay draws a spring from every object
   to each edge it follows, **one axis at a time** (by default every object draws
   at least the left/top springs). The load message carries the whole
@@ -371,6 +377,18 @@ to CSS (`applyEdgeStyles`: `left`+`width`, `right`+`width`, `left`+`right`, or
 page for top-level objects, the parent group wrapper for members — so the browser
 repositions everything on resize with **no JavaScript re-render**.
 
+An optional **outer margin** (`PageObject.margin: { top?, right?, bottom?, left? }`,
+missing sides = 0) folds into the same resolution, like CSS `margin` around an
+absolutely-positioned box. On a followed edge it offsets the control away from
+that edge (`left` → `left + margin.left`, `right` → `right + margin.right`,
+`both` shrinks by both margins); a centred axis centres the **margin box**, so
+equal margins cancel and the control stays centred. `rectForObject` and
+`applyEdgeStyles` share this math, and `xEdgeFromRect`/`yEdgeFromRect` subtract
+the margin again so a drag/typed write cannot double-count it. `scaleEdges`
+scales the margin with a group resize; `marginOf` fills in the missing sides.
+Margins are editor-authored only (the Geometry panel's **Margin** row) — there is
+no `ControlApi`/author-bridge setter.
+
 The author-facing surface is the **Responsive** section of the properties panel
 (`apps/editor/src/components/PropertiesPanel.vue`): four plain choices per axis
 (Follows left · Follows right · Follows both (stretches) · Centred), stored
@@ -407,11 +425,13 @@ carry their own constraints **relative to the group box** (see §5).
 `resolvePageBox(page, container, objects)` (`packages/format`) is the single
 source of a page's size. A **fixed** page (`Page.size`) returns that size. An
 **ordinary** page returns `max(container, content extent)`, where the extent is
-`contentExtent(objects)`: the right/bottom of every object whose x/y mode is
-**left/top** (near edge, groups included). Right/bottom/both/centred objects sit
-inside the page box by definition and never enlarge it — this is what makes
-"follows bottom" mean a fixed distance from the page's real bottom edge without
-circularity.
+`contentExtent(objects)`: the outer (margin-box) right/bottom of every object
+whose x/y mode is **left/top** (near edge, groups included). Right/bottom/both/
+centred objects sit inside the page box by definition and never enlarge it — this
+is what makes "follows bottom" mean a fixed distance from the page's real bottom
+edge without circularity. Including the margin box is what lets a Follows-top
+control keep `margin.bottom` px of empty page below it instead of sitting flush
+on the auto-grown edge.
 
 At render time a fluid page is given `width:100%; height:100vh` (or `100%` inside
 a sized popup/author box) with `min-width`/`min-height` set to the content
@@ -675,8 +695,10 @@ match what will resolve at runtime:
    and preview consume that layout.
 9. **Far edges cannot feed the page size.** `resolvePageBox` may grow the page
    *box* past the container; only left/top (near-edge) objects contribute to
-   `contentExtent` (see §4.2). A right/bottom/both/centred object never enlarges
-   the page.
+   `contentExtent` (see §4.2), measured to their outer (margin-box) edge. A
+   right/bottom/both/centred object never enlarges the page — its margin only
+   offsets it. Margins must be subtracted again by `xEdgeFromRect`/`yEdgeFromRect`
+   on write (never bake a resolved rect back into `x`/`y`).
 10. **A group scales when you size it, not when the page reflows.** A group
     resize — a handle drag (`applyRects` with `dir`), a typed W/H
     (`setGeometry`), or a scripted `group.width`/`height` — scales descendants'

@@ -69,17 +69,23 @@ ones most easily broken:
   equivalents) — the internal data behind the user-facing **Responsive** section
   in the properties panel (the Horizontal/Vertical dropdowns —
   `apps/editor/src/components/PropertiesPanel.vue`) and the "spring" language in
-  the docs. `resolveX`/`resolveY` (via `rectForObject`) derive a rect against the
+  the docs. An optional `PageObject.margin` (outer space, like CSS) folds into
+  the same resolution: it offsets the control on the edges it follows, and a
+  near-edge control's margin box feeds `contentExtent` so a fluid page grows
+  past it. `resolveX`/`resolveY` (via `rectForObject`) derive a rect against the
   containing box and `applyEdgeStyles` writes it straight to CSS, so the browser
   repositions controls on resize with no re-render. Never bake a resolved rect
   back into `x`/`y`; deliberate geometry writes (drag, typed X/Y/W/H, script
-  setter, author bridge) keep the mode through `writeRectPart`.
+  setter, author bridge) keep the mode through `writeRectPart`, and
+  `xEdgeFromRect`/`yEdgeFromRect` subtract `margin` so a write cannot
+  double-count it.
 - **A fluid page's extent is driven only by near edges.** `resolvePageBox` grows
   the page past the viewport with `contentExtent`, which counts only objects
-  following left/top. Right/bottom/both/centred objects sit inside the page box
-  (that is what makes "follows bottom" mean N from the page's bottom edge). A
-  fluid page uses `width:100%` + content `min-width`/`min-height`; the editor
-  wrapper toggles `.tb-canvas-root--fluid` so it spans the viewport.
+  following left/top (to their outer margin edge). Right/bottom/both/centred
+  objects sit inside the page box (that is what makes "follows bottom" mean N
+  from the page's bottom edge), so their margin only offsets them. A fluid page
+  uses `width:100%` + content `min-width`/`min-height`; the editor wrapper
+  toggles `.tb-canvas-root--fluid` so it spans the viewport.
 - **A group scales when you size it, not when the page reflows.** Each member
   carries its own `x`/`y` against the group box. A handle drag (and a typed W/H
   or a scripted `group.width`/`height`) scales every descendant's edges

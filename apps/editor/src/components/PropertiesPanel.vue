@@ -182,6 +182,21 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
   store.setGeometry(sel.value.id, { [field]: n })
 }
 
+// ---- outer margin: space reserved around the control ----
+const margin = computed(() => sel.value?.margin ?? {})
+const marginLinked = ref(false)
+const MARGIN_SIDES = ['top', 'right', 'bottom', 'left'] as const
+type MarginSide = (typeof MARGIN_SIDES)[number]
+function setMargin(side: MarginSide, e: Event): void {
+  if (!sel.value) return
+  const n = Math.max(0, Math.round(Number((e.target as HTMLInputElement).value)) || 0)
+  if (marginLinked.value) {
+    store.setObjectMargin(sel.value.id, { top: n, right: n, bottom: n, left: n })
+  } else {
+    store.setObjectMargin(sel.value.id, { [side]: n })
+  }
+}
+
 // ---- Fill page: size a top-level object to the page (minus a margin) ----
 function readFillMargin(): number {
   try {
@@ -536,6 +551,31 @@ function onPaste(): void {
       </div>
     </div>
 
+    <div class="margin-row">
+      <label class="margin-title" title="Space reserved around the control. On a fluid page a Follows-top/left control's bottom/right margin keeps that much empty page below/right of it.">
+        Margin
+        <input type="checkbox" v-model="marginLinked" title="Set all four sides together" />
+      </label>
+      <div class="margin-grid">
+        <label class="margin-field">
+          T
+          <input type="number" min="0" step="4" :value="margin.top ?? 0" @change="setMargin('top', $event)" />
+        </label>
+        <label class="margin-field">
+          R
+          <input type="number" min="0" step="4" :value="margin.right ?? 0" @change="setMargin('right', $event)" />
+        </label>
+        <label class="margin-field">
+          B
+          <input type="number" min="0" step="4" :value="margin.bottom ?? 0" @change="setMargin('bottom', $event)" />
+        </label>
+        <label class="margin-field">
+          L
+          <input type="number" min="0" step="4" :value="margin.left ?? 0" @change="setMargin('left', $event)" />
+        </label>
+      </div>
+    </div>
+
     <div v-if="canFit()" class="fill-row">
       <button class="fill" @click="onFill">Fill page</button>
       <button class="fill" @click="onFillWidth">Fill width</button>
@@ -766,6 +806,53 @@ function onPaste(): void {
   align-items: center;
   gap: 8px;
   margin: 10px 0 14px;
+}
+
+.margin-row {
+  margin: 8px 0 4px;
+}
+
+.margin-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ed-text-dim);
+  margin-bottom: 4px;
+}
+
+.margin-title input[type='checkbox'] {
+  margin: 0;
+}
+
+.margin-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.margin-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--ed-text-dim);
+}
+
+.margin-field input {
+  width: 100%;
+  min-width: 0;
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  color: var(--ed-text);
+  padding: 5px 6px;
+  font: 12px ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.margin-field input:focus {
+  outline: none;
+  border-color: var(--ed-accent);
 }
 
 .fill {

@@ -321,6 +321,17 @@ Things to know:
   **Fill width** / **Fill height** do a single axis. **Center** sets both axes
   to **Centred**. Works on top-level objects; a group member follows its group's
   box instead.
+- **Margin (space around the control).** The **Margin** fields (T/R/B/L) in the
+  Geometry section reserve empty space around the control, like the CSS margin
+  of the same name. On the edges it follows, the margin offsets the control
+  (so a Follows-bottom control keeps its `bottom` distance **plus** its bottom
+  margin). The important one is the **far** side: a fluid page grows to the
+  outer edge of the bottom/right margin, so a **Follows-top** control with a
+  24px bottom margin keeps 24px of empty page below it instead of sitting flush
+  on the auto-sized edge — the fix for "the page always eats my bottom gap."
+  Equal left/right (or top/bottom) margins on a **Centred** control cancel out,
+  so it stays centred. A group wraps only its members' boxes, so a margin on a
+  member is internal spacing and does not enlarge the group.
 - **A spring shows every edge an object follows.** A solid zigzag runs from the
   object to each page edge it follows — a square anchor sits on the edge and a
   small arrowhead at the object points back at it. **Centred** draws a plain
