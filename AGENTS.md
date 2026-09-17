@@ -69,16 +69,19 @@ ones most easily broken:
   equivalents) — the internal data behind the user-facing **Responsive** section
   in the properties panel (the Horizontal/Vertical dropdowns —
   `apps/editor/src/components/PropertiesPanel.vue`) and the "spring" language in
-  the docs. An optional `PageObject.margin` (outer space, like CSS) folds into
-  the same resolution: it offsets the control on the edges it follows, and a
-  near-edge control's margin box feeds `contentExtent` so a fluid page grows
-  past it. `resolveX`/`resolveY` (via `rectForObject`) derive a rect against the
+  the docs. An optional `PageObject.margin` (`{ right?, bottom? }` — only the
+  far sides exist) folds into the same resolution: it offsets the control on the
+  edge it follows, and a near-edge control's margin feeds `contentExtent` so a
+  fluid page grows past it. `resolveX`/`resolveY` (via `rectForObject`) derive a rect against the
   containing box and `applyEdgeStyles` writes it straight to CSS, so the browser
   repositions controls on resize with no re-render. Never bake a resolved rect
   back into `x`/`y`; deliberate geometry writes (drag, typed X/Y/W/H, script
   setter, author bridge) keep the mode through `writeRectPart`, and
   `xEdgeFromRect`/`yEdgeFromRect` subtract `margin` so a write cannot
-  double-count it.
+  double-count it. `PageObject.marginEnabled: false` turns the margin off while
+  keeping its values; read the applied margin through `effectiveMargin` (as
+  `marginOf`/`rectForObject`/`applyRectToObject` do) so nothing acts on a
+  switched-off margin.
 - **A fluid page's extent is driven only by near edges.** `resolvePageBox` grows
   the page past the viewport with `contentExtent`, which counts only objects
   following left/top (to their outer margin edge). Right/bottom/both/centred

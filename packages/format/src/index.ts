@@ -43,27 +43,37 @@ export type XEdgeMode = XEdge['mode']
 export type YEdgeMode = YEdge['mode']
 
 /**
- * An object's outer margin, in the CSS sense: space reserved around the
- * control, outside its box. On the edge(s) the object follows it offsets the
- * control away from that edge, and on a fluid page a near-edge (left/top)
- * object's trailing margin grows the page past it — so a Follows-top control
- * can keep `margin.bottom` px of empty page below it instead of sitting flush
- * on the auto-sized edge. Missing sides are zero.
+ * An object's outer margin: space reserved on the far side of the control,
+ * outside its box. It offsets the control from the right/bottom edge it follows
+ * (or the right/bottom of a centred control's margin box), and on a fluid page a
+ * near-edge (left/top) object's trailing margin grows the page past it — so a
+ * Follows-top control can keep `margin.bottom` px of empty page below it instead
+ * of sitting flush on the auto-sized edge. Missing sides are zero.
+ *
+ * Only the right/bottom sides exist: on a left/top control the near margin is
+ * just the `left`/`top` distance by another name, and on a right/bottom control
+ * it never applies, so those sides were dropped.
  */
 export interface Margin {
-  top?: number
   right?: number
   bottom?: number
-  left?: number
 }
 
-/** every side of an object's margin, missing sides filled in as 0 */
+/**
+ * The margin actually applied to an object: `undefined` when the object's
+ * margin is switched off (`marginEnabled: false`), else its stored margin.
+ * Values are kept on the object so toggling back on restores them.
+ */
+export function effectiveMargin(obj: PageObject): Margin | undefined {
+  return obj.marginEnabled === false ? undefined : obj.margin
+}
+
+/** an object's applied margin, missing sides filled in as 0 */
 export function marginOf(obj: PageObject): Required<Margin> {
+  const m = effectiveMargin(obj)
   return {
-    top: obj.margin?.top ?? 0,
-    right: obj.margin?.right ?? 0,
-    bottom: obj.margin?.bottom ?? 0,
-    left: obj.margin?.left ?? 0,
+    right: m?.right ?? 0,
+    bottom: m?.bottom ?? 0,
   }
 }
 
@@ -145,10 +155,8 @@ const YEdgeSchema: z.ZodType<YEdge> = z.discriminatedUnion('mode', [
 
 const MarginSchema = z
   .object({
-    top: z.number().optional(),
     right: z.number().optional(),
     bottom: z.number().optional(),
-    left: z.number().optional(),
   })
   .optional()
 
@@ -162,6 +170,8 @@ export interface PageObject {
   y: YEdge
   /** outer margin (space reserved around the control); see {@link Margin} */
   margin?: Margin
+  /** whether the outer margin is applied; omitted/true = on (values kept when off) */
+  marginEnabled?: boolean
   props: Record<string, unknown>
   on: Record<string, string>
   /** groups only: member objects, constrained to the group box */
@@ -177,6 +187,7 @@ const PageObjectSchema: z.ZodType<PageObject, z.ZodTypeDef, unknown> = z.lazy(()
     x: XEdgeSchema,
     y: YEdgeSchema,
     margin: MarginSchema,
+    marginEnabled: z.boolean().optional(),
     props: z.record(z.unknown()).default({}),
     on: z.record(z.string()).default({}),
     children: z.array(PageObjectSchema).optional(),
@@ -654,17 +665,16 @@ export function resolveX(
   boxWidth: number,
   margin: Margin = {},
 ): { left: number; width: number } {
-  const ml = margin.left ?? 0
   const mr = margin.right ?? 0
   switch (c.mode) {
     case 'left':
-      return { left: c.left + ml, width: c.width }
+      return { left: c.left, width: c.width }
     case 'right':
       return { left: boxWidth - c.right - mr - c.width, width: c.width }
     case 'both':
-      return { left: c.left + ml, width: Math.max(1, boxWidth - c.left - c.right - ml - mr) }
+      return { left: c.left, width: Math.max(1, boxWidth - c.left - c.right - mr) }
     case 'center':
-      return { left: (boxWidth - c.width) / 2 + (ml - mr) / 2, width: c.width }
+      return { left: (boxWidth - c.width - mr) / 2, width: c.width }
   }
 }
 
@@ -674,24 +684,23 @@ export function resolveY(
   boxHeight: number,
   margin: Margin = {},
 ): { top: number; height: number } {
-  const mt = margin.top ?? 0
   const mb = margin.bottom ?? 0
   switch (c.mode) {
     case 'top':
-      return { top: c.top + mt, height: c.height }
+      return { top: c.top, height: c.height }
     case 'bottom':
       return { top: boxHeight - c.bottom - mb - c.height, height: c.height }
     case 'both':
-      return { top: c.top + mt, height: Math.max(1, boxHeight - c.top - c.bottom - mt - mb) }
+      return { top: c.top, height: Math.max(1, boxHeight - c.top - c.bottom - mb) }
     case 'center':
-      return { top: (boxHeight - c.height) / 2 + (mt - mb) / 2, height: c.height }
+      return { top: (boxHeight - c.height - mb) / 2, height: c.height }
   }
 }
 
 /** the rect an object renders at inside `box` (its page or its group box) */
 export function rectForObject(obj: PageObject, box: CanvasSize): Rect {
-  const x = resolveX(obj.x, box.width, obj.margin)
-  const y = resolveY(obj.y, box.height, obj.margin)
+  const x = resolveX(obj.x, box.width, effectiveMargin(obj))
+  const y = resolveY(obj.y, box.height, effectiveMargin(obj))
   return {
     x: Math.round(x.left),
     y: Math.round(y.top),
@@ -707,9 +716,8 @@ export function xEdgeFromRect(
   mode: XEdgeMode,
   margin: Margin = {},
 ): XEdge {
-  const ml = margin.left ?? 0
   const mr = margin.right ?? 0
-  const left = Math.round(rect.x - ml)
+  const left = Math.round(rect.x)
   const width = Math.max(1, Math.round(rect.w))
   const right = Math.round(boxWidth - (rect.x + rect.w) - mr)
   switch (mode) {
@@ -731,9 +739,8 @@ export function yEdgeFromRect(
   mode: YEdgeMode,
   margin: Margin = {},
 ): YEdge {
-  const mt = margin.top ?? 0
   const mb = margin.bottom ?? 0
-  const top = Math.round(rect.y - mt)
+  const top = Math.round(rect.y)
   const height = Math.max(1, Math.round(rect.h))
   const bottom = Math.round(boxHeight - (rect.y + rect.h) - mb)
   switch (mode) {
@@ -759,8 +766,8 @@ export function applyRectToObject(
   box: CanvasSize,
   modes?: { x?: XEdgeMode; y?: YEdgeMode },
 ): void {
-  obj.x = xEdgeFromRect(rect, box.width, modes?.x ?? obj.x.mode, obj.margin)
-  obj.y = yEdgeFromRect(rect, box.height, modes?.y ?? obj.y.mode, obj.margin)
+  obj.x = xEdgeFromRect(rect, box.width, modes?.x ?? obj.x.mode, effectiveMargin(obj))
+  obj.y = yEdgeFromRect(rect, box.height, modes?.y ?? obj.y.mode, effectiveMargin(obj))
 }
 
 /**
@@ -843,10 +850,8 @@ export function scaleEdges(obj: PageObject, fx: number, fy: number): void {
     const s = (n: number | undefined, f: number): number | undefined =>
       n === undefined ? undefined : Math.round(n * f)
     obj.margin = {
-      top: s(m.top, fy),
       right: s(m.right, fx),
       bottom: s(m.bottom, fy),
-      left: s(m.left, fx),
     }
   }
 }
@@ -869,10 +874,10 @@ export function contentExtent(objects: PageObject[]): { right: number; bottom: n
   for (const obj of objects) {
     const m = marginOf(obj)
     if (obj.x.mode === 'left') {
-      right = Math.max(right, obj.x.left + m.left + obj.x.width + m.right)
+      right = Math.max(right, obj.x.left + obj.x.width + m.right)
     }
     if (obj.y.mode === 'top') {
-      bottom = Math.max(bottom, obj.y.top + m.top + obj.y.height + m.bottom)
+      bottom = Math.max(bottom, obj.y.top + obj.y.height + m.bottom)
     }
   }
   return { right, bottom }

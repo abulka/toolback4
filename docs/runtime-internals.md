@@ -334,14 +334,22 @@ and communicates with the editor only through messages (`toolback:selection`,
   translucent white halo so it reads on dark pages. **Members draw their own
   springs against the parent group box** (the group wrapper's rect, via the
   `rects`/`bgRects` maps) rather than the page; top-level objects use the page box
-  (`origin` + `pageBounds`). Covers background objects too (`bgRects` fallback),
-  with a **?** help popup in the toolbar (buttons + options + line legend). The
-  hint is the page's first child, so it
+  (`origin` + `pageBounds`). An object's **outer margin** is shaded too: a soft
+  translucent band (`.tb-fithint-margin`) covers each side that carries a margin,
+  drawn under the springs. Margins are gated by `modeAllows` only (not
+  `springShown`), so a default left/top object's margin stays visible even when
+  `nonDefaultOnly` hides its springs. When the selected object's applied margin
+  changes, `revealMarginChange` scrolls its bands into view (`scrollIntoView`) —
+  a far-side margin grows the page instead of moving the control, so the effect
+  can land off-screen. Covers background objects too (`bgRects`
+  fallback), with a **?** help popup in the toolbar (buttons + options + line
+  legend). The hint is the page's first child, so it
   paints above the page background but **under** the controls; page-edge anchor
   glyphs are nudged just inside the page so clipping doesn't cut them. Pure
   decoration — `pointer-events: none`, rebuilt on render, drag redraws and window
-  resizes (`DesignController.refresh`). Reads the `data-tb-edge-x/y` modes the
-  renderer stamps on each wrapper.
+  resizes (`DesignController.refresh`). Reads the `data-tb-edge-x/y` modes and
+  the `data-tb-margin` (right/bottom) the renderer stamps on each wrapper
+  in `applyEdgeStyles`.
 - **Group outlines** (`.tb-group-outline`): a quiet dashed slate box tracing a
   group that has no selection box of its own but whose edges matter — every
   group in `drillPath` (so each nesting level stays faintly visible while an
@@ -381,17 +389,24 @@ to CSS (`applyEdgeStyles`: `left`+`width`, `right`+`width`, `left`+`right`, or
 page for top-level objects, the parent group wrapper for members — so the browser
 repositions everything on resize with **no JavaScript re-render**.
 
-An optional **outer margin** (`PageObject.margin: { top?, right?, bottom?, left? }`,
-missing sides = 0) folds into the same resolution, like CSS `margin` around an
-absolutely-positioned box. On a followed edge it offsets the control away from
-that edge (`left` → `left + margin.left`, `right` → `right + margin.right`,
-`both` shrinks by both margins); a centred axis centres the **margin box**, so
-equal margins cancel and the control stays centred. `rectForObject` and
-`applyEdgeStyles` share this math, and `xEdgeFromRect`/`yEdgeFromRect` subtract
-the margin again so a drag/typed write cannot double-count it. `scaleEdges`
-scales the margin with a group resize; `marginOf` fills in the missing sides.
-Margins are editor-authored only (the Geometry panel's **Margin** row) — there is
-no `ControlApi`/author-bridge setter.
+An optional **outer margin** (`PageObject.margin: { right?, bottom? }`, missing
+sides = 0) folds into the same resolution as the edge distances. Only the
+right/bottom sides exist: a left/top control's near-side margin would duplicate
+its `left`/`top` distance, and a right/bottom control's near-side margin never
+applies. On a followed edge it offsets the control away from that edge (`right`
+→ `right + margin.right`, `both` shrinks by the right margin); a centred axis
+shifts its box by half the margin. `rectForObject` and `applyEdgeStyles` share
+this math, and `xEdgeFromRect`/`yEdgeFromRect` subtract the margin again so a
+drag/typed write cannot double-count it. `scaleEdges` scales the margin with a
+group resize; `marginOf` fills in the missing sides.
+An optional `PageObject.marginEnabled: false` switches the margin **off without
+losing its values** (the panel's **Enable** tick previews both states):
+`effectiveMargin` returns `undefined` in that case, and `marginOf`,
+`rectForObject` and `applyRectToObject` all read through it, so resolution, page
+growth and the `data-tb-margin` shading agree. `scaleEdges` still scales the raw
+stored values, so re-enabling restores them. Margins are editor-authored only
+(the Geometry panel's **Margin** row, with the `setObjectMarginEnabled` store
+action) — there is no `ControlApi`/author-bridge setter.
 
 The author-facing surface is the **Responsive** section of the properties panel
 (`apps/editor/src/components/PropertiesPanel.vue`): four plain choices per axis

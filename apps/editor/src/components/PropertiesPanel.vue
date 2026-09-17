@@ -184,17 +184,17 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
 
 // ---- outer margin: space reserved around the control ----
 const margin = computed(() => sel.value?.margin ?? {})
-const marginLinked = ref(false)
-const MARGIN_SIDES = ['top', 'right', 'bottom', 'left'] as const
+const marginEnabled = computed(() => sel.value?.marginEnabled !== false)
+const MARGIN_SIDES = ['right', 'bottom'] as const
 type MarginSide = (typeof MARGIN_SIDES)[number]
 function setMargin(side: MarginSide, e: Event): void {
   if (!sel.value) return
   const n = Math.max(0, Math.round(Number((e.target as HTMLInputElement).value)) || 0)
-  if (marginLinked.value) {
-    store.setObjectMargin(sel.value.id, { top: n, right: n, bottom: n, left: n })
-  } else {
-    store.setObjectMargin(sel.value.id, { [side]: n })
-  }
+  store.setObjectMargin(sel.value.id, { [side]: n })
+}
+function onToggleMargin(e: Event): void {
+  if (!sel.value) return
+  store.setObjectMarginEnabled(sel.value.id, (e.target as HTMLInputElement).checked)
 }
 
 // ---- Fill page: size a top-level object to the page (minus a margin) ----
@@ -531,7 +531,10 @@ function onPaste(): void {
       contents with it; resizing the page re-resolves this member's own edges.
     </p>
 
-    <h2>Geometry</h2>
+    <div class="row">
+      <h2>Geometry</h2>
+      <HelpButton anchor="responsive-edges" />
+    </div>
     <div class="geo">
       <div class="field">
         <label>X</label>
@@ -552,39 +555,41 @@ function onPaste(): void {
     </div>
 
     <div class="margin-row">
-      <label class="margin-title" title="Space reserved around the control. On a fluid page a Follows-top/left control's bottom/right margin keeps that much empty page below/right of it.">
-        Margin
-        <input type="checkbox" v-model="marginLinked" title="Set all four sides together" />
-      </label>
-      <div class="margin-grid">
-        <label class="margin-field">
-          T
-          <input type="number" min="0" step="4" :value="margin.top ?? 0" @change="setMargin('top', $event)" />
+      <div class="margin-title">
+        <span class="margin-title-text" title="Outer margin — space reserved to the right/below the control. It pushes a right/bottom-following control inward, and on a fluid page a Follows-left/top control's margin keeps that much empty page to its right/below.">
+          Margin
+        </span>
+        <label class="fixed-toggle" title="Enable margin — preview the layout with the margin applied or not. The values are kept either way.">
+          <input type="checkbox" :checked="marginEnabled" @change="onToggleMargin" />
+          Enable
         </label>
-        <label class="margin-field">
+      </div>
+      <div class="margin-grid">
+        <label class="margin-field" title="Space reserved to the right of the control. Grows the page on a Follows-left control.">
           R
           <input type="number" min="0" step="4" :value="margin.right ?? 0" @change="setMargin('right', $event)" />
         </label>
-        <label class="margin-field">
+        <label class="margin-field" title="Space reserved below the control. Grows the page on a Follows-top control.">
           B
           <input type="number" min="0" step="4" :value="margin.bottom ?? 0" @change="setMargin('bottom', $event)" />
-        </label>
-        <label class="margin-field">
-          L
-          <input type="number" min="0" step="4" :value="margin.left ?? 0" @change="setMargin('left', $event)" />
         </label>
       </div>
     </div>
 
-    <div v-if="canFit()" class="fill-row">
-      <button class="fill" @click="onFill">Fill page</button>
-      <button class="fill" @click="onFillWidth">Fill width</button>
-      <button class="fill" @click="onFillHeight">Fill height</button>
-      <button class="fill" @click="onCenterInPage">Center</button>
-      <label class="fill-margin-label">
-        margin
-        <input class="fill-margin" type="number" min="0" step="4" v-model.number="fillMargin" />
-      </label>
+    <div v-if="canFit()" class="fill-group">
+      <div class="fill-group-title" title="Stretch the object to the page edges. The Fill margin gap is left on each side; it is not the control's outer Margin.">
+        Fill to page
+      </div>
+      <div class="fill-row">
+        <button class="fill" title="Stretch to all four page edges, leaving the Fill margin on each side (Follows both)." @click="onFill">Fill page</button>
+        <button class="fill" title="Stretch to the left and right page edges, leaving the Fill margin on each side (Follows both horizontally)." @click="onFillWidth">Fill width</button>
+        <button class="fill" title="Stretch to the top and bottom page edges, leaving the Fill margin on each side (Follows both vertically)." @click="onFillHeight">Fill height</button>
+        <button class="fill" title="Centre the object on the page (Centred on both axes)." @click="onCenterInPage">Center</button>
+        <label class="fill-margin-label" title="Gap left to the page edges when you click a Fill button. Remembered between sessions. This is not the control's outer Margin.">
+          Fill margin
+          <input class="fill-margin" type="number" min="0" step="4" v-model.number="fillMargin" />
+        </label>
+      </div>
     </div>
 
     <button class="delete" @click="store.removeSelected()">Delete object</button>
@@ -800,12 +805,27 @@ function onPaste(): void {
   column-gap: 8px;
 }
 
+.fill-group {
+  border: 1px solid var(--ed-border);
+  border-radius: 8px;
+  padding: 8px;
+  margin: 10px 0 14px;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.fill-group-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ed-text-dim);
+  margin-bottom: 6px;
+}
+
 .fill-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin: 10px 0 14px;
 }
 
 .margin-row {
@@ -814,20 +834,25 @@ function onPaste(): void {
 
 .margin-title {
   display: flex;
-  align-items: center;
+  align-items: baseline;
+  justify-content: space-between;
   gap: 6px;
   font-size: 11px;
   color: var(--ed-text-dim);
   margin-bottom: 4px;
 }
 
-.margin-title input[type='checkbox'] {
-  margin: 0;
+.margin-title-text {
+  cursor: help;
+}
+
+.margin-title .fixed-toggle {
+  cursor: pointer;
 }
 
 .margin-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 6px;
 }
 

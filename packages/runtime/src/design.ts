@@ -204,6 +204,10 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   let groupOutlines = new Map<string, HTMLElement>()
   let pageRoot: HTMLElement | null = null
   let selected = new Set<string>()
+  // the selected object's applied margin on the previous render, so a margin
+  // change (not a selection change) can scroll its reserved space into view
+  let lastMarginSelId: string | null = null
+  let lastMarginSig = ''
   // groups we've drilled into, outermost→innermost. Objects at the "current
   // level" live at chain[drillPath.length] under the pointer.
   let drillPath: string[] = []
@@ -764,6 +768,48 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     }
   }
 
+  /** an object's outer margin, parsed from the wrapper's `data-tb-margin` */
+  type Margins = { right: number; bottom: number }
+
+  function marginOfEl(el: HTMLElement): Margins | null {
+    const raw = el.dataset.tbMargin
+    if (!raw) return null
+    const [right, bottom] = raw.split(' ').map(Number)
+    if (![right, bottom].every(Number.isFinite)) return null
+    if (!right && !bottom) return null
+    return { right: right!, bottom: bottom! }
+  }
+
+  /**
+   * The space an object's outer margin reserves, as a soft shaded band on each
+   * side that carries a margin — the area the control pushes inward from. Drawn
+   * under the springs so the zigzags stay legible on top. Bands carry their
+   * object id so the margin change can be scrolled into view.
+   */
+  function drawMarginAreas(
+    hint: HTMLElement,
+    doc: Document,
+    id: string,
+    r: Rect,
+    m: Margins,
+  ): boolean {
+    const bands: Array<[number, number, number, number]> = []
+    if (m.right > 0) bands.push([r.x + r.w, r.y, m.right, r.h])
+    if (m.bottom > 0) bands.push([r.x, r.y + r.h, r.w, m.bottom])
+    for (const [x, y, w, h] of bands) {
+      if (w <= 0 || h <= 0) continue
+      const e = doc.createElement('div')
+      e.className = 'tb-fithint-margin'
+      e.dataset.tbMarginFor = id
+      e.style.left = `${x}px`
+      e.style.top = `${y}px`
+      e.style.width = `${w}px`
+      e.style.height = `${h}px`
+      hint.appendChild(e)
+    }
+    return bands.length > 0
+  }
+
   function drawFitHints(): void {
     clearFitHint()
     if (!overlay || !enabled || !pageRoot || fitHints.mode === 'off') return
@@ -788,9 +834,14 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     let drew = false
     for (const el of Array.from(pageRoot.querySelectorAll<HTMLElement>('[data-tb-id]'))) {
       const id = el.dataset.tbId
-      if (!id || !springShown(el)) continue
+      if (!id || !modeAllows(el)) continue
       const r = rects.get(id) ?? bgRects.get(id)
       if (!r) continue
+      // margins are real reserved space, so they show even for default
+      // left/top objects whose springs the non-default filter would drop
+      const margins = marginOfEl(el)
+      if (margins) drew = drawMarginAreas(hint, doc, id, r, margins) || drew
+      if (!springShown(el)) continue
       // a top-level object is measured against the page box, a member against
       // its parent group's box — both in wrapper coordinates (the hint frame)
       const parentEl = el.parentElement?.closest<HTMLElement>('[data-tb-id]') ?? null
@@ -1019,6 +1070,28 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   function setSelected(ids: Iterable<string>): void {
     selected = new Set([...ids].filter((id) => rects.has(id)))
     redrawSelection()
+  }
+
+  /**
+   * When the selected object's applied margin changes (an edit or the Enable
+   * toggle), scroll its shaded bands into view. A right/bottom margin on a
+   * left/top-anchored control reserves space the page grows into, so without
+   * this the effect happens off-screen. Selecting a different object or a
+   * re-render with an unchanged margin does nothing.
+   */
+  function revealMarginChange(selection: string[]): void {
+    const id = selection.length === 1 ? selection[0]! : null
+    const sig = id ? (objectEl(id)?.dataset.tbMargin ?? '') : ''
+    const changed = id !== null && id === lastMarginSelId && sig !== lastMarginSig
+    lastMarginSelId = id
+    lastMarginSig = sig
+    if (!changed || !sig || !fitHint) return
+    for (const band of Array.from(fitHint.querySelectorAll<HTMLElement>('.tb-fithint-margin'))) {
+      if (band.dataset.tbMarginFor !== id) continue
+      if (typeof band.scrollIntoView === 'function') {
+        band.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      }
+    }
   }
 
   function sendSelection(): void {
@@ -1348,6 +1421,7 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       refreshRects()
       drillPath = selection.length ? contextOf(selection[0]!) : []
       setSelected(selection)
+      revealMarginChange(selection)
     },
     refresh(): void {
       if (!pageRoot?.isConnected) pageRoot = wrapper?.querySelector<HTMLElement>('.tb-page') ?? null

@@ -13,6 +13,7 @@ import {
   DEFAULT_FIT_HINTS,
   DEFAULT_PROPS,
   distributeRects,
+  effectiveMargin,
   flattenObjects,
   matchSizeRects,
   newId,
@@ -1060,8 +1061,8 @@ export const useBookStore = defineStore('book', () => {
     record('Responsive', `edge:${id}`)
     const box = boxForObject(obj)
     const r = rectForObject(obj, box)
-    if (axis === 'x') obj.x = xEdgeFromRect(r, box.width, mode as XEdgeMode, obj.margin)
-    else obj.y = yEdgeFromRect(r, box.height, mode as YEdgeMode, obj.margin)
+    if (axis === 'x') obj.x = xEdgeFromRect(r, box.width, mode as XEdgeMode, effectiveMargin(obj))
+    else obj.y = yEdgeFromRect(r, box.height, mode as YEdgeMode, effectiveMargin(obj))
     // a member's new edge can change what the group must surround
     if (found.parent) expandGroup(found.parent)
     sync()
@@ -1080,14 +1081,8 @@ export const useBookStore = defineStore('book', () => {
   function clearMarginAxis(obj: PageObject, axis: 'x' | 'y' | 'both'): void {
     if (!obj.margin) return
     const m: Margin = { ...obj.margin }
-    if (axis === 'x' || axis === 'both') {
-      delete m.left
-      delete m.right
-    }
-    if (axis === 'y' || axis === 'both') {
-      delete m.top
-      delete m.bottom
-    }
+    if (axis === 'x' || axis === 'both') delete m.right
+    if (axis === 'y' || axis === 'both') delete m.bottom
     if (Object.keys(m).length) obj.margin = m
     else delete obj.margin
   }
@@ -1098,7 +1093,7 @@ export const useBookStore = defineStore('book', () => {
     if (!found) return
     record('Margin', `margin:${id}`)
     const next: Margin = { ...(found.obj.margin ?? {}) }
-    for (const side of ['top', 'right', 'bottom', 'left'] as const) {
+    for (const side of ['right', 'bottom'] as const) {
       const v = patch[side]
       if (v === undefined) continue
       const n = Math.max(0, Math.round(v))
@@ -1107,6 +1102,20 @@ export const useBookStore = defineStore('book', () => {
     }
     if (Object.keys(next).length) found.obj.margin = next
     else delete found.obj.margin
+    if (found.parent) expandGroup(found.parent)
+    sync()
+  }
+
+  /**
+   * Turn an object's outer margin on or off without touching its values, so it
+   * can be previewed and re-enabled. Undoable.
+   */
+  function setObjectMarginEnabled(id: string, enabled: boolean): void {
+    const found = locateObj(id)
+    if (!found) return
+    record('Margin', `margin-enabled:${id}`)
+    if (enabled) delete found.obj.marginEnabled
+    else found.obj.marginEnabled = false
     if (found.parent) expandGroup(found.parent)
     sync()
   }
@@ -1631,6 +1640,7 @@ export const useBookStore = defineStore('book', () => {
     updateProps,
     setObjectEdge,
     setObjectMargin,
+    setObjectMarginEnabled,
     setGeometry,
     effectiveRectOf,
     fillObjectToPage,

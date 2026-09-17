@@ -849,14 +849,16 @@ describe('book store — outer margin', () => {
     setActivePinia(createPinia())
   })
 
-  it('setObjectMargin stores sides and offsets the control', () => {
+  it('setObjectMargin stores the far-side margins and offsets a far-edge control', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
-    const id = store.book.pages[0]!.objects[0]!.id
-    store.setObjectMargin(id, { top: 4, right: 10, bottom: 24, left: 6 })
     const o = store.book.pages[0]!.objects[0]!
-    expect(o.margin).toEqual({ top: 4, right: 10, bottom: 24, left: 6 })
-    expect(store.effectiveRectOf(id)).toMatchObject({ x: 6, y: 4 })
+    o.x = { mode: 'right', right: 0, width: 100 }
+    o.y = { mode: 'bottom', bottom: 0, height: 50 }
+    store.setObjectMargin(o.id, { right: 10, bottom: 24 })
+    expect(o.margin).toEqual({ right: 10, bottom: 24 })
+    // 1280 - 100 - 10 = 1170; 800 - 50 - 24 = 726
+    expect(store.effectiveRectOf(o.id)).toMatchObject({ x: 1170, y: 726 })
   })
 
   it('a bottom margin grows the page past a near-edge control', () => {
@@ -872,9 +874,9 @@ describe('book store — outer margin', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
     const id = store.book.pages[0]!.objects[0]!.id
-    store.setObjectMargin(id, { top: 5 })
-    expect(store.book.pages[0]!.objects[0]!.margin).toEqual({ top: 5 })
-    store.setObjectMargin(id, { top: 0 })
+    store.setObjectMargin(id, { right: 5 })
+    expect(store.book.pages[0]!.objects[0]!.margin).toEqual({ right: 5 })
+    store.setObjectMargin(id, { right: 0 })
     expect(store.book.pages[0]!.objects[0]!.margin).toBeUndefined()
   })
 
@@ -882,7 +884,7 @@ describe('book store — outer margin', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
     const id = store.book.pages[0]!.objects[0]!.id
-    store.setObjectMargin(id, { top: 5, right: 10, bottom: 24, left: 3 })
+    store.setObjectMargin(id, { right: 10, bottom: 24 })
     store.fillObjectToPage(id, 8)
     const o = store.book.pages[0]!.objects[0]!
     expect(o.margin).toBeUndefined()
@@ -893,12 +895,59 @@ describe('book store — outer margin', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
     const o = store.book.pages[0]!.objects[0]!
-    o.margin = { left: 6, top: 4 }
-    // rendered border box is at 6,4; drag it +40,+10
-    store.applyRects([{ id: o.id, rect: { x: 46, y: 14, w: 100, h: 50 } }])
-    expect(o.x).toEqual({ mode: 'left', left: 40, width: 100 })
-    expect(o.y).toEqual({ mode: 'top', top: 10, height: 50 })
-    expect(o.margin).toEqual({ left: 6, top: 4 })
+    o.x = { mode: 'right', right: 0, width: 100 }
+    o.y = { mode: 'bottom', bottom: 0, height: 50 }
+    o.margin = { right: 10, bottom: 24 }
+    // rendered border box at 1170,726; drag it -40,-10
+    store.applyRects([{ id: o.id, rect: { x: 1130, y: 716, w: 100, h: 50 } }])
+    // 1280 - 1230 - 10 = 40; 800 - 766 - 24 = 10
+    expect(o.x).toEqual({ mode: 'right', right: 40, width: 100 })
+    expect(o.y).toEqual({ mode: 'bottom', bottom: 10, height: 50 })
+    expect(o.margin).toEqual({ right: 10, bottom: 24 })
+  })
+
+  it('setObjectMarginEnabled toggles the margin without touching its values', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const o = store.book.pages[0]!.objects[0]!
+    o.x = { mode: 'right', right: 0, width: 100 }
+    o.y = { mode: 'bottom', bottom: 0, height: 50 }
+    store.setObjectMargin(o.id, { right: 10, bottom: 24 })
+    expect(store.effectiveRectOf(o.id)).toMatchObject({ x: 1170, y: 726 })
+    store.setObjectMarginEnabled(o.id, false)
+    expect(o.marginEnabled).toBe(false)
+    expect(o.margin).toEqual({ right: 10, bottom: 24 })
+    expect(store.effectiveRectOf(o.id)).toMatchObject({ x: 1180, y: 750 })
+    store.setObjectMarginEnabled(o.id, true)
+    expect(o.marginEnabled).toBeUndefined()
+    expect(store.effectiveRectOf(o.id)).toMatchObject({ x: 1170, y: 726 })
+  })
+
+  it('a geometry write while the margin is off does not double-count', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const o = store.book.pages[0]!.objects[0]!
+    o.x = { mode: 'right', right: 0, width: 100 }
+    o.y = { mode: 'bottom', bottom: 0, height: 50 }
+    o.margin = { right: 10, bottom: 24 }
+    o.marginEnabled = false
+    // the rendered box is now at 1180,750; a drag to 1140,730 must not subtract
+    // the switched-off margin
+    store.applyRects([{ id: o.id, rect: { x: 1140, y: 730, w: 100, h: 50 } }])
+    expect(o.x).toEqual({ mode: 'right', right: 40, width: 100 })
+    expect(o.y).toEqual({ mode: 'bottom', bottom: 20, height: 50 })
+  })
+
+  it('margin enable/disable is undoable and keeps the values', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const id = store.book.pages[0]!.objects[0]!.id
+    store.setObjectMargin(id, { right: 5 })
+    store.setObjectMarginEnabled(id, false)
+    expect(store.book.pages[0]!.objects[0]!.marginEnabled).toBe(false)
+    store.undo()
+    expect(store.book.pages[0]!.objects[0]!.marginEnabled).toBeUndefined()
+    expect(store.book.pages[0]!.objects[0]!.margin).toEqual({ right: 5 })
   })
 })
 

@@ -14,7 +14,9 @@ import {
   createObject,
   createPage,
   distributeRects,
+  effectiveMargin,
   flattenObjects,
+  marginOf,
   matchSizeRects,
   parseBook,
   randomImageUrl,
@@ -216,18 +218,52 @@ describe('format', () => {
       const page = book.pages[0]!
       const container = { width: 1024, height: 700 }
       const btn = createObject('button', 'go', { x: 40, y: 900, w: 100, h: 40 })
-      btn.margin = { top: 4, right: 10, bottom: 24, left: 6 }
-      expect(contentExtent([btn])).toEqual({ right: 156, bottom: 968 })
-      expect(resolvePageBox(page, container, [btn])).toEqual({ width: 1024, height: 968 })
+      btn.margin = { right: 10, bottom: 24 }
+      expect(contentExtent([btn])).toEqual({ right: 150, bottom: 964 })
+      expect(resolvePageBox(page, container, [btn])).toEqual({ width: 1024, height: 964 })
     })
 
     it('round-trips an object margin through parse', () => {
       const book = createBook('M')
       const o = createObject('button', 'b', { x: 10, y: 20, w: 100, h: 40 })
-      o.margin = { top: 1, right: 2, bottom: 3, left: 4 }
+      o.margin = { right: 2, bottom: 3 }
       book.pages[0]!.objects.push(o)
       const parsed = parseBook(JSON.parse(JSON.stringify(book)))
-      expect(parsed.pages[0]!.objects[0]!.margin).toEqual({ top: 1, right: 2, bottom: 3, left: 4 })
+      expect(parsed.pages[0]!.objects[0]!.margin).toEqual({ right: 2, bottom: 3 })
+    })
+
+    it('drops legacy left/top margins on parse', () => {
+      const book = createBook('M')
+      const o = createObject('button', 'b', { x: 10, y: 20, w: 100, h: 40 })
+      book.pages[0]!.objects.push(o)
+      const raw = JSON.parse(JSON.stringify(book))
+      raw.pages[0].objects[0].margin = { top: 1, right: 2, bottom: 3, left: 4 }
+      const parsed = parseBook(raw)
+      expect(parsed.pages[0]!.objects[0]!.margin).toEqual({ right: 2, bottom: 3 })
+    })
+
+    it('a disabled margin stops growing the page but keeps its values', () => {
+      const btn = createObject('button', 'go', { x: 40, y: 900, w: 100, h: 40 })
+      btn.margin = { right: 10, bottom: 24 }
+      btn.marginEnabled = false
+      expect(marginOf(btn)).toEqual({ right: 0, bottom: 0 })
+      expect(effectiveMargin(btn)).toBeUndefined()
+      expect(contentExtent([btn])).toEqual({ right: 140, bottom: 940 })
+      // the stored values survive for re-enabling
+      expect(btn.margin).toEqual({ right: 10, bottom: 24 })
+    })
+
+    it('marginEnabled defaults to on and round-trips off', () => {
+      const book = createBook('M')
+      const on = createObject('button', 'a', { x: 10, y: 20, w: 100, h: 40 })
+      on.margin = { right: 8 }
+      const off = createObject('button', 'b', { x: 10, y: 20, w: 100, h: 40 })
+      off.margin = { right: 8 }
+      off.marginEnabled = false
+      book.pages[0]!.objects.push(on, off)
+      const parsed = parseBook(JSON.parse(JSON.stringify(book)))
+      expect(parsed.pages[0]!.objects[0]!.marginEnabled).toBeUndefined()
+      expect(parsed.pages[0]!.objects[1]!.marginEnabled).toBe(false)
     })
 
     it('createPage links a backgroundId', () => {
@@ -389,17 +425,17 @@ describe('edge constraints', () => {
   })
 
   it('margin offsets the followed edges and shifts a centred margin box', () => {
-    const m = { top: 5, right: 10, bottom: 7, left: 3 }
-    expect(resolveX({ mode: 'left', left: 40, width: 100 }, 1000, m)).toEqual({ left: 43, width: 100 })
+    const m = { right: 10, bottom: 7 }
+    // left/top have no margin side — the distance is the whole offset
+    expect(resolveX({ mode: 'left', left: 40, width: 100 }, 1000, m)).toEqual({ left: 40, width: 100 })
     expect(resolveX({ mode: 'right', right: 30, width: 100 }, 1000, m)).toEqual({ left: 860, width: 100 })
-    expect(resolveX({ mode: 'both', left: 20, right: 30 }, 1000, m)).toEqual({ left: 23, width: 937 })
-    // equal left/right margins cancel out — a centred control stays centred
-    expect(resolveX({ mode: 'center', width: 100 }, 1000, { left: 8, right: 8 })).toEqual({ left: 450, width: 100 })
-    expect(resolveX({ mode: 'center', width: 100 }, 1000, { left: 20, right: 0 })).toEqual({ left: 460, width: 100 })
-    expect(resolveY({ mode: 'top', top: 12, height: 40 }, 600, m)).toEqual({ top: 17, height: 40 })
+    expect(resolveX({ mode: 'both', left: 20, right: 30 }, 1000, m)).toEqual({ left: 20, width: 940 })
+    // a right margin shifts the centred margin box left by half
+    expect(resolveX({ mode: 'center', width: 100 }, 1000, { right: 8 })).toEqual({ left: 446, width: 100 })
+    expect(resolveY({ mode: 'top', top: 12, height: 40 }, 600, m)).toEqual({ top: 12, height: 40 })
     expect(resolveY({ mode: 'bottom', bottom: 12, height: 40 }, 600, m)).toEqual({ top: 541, height: 40 })
-    expect(resolveY({ mode: 'both', top: 10, bottom: 20 }, 600, m)).toEqual({ top: 15, height: 558 })
-    expect(resolveY({ mode: 'center', height: 40 }, 600, { top: 8, bottom: 8 })).toEqual({ top: 280, height: 40 })
+    expect(resolveY({ mode: 'both', top: 10, bottom: 20 }, 600, m)).toEqual({ top: 10, height: 563 })
+    expect(resolveY({ mode: 'center', height: 40 }, 600, { bottom: 8 })).toEqual({ top: 276, height: 40 })
   })
 
   it('left keeps its distance from the left and its width', () => {
@@ -464,31 +500,44 @@ describe('edge constraints', () => {
   })
 
   it('xEdgeFromRect / yEdgeFromRect subtract the margin so a write round-trips', () => {
-    const m = { top: 5, right: 10, bottom: 7, left: 3 }
-    const r = { x: 43, y: 17, w: 100, h: 40 }
+    const m = { right: 10, bottom: 7 }
+    const r = { x: 40, y: 12, w: 100, h: 40 }
     expect(xEdgeFromRect(r, 1000, 'left', m)).toEqual({ mode: 'left', left: 40, width: 100 })
-    expect(xEdgeFromRect(r, 1000, 'right', m)).toEqual({ mode: 'right', right: 847, width: 100 })
-    expect(xEdgeFromRect(r, 1000, 'both', m)).toEqual({ mode: 'both', left: 40, right: 847 })
+    expect(xEdgeFromRect(r, 1000, 'right', m)).toEqual({ mode: 'right', right: 850, width: 100 })
+    expect(xEdgeFromRect(r, 1000, 'both', m)).toEqual({ mode: 'both', left: 40, right: 850 })
     expect(yEdgeFromRect(r, 600, 'top', m)).toEqual({ mode: 'top', top: 12, height: 40 })
-    expect(yEdgeFromRect(r, 600, 'bottom', m)).toEqual({ mode: 'bottom', bottom: 536, height: 40 })
+    expect(yEdgeFromRect(r, 600, 'bottom', m)).toEqual({ mode: 'bottom', bottom: 541, height: 40 })
   })
 
   it('a rect read back through applyRectToObject keeps the margin (no double count)', () => {
-    const o = obj({ mode: 'left', left: 40, width: 100 }, { mode: 'top', top: 12, height: 40 })
-    o.margin = { top: 5, right: 10, bottom: 7, left: 3 }
+    const o = obj({ mode: 'right', right: 30, width: 100 }, { mode: 'bottom', bottom: 12, height: 40 })
+    o.margin = { right: 10, bottom: 7 }
     const r = rectForObject(o, box)
-    expect(r).toMatchObject({ x: 43, y: 17 })
-    applyRectToObject(o, { x: r.x + 50, y: r.y + 20, w: r.w, h: r.h }, box)
-    expect(o.x).toEqual({ mode: 'left', left: 90, width: 100 })
-    expect(o.y).toEqual({ mode: 'top', top: 32, height: 40 })
-    expect(rectForObject(o, box)).toMatchObject({ x: 93, y: 37 })
+    expect(r).toMatchObject({ x: 860, y: 541 })
+    applyRectToObject(o, { x: r.x - 50, y: r.y - 20, w: r.w, h: r.h }, box)
+    expect(o.x).toEqual({ mode: 'right', right: 80, width: 100 })
+    expect(o.y).toEqual({ mode: 'bottom', bottom: 32, height: 40 })
+    expect(o.margin).toEqual({ right: 10, bottom: 7 })
+    expect(rectForObject(o, box)).toMatchObject({ x: 810, y: 521 })
+  })
+
+  it('a disabled margin is ignored by rectForObject and applyRectToObject', () => {
+    const o = obj({ mode: 'right', right: 30, width: 100 }, { mode: 'bottom', bottom: 12, height: 40 })
+    o.margin = { right: 10, bottom: 7 }
+    expect(rectForObject(o, box)).toMatchObject({ x: 860, y: 541 })
+    o.marginEnabled = false
+    expect(rectForObject(o, box)).toMatchObject({ x: 870, y: 548 })
+    applyRectToObject(o, { x: 500, y: 200, w: 100, h: 40 }, box)
+    expect(o.x).toEqual({ mode: 'right', right: 400, width: 100 })
+    expect(o.y).toEqual({ mode: 'bottom', bottom: 360, height: 40 })
+    expect(rectForObject(o, box)).toMatchObject({ x: 500, y: 200 })
   })
 
   it('scaleEdges scales the margin too', () => {
     const o = obj({ mode: 'left', left: 40, width: 100 }, { mode: 'top', top: 12, height: 40 })
-    o.margin = { top: 5, right: 10, bottom: 7, left: 3 }
+    o.margin = { right: 10, bottom: 7 }
     scaleEdges(o, 2, 3)
-    expect(o.margin).toEqual({ top: 15, right: 20, bottom: 21, left: 6 })
+    expect(o.margin).toEqual({ right: 20, bottom: 21 })
   })
 
   it('scaleEdges scales distances and sizes for every mode', () => {

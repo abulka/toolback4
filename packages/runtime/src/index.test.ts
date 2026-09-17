@@ -394,30 +394,47 @@ describe('runtime', () => {
       })
     })
 
-    it('a margin offsets the control and grows the page past a near-edge control', () => {
+    it('a right/bottom margin grows the page past a near-edge control', () => {
       const book = edgeBook(L, T)
-      book.pages[0]!.objects[0]!.margin = { top: 5, right: 10, bottom: 24, left: 3 }
-      expect(firstStyle(book)).toMatchObject({ left: '1083px', top: '29px', width: '176px' })
+      book.pages[0]!.objects[0]!.margin = { right: 10, bottom: 24 }
+      expect(firstStyle(book)).toMatchObject({ left: '1080px', top: '24px', width: '176px' })
       const root = document.createElement('div')
       renderBookPage(book, 0, root, { width: 800, height: 600 })
       const page = root.querySelector<HTMLElement>('.tb-page')!
-      // extent.right = 1080 + 3 + 176 + 10; extent.bottom = 24 + 5 + 48 + 24
-      expect(page.style.minWidth).toBe('1269px')
-      expect(page.style.minHeight).toBe('101px')
+      // extent.right = 1080 + 176 + 10; extent.bottom = 24 + 48 + 24
+      expect(page.style.minWidth).toBe('1266px')
+      expect(page.style.minHeight).toBe('96px')
     })
 
-    it('a uniform margin keeps a centred control centred', () => {
+    it('a disabled margin neither offsets nor grows the page', () => {
+      const book = edgeBook(L, T)
+      const o = book.pages[0]!.objects[0]!
+      o.margin = { right: 10, bottom: 24 }
+      o.marginEnabled = false
+      // values kept, but the control sits flush to the constraint
+      expect(o.margin).toEqual({ right: 10, bottom: 24 })
+      expect(firstStyle(book)).toMatchObject({ left: '1080px', top: '24px', width: '176px' })
+      const root = document.createElement('div')
+      renderBookPage(book, 0, root, { width: 800, height: 600 })
+      const page = root.querySelector<HTMLElement>('.tb-page')!
+      expect(page.style.minWidth).toBe('1256px')
+      expect(page.style.minHeight).toBe('72px')
+      // no margin advertised for the design overlay, so no shaded bands
+      expect(root.querySelector<HTMLElement>('.tb-object')?.dataset.tbMargin).toBeUndefined()
+    })
+
+    it('a centred control’s margin shifts its margin box by half', () => {
       const book = edgeBook(CX, CY)
-      book.pages[0]!.objects[0]!.margin = { top: 8, right: 8, bottom: 8, left: 8 }
+      book.pages[0]!.objects[0]!.margin = { right: 8, bottom: 8 }
       expect(firstStyle(book)).toMatchObject({
-        left: 'calc(50% - 88px)',
-        top: 'calc(50% - 24px)',
+        left: 'calc(50% - 92px)',
+        top: 'calc(50% - 28px)',
       })
     })
 
     it('a far-edge margin offsets the control but does not grow the page', () => {
       const book = edgeBook(R, BOT)
-      book.pages[0]!.objects[0]!.margin = { top: 5, right: 10, bottom: 24, left: 3 }
+      book.pages[0]!.objects[0]!.margin = { right: 10, bottom: 24 }
       expect(firstStyle(book)).toMatchObject({ right: '34px', bottom: '48px' })
       const root = document.createElement('div')
       renderBookPage(book, 0, root, { width: 800, height: 600 })

@@ -1804,6 +1804,65 @@ describe('spring display options', () => {
       root.remove()
     }
   })
+
+  it('shades an object’s outer margin as bands under the springs', () => {
+    const o = button('o', { mode: 'left', left: 100, width: 100 }, { mode: 'top', top: 50, height: 40 })
+    o.margin = { right: 12, bottom: 24 }
+    // nonDefaultOnly hides this default left/top object's springs — the margin
+    // is real reserved space, so its bands still show
+    const { root, cleanup } = mount(flatBook([o]), opts({ nonDefaultOnly: true }))
+    try {
+      const wrapper = root.querySelector<HTMLElement>('.tb-object[data-tb-id="o"]')!
+      expect(wrapper.dataset.tbMargin).toBe('12 24')
+      const bands = [...root.querySelectorAll<HTMLElement>('.tb-fithint-margin')]
+      const rects = bands.map((b) => ({
+        left: parseFloat(b.style.left),
+        top: parseFloat(b.style.top),
+        width: parseFloat(b.style.width),
+        height: parseFloat(b.style.height),
+      }))
+      // the 12px strip right of the control and the 24px reserved below
+      expect(rects).toEqual(
+        expect.arrayContaining([
+          { left: 200, top: 50, width: 12, height: 40 },
+          { left: 100, top: 90, width: 100, height: 24 },
+        ]),
+      )
+      expect(labels(root)).not.toContain('left 100')
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('scrolls the selected object’s margin bands into view when its margin changes', () => {
+    const o = button('o', { mode: 'left', left: 100, width: 100 }, { mode: 'top', top: 50, height: 40 })
+    o.margin = { right: 12 }
+    const { root, cleanup } = mount(flatBook([o]), opts({}), ['o'])
+    const proto = HTMLElement.prototype as unknown as { scrollIntoView?: () => void }
+    const real = proto.scrollIntoView
+    const seen: HTMLElement[] = []
+    proto.scrollIntoView = function (this: HTMLElement) {
+      seen.push(this)
+    }
+    try {
+      // the still-selected object grows its margin, then the canvas re-renders
+      o.margin = { right: 40 }
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: { type: 'toolback:load', book: flatBook([o]), design: true, fitHints: opts({}), selection: ['o'] },
+        }),
+      )
+      expect(seen.length).toBeGreaterThan(0)
+      expect(seen.every((el) => el.classList.contains('tb-fithint-margin'))).toBe(true)
+    } finally {
+      proto.scrollIntoView = real
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
 })
 
 describe('design mode — viewer scrolling', () => {

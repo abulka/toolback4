@@ -321,29 +321,40 @@ Things to know:
   keeping which edges it follows; a `width`/`height` write on a **Follows both**
   control switches it to a fixed size held to the left/top. See *Scripts and
   geometry* below.
-- **Fill page.** The Geometry section's **Fill page** button (with a margin
-  box) pins both axes to the page edges at that margin (**Follows both**);
-  **Fill width** / **Fill height** do a single axis. **Center** sets both axes
-  to **Centred**. Works on top-level objects; a group member follows its group's
-  box instead.
-- **Margin (space around the control).** The **Margin** fields (T/R/B/L) in the
-  Geometry section reserve empty space around the control, like the CSS margin
-  of the same name. On the edges it follows, the margin offsets the control
-  (so a Follows-bottom control keeps its `bottom` distance **plus** its bottom
-  margin). The important one is the **far** side: a fluid page grows to the
-  outer edge of the bottom/right margin, so a **Follows-top** control with a
-  24px bottom margin keeps 24px of empty page below it instead of sitting flush
-  on the auto-sized edge — the fix for "the page always eats my bottom gap."
-  Equal left/right (or top/bottom) margins on a **Centred** control cancel out,
-  so it stays centred. A group wraps only its members' boxes, so a margin on a
-  member is internal spacing and does not enlarge the group.
+- **Fill to page.** The Geometry section's **Fill to page** group stretches the
+  object to the page edges. **Fill page** pins both axes (**Follows both**);
+  **Fill width** / **Fill height** do a single axis. The **Fill margin** field
+  is the gap left on each side (remembered between sessions); it is *not* the
+  control's outer **Margin**. **Center** sets both axes to **Centred**. Works on
+  top-level objects; a group member follows its group's box instead.
+- **Margin (space reserved on the right/bottom).** The **Margin** fields (R/B)
+  in the Geometry section reserve empty space to the right of and below the
+  control. The **Enable** tick turns the margin on or off as a preview — the R/B
+  values are kept either way, so you can compare the layout with and without it.
+  On a **Follows-right/bottom** control the margin offsets it inward (a
+  Follows-bottom control keeps its `bottom` distance **plus** its bottom margin).
+  On a **Follows-left/top** control the margin is the **far** side: a fluid page
+  grows to the outer edge of the bottom/right margin, so a **Follows-top**
+  control with a 24px bottom margin keeps 24px of empty page below it instead of
+  sitting flush on the auto-sized edge — the fix for "the page always eats my
+  bottom gap." On a **Centred** control the margin shifts its box by half
+  (a right margin moves it left). There are no left/top margin fields: on a
+  left/top control they would just be the `left`/`top` distance by another name,
+  and on a right/bottom control they would do nothing. A group wraps only its
+  members' boxes, so a margin on a member is internal spacing and does not
+  enlarge the group.
 - **A spring shows every edge an object follows.** A solid zigzag runs from the
   object to each page edge it follows — a square anchor sits on the edge and a
   small arrowhead at the object points back at it. **Centred** draws a plain
   straight connector to each side with circle anchors. Each spring carries a
   small caption with the edge and its **pixel distance** (e.g. `right 198`,
-  `top 46`, `centre`) so you can judge the gaps at a glance. Springs are drawn
-  **behind the controls**, so they never cover what's on the page. Background
+  `top 46`, `centre`) so you can judge the gaps at a glance. An object's
+  **outer margin** is shaded as a soft translucent band on each side that has
+  one, so you can see the reserved space even on a default left/top object.
+  Changing a margin scrolls the band into view, since a far-side margin grows
+  the page rather than moving the control.
+  Springs are drawn **behind the controls**, so they never cover what's on the
+  page. Background
   objects show their springs too, and a **group's members** show theirs inside
   the group — measured against the **group box**, not the page. The **≋
   All/Sel/Off** control in the top bar shows springs for every object, only the
