@@ -1977,6 +1977,40 @@ describe('group outlines', () => {
     }
   })
 
+  it('traces borderless markdown/HTML viewers even with the hints off', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const cleanup = listenForEditor(root, () => {})
+    try {
+      const md = createObject('markdown', 'doc', { x: 60, y: 80, w: 200, h: 120 })
+      const html = createObject('html', 'raw', { x: 300, y: 80, w: 200, h: 120 })
+      const book: Book = {
+        id: 'bv',
+        title: 'V',
+        backgrounds: [BG],
+        pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [md, html] }],
+      }
+      loadBook(root, book, { fitHints: 'off' })
+      expect(outlineIds(root)).toEqual([html.id, md.id].sort())
+      const box = root.querySelector<HTMLElement>(
+        `.tb-group-outline[data-tb-group-outline-id="${md.id}"]`,
+      )!
+      expect(box.style.left).toBe('60px')
+      expect(box.style.top).toBe('80px')
+      expect(box.style.width).toBe('200px')
+      expect(box.style.height).toBe('120px')
+
+      // selecting a viewer drops its outline (the loud .tb-sel box takes over)
+      pointer(root, 'pointerdown', 100, 100)
+      pointer(root, 'pointerup', 100, 100)
+      expect(outlineIds(root)).toEqual([html.id])
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
   it('drops the outline for a selected group, and shows none when hints are off', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)

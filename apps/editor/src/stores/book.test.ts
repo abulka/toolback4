@@ -92,6 +92,16 @@ describe('book store — groups and arrange', () => {
     expect(store.selectionIds).toEqual([group.id])
   })
 
+  it('moving a top-level group below the fold grows the page', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a', 'b'])
+    store.groupSelected()
+    const group = store.activePage.objects[0]!
+    store.applyRects([{ id: group.id, rect: { x: 0, y: 900, w: 200, h: 100 } }])
+    expect(store.activeCanvasSize.height).toBe(1000)
+  })
+
   it('every group box carries left/top edges by default', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())

@@ -290,9 +290,12 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   }
 
   /**
-   * Draw the subtle group boxes: the drilled ancestors plus any group whose
-   * members are in view at the current mode. Selected groups are skipped (their
-   * `.tb-sel` box is the loud one). Keeps and hides stale boxes, like `.tb-sel`.
+   * Draw the subtle boxes: the drilled ancestors plus any group whose members
+   * are in view at the current mode. Markdown/HTML viewers have no chrome of
+   * their own, so their box is traced too whenever they're not the selection
+   * (otherwise an empty viewer is invisible at design time). Selected objects
+   * are skipped (their `.tb-sel` box is the loud one). Keeps and hides stale
+   * boxes, like `.tb-sel`.
    *
    * Uses `modeAllows` rather than `springShown`: hiding member springs (the
    * "group members in All" / "custom constraints only" options) must NOT hide
@@ -301,9 +304,13 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   function redrawGroupOutlines(): void {
     if (!wrapper || !overlay) return
     const hintParentIds = new Set<string>()
-    if (enabled && fitHints.mode !== 'off' && pageRoot) {
+    const viewerIds = new Set<string>()
+    if (enabled && pageRoot) {
       for (const el of Array.from(pageRoot.querySelectorAll<HTMLElement>('[data-tb-id]'))) {
-        if (!modeAllows(el)) continue
+        const id = el.dataset.tbId
+        if (!id || el.closest('[data-tb-bg]')) continue
+        if (isViewerObject(id)) viewerIds.add(id)
+        if (fitHints.mode === 'off' || !modeAllows(el)) continue
         const pid = el.parentElement?.closest<HTMLElement>('[data-tb-id]')?.dataset.tbId
         if (pid) hintParentIds.add(pid)
       }
@@ -316,7 +323,10 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
         mode: enabled ? fitHints.mode : 'off',
       }),
     )
-    for (const id of wanted) if (!isGroupObject(id)) wanted.delete(id)
+    // viewer boxes show independently of the spring mode — they're the only
+    // thing that makes a borderless viewer's bounds visible
+    for (const id of viewerIds) if (!selected.has(id)) wanted.add(id)
+    for (const id of [...wanted]) if (!isGroupObject(id) && !viewerIds.has(id)) wanted.delete(id)
     for (const id of wanted) groupOutlineFor(id)
     for (const [id, box] of groupOutlines) {
       const r = wanted.has(id) ? (rects.get(id) ?? bgRects.get(id)) : undefined
@@ -912,6 +922,13 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   /** is this object a group (its object element wraps a `.tb-group`)? */
   function isGroupObject(id: string): boolean {
     return !!objectEl(id)?.firstElementChild?.classList.contains('tb-group')
+  }
+
+  /** is this object a borderless viewer (markdown / HTML)? Their box is
+   *  invisible otherwise, so design mode traces it. */
+  function isViewerObject(id: string): boolean {
+    const cls = objectEl(id)?.firstElementChild?.classList
+    return !!cls && (cls.contains('tb-markdown') || cls.contains('tb-html'))
   }
 
   /**

@@ -517,8 +517,8 @@ body > .tb-page {
 }
 
 /* a quiet box tracing a group we're inside, or whose members' edge springs
-   are showing — so members' springs land on a visible edge. Selected groups
-   keep the louder .tb-sel box and draw no outline. */
+   are showing — and a borderless markdown/HTML viewer's own box in design
+   mode. Selected objects keep the louder .tb-sel box and draw no outline. */
 .tb-group-outline {
   position: absolute;
   border: 1px dashed rgba(100, 116, 139, 0.55);

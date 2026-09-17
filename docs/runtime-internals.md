@@ -350,10 +350,14 @@ and communicates with the editor only through messages (`toolback:selection`,
   `groupMembers`/`nonDefaultOnly` filters hide springs, not the box). A group
   can be both drilled and in-view, or selected: a selected group is
   always excluded — its `.tb-sel` box is the loud one — and `fitHints.mode:'off'`
-  leaves only the drilled ancestors. Built by `redrawGroupOutlines` (the set is
-  the pure `groupOutlineIds`), positioned from the `rects`/`bgRects` maps like
-  the selection boxes, painted under `.tb-sel`, and refreshed whenever the
-  selection, drill path or hint mode changes.
+  leaves only the drilled ancestors. **Markdown/HTML viewers** join the set too
+  (detected by their `.tb-markdown`/`.tb-html` element): they have no chrome of
+  their own, so their box is traced whenever they're not selected, independent
+  of the spring mode — otherwise an empty viewer is invisible at design time.
+  Built by `redrawGroupOutlines` (the group part is the pure `groupOutlineIds`),
+  positioned from the `rects`/`bgRects` maps like the selection boxes, painted
+  under `.tb-sel`, and refreshed whenever the selection, drill path or hint mode
+  changes.
 - **Drags rewrite edge distances**: canvas drags send page-absolute rects; the
   store converts each to the object's `x`/`y` distances against its page/group
   box, keeping the edges it already follows. A centred axis is rigid (the canvas
