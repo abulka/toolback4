@@ -284,7 +284,13 @@ and communicates with the editor only through messages (`toolback:selection`,
   controller also re-derives the cached `rects` of every descendant of a moved
   object from their start rects (`followers`, captured at pointer-down), so a
   group's members' springs and hit-testing track the ghost live instead of
-  lagging until the commit's re-render.
+  lagging until the commit's re-render. Before sending, `compensateMoveForScroll`
+  nudges the committed rects by the scroll the browser is about to clamp: moving
+  the far-edge control inwards shrinks a scrolled fluid page until it stops
+  overflowing, so `scrollLeft`/`scrollTop` reset and the page would snap
+  sideways. `scrollClampShift` iterates the page size / clamp to preserve the
+  dropped object's on-screen position (top-level moves only; no-op when the page
+  isn't scrolled or other content still overflows).
 - **Group resize**: a group handle drag leaves the layout box alone and previews
   a CSS `transform: scale(fx, fy)` anchored on the fixed corner, stretching the
   whole subtree. The commit sends only the group's rect + `dir`; the store scales
@@ -334,22 +340,25 @@ and communicates with the editor only through messages (`toolback:selection`,
   translucent white halo so it reads on dark pages. **Members draw their own
   springs against the parent group box** (the group wrapper's rect, via the
   `rects`/`bgRects` maps) rather than the page; top-level objects use the page box
-  (`origin` + `pageBounds`). An object's **outer margin** is shaded too: a soft
-  translucent band (`.tb-fithint-margin`) covers each side that carries a margin,
-  drawn under the springs. Margins are gated by `modeAllows` only (not
-  `springShown`), so a default left/top object's margin stays visible even when
-  `nonDefaultOnly` hides its springs. When the selected object's applied margin
-  changes, `revealMarginChange` scrolls its bands into view (`scrollIntoView`) —
-  a far-side margin grows the page instead of moving the control, so the effect
-  can land off-screen. Covers background objects too (`bgRects`
+  (`origin` + `pageBounds`). **Page padding** is shaded too: soft bands
+  (`.tb-fithint-padding`) run along the page's right/bottom edge, drawn under the
+  springs. They always show in `all` mode. In `selected` mode they show only when
+  the padding actually contributes on that axis (the page is content-sized —
+  `bounds` bigger than the document viewport) **and** the selected object follows
+  the near edge (x `left` → right band, y `top` → bottom band), so the padding
+  reads as the real gap past it rather than a strip on a window-sized page. When
+  the page padding
+  changes, `revealPaddingChange` scrolls the page's far corner into view
+  (`scrollIntoView` on a transient probe) so the gap can be watched growing.
+  Covers background objects too (`bgRects`
   fallback), with a **?** help popup in the toolbar (buttons + options + line
   legend). The hint is the page's first child, so it
   paints above the page background but **under** the controls; page-edge anchor
   glyphs are nudged just inside the page so clipping doesn't cut them. Pure
   decoration — `pointer-events: none`, rebuilt on render, drag redraws and window
-  resizes (`DesignController.refresh`). Reads the `data-tb-edge-x/y` modes and
-  the `data-tb-margin` (right/bottom) the renderer stamps on each wrapper
-  in `applyEdgeStyles`.
+  resizes (`DesignController.refresh`). Reads the `data-tb-edge-x/y` modes the
+  renderer stamps on each wrapper in `applyEdgeStyles`, and the page's
+  `data-tb-padding` stamped in `renderPage`.
 - **Group outlines** (`.tb-group-outline`): a quiet dashed slate box tracing a
   group that has no selection box of its own but whose edges matter — every
   group in `drillPath` (so each nesting level stays faintly visible while an
@@ -378,7 +387,7 @@ like CSS `left`/`right`/`top`/`bottom`:
 
 - `{ mode:'left', left, width }` — fixed distance from the left edge, fixed size
 - `{ mode:'right', right, width }` — fixed distance from the right edge
-- `{ mode:'both', left, right }` — both margins fixed, so the size stretches
+- `{ mode:'both', left, right }` — both distances fixed, so the size stretches
 - `{ mode:'center', width }` — fixed size, centred
 
 `y` mirrors with `top` / `bottom` / `both` / `center`. There is no stored
@@ -389,24 +398,16 @@ to CSS (`applyEdgeStyles`: `left`+`width`, `right`+`width`, `left`+`right`, or
 page for top-level objects, the parent group wrapper for members — so the browser
 repositions everything on resize with **no JavaScript re-render**.
 
-An optional **outer margin** (`PageObject.margin: { right?, bottom? }`, missing
-sides = 0) folds into the same resolution as the edge distances. Only the
-right/bottom sides exist: a left/top control's near-side margin would duplicate
-its `left`/`top` distance, and a right/bottom control's near-side margin never
-applies. On a followed edge it offsets the control away from that edge (`right`
-→ `right + margin.right`, `both` shrinks by the right margin); a centred axis
-shifts its box by half the margin. `rectForObject` and `applyEdgeStyles` share
-this math, and `xEdgeFromRect`/`yEdgeFromRect` subtract the margin again so a
-drag/typed write cannot double-count it. `scaleEdges` scales the margin with a
-group resize; `marginOf` fills in the missing sides.
-An optional `PageObject.marginEnabled: false` switches the margin **off without
-losing its values** (the panel's **Enable** tick previews both states):
-`effectiveMargin` returns `undefined` in that case, and `marginOf`,
-`rectForObject` and `applyRectToObject` all read through it, so resolution, page
-growth and the `data-tb-margin` shading agree. `scaleEdges` still scales the raw
-stored values, so re-enabling restores them. Margins are editor-authored only
-(the Geometry panel's **Margin** row, with the `setObjectMarginEnabled` store
-action) — there is no `ControlApi`/author-bridge setter.
+There is no per-object margin: an object's outer space is the edge distance
+itself (a right/bottom control's inset, a follows-both control's stretch). The
+only page-level space is **page padding** (`Page.padding`, fluid pages only,
+missing = 0): `resolvePageBox` and `renderPage` size the page as
+`max(viewport, content extent + padding)` on each axis, so the page keeps that
+much empty space past its content on the right/bottom. It is masked when the
+window is already bigger (the `max` wins), and fixed-size pages ignore it.
+`contentExtent` measures only the near-edge (left/top) content outer edges.
+`pagePadding(page)` is the accessor. Editor-only (the Page tab's **Content
+padding** field, `setPagePadding` store action).
 
 The author-facing surface is the **Responsive** section of the properties panel
 (`apps/editor/src/components/PropertiesPanel.vue`): four plain choices per axis
@@ -443,14 +444,13 @@ carry their own constraints **relative to the group box** (see §5).
 
 `resolvePageBox(page, container, objects)` (`packages/format`) is the single
 source of a page's size. A **fixed** page (`Page.size`) returns that size. An
-**ordinary** page returns `max(container, content extent)`, where the extent is
-`contentExtent(objects)`: the outer (margin-box) right/bottom of every object
+**ordinary** page returns `max(container, content extent + page padding)`, where
+the extent is `contentExtent(objects)`: the outer right/bottom of every object
 whose x/y mode is **left/top** (near edge, groups included). Right/bottom/both/
 centred objects sit inside the page box by definition and never enlarge it — this
 is what makes "follows bottom" mean a fixed distance from the page's real bottom
-edge without circularity. Including the margin box is what lets a Follows-top
-control keep `margin.bottom` px of empty page below it instead of sitting flush
-on the auto-grown edge.
+edge without circularity. Adding `Page.padding` is what lets a Follows-top
+control keep empty page below it instead of sitting flush on the auto-grown edge.
 
 At render time a fluid page is given `width:100%; height:100vh` (or `100%` inside
 a sized popup/author box) with `min-width`/`min-height` set to the content
@@ -568,7 +568,7 @@ IndexedDB autosave. Components never touch `book` directly.
   `applyRects` (canvas commits), `setGeometry` (panel fields, author bridge) and
   `setObjectEdge` (Responsive dropdowns) all write through
   `writeRectPart`/`applyRectToObject`, keeping the edges each control follows.
-  `fillObjectToPage`/`fillObjectWidth`/`fillObjectHeight` pin both margins;
+  `fillObjectToPage`/`fillObjectWidth`/`fillObjectHeight` pin both edges;
   `centerObjectInPage` sets both axes centred. `expandGroup` re-hugs a group box
   around its members.
 - **Align / distribute / match** (`alignSelection`, `distributeSelection`,
@@ -714,10 +714,10 @@ match what will resolve at runtime:
    and preview consume that layout.
 9. **Far edges cannot feed the page size.** `resolvePageBox` may grow the page
    *box* past the container; only left/top (near-edge) objects contribute to
-   `contentExtent` (see §4.2), measured to their outer (margin-box) edge. A
-   right/bottom/both/centred object never enlarges the page — its margin only
-   offsets it. Margins must be subtracted again by `xEdgeFromRect`/`yEdgeFromRect`
-   on write (never bake a resolved rect back into `x`/`y`).
+   `contentExtent` (see §4.2). A right/bottom/both/centred object never enlarges
+   the page — it sits inside the box. `Page.padding` is the only extra page-level
+   space (fluid pages, right/bottom). `xEdgeFromRect`/`yEdgeFromRect` must not
+   bake a resolved rect back into `x`/`y`.
 10. **A group scales when you size it, not when the page reflows.** A group
     resize — a handle drag (`applyRects` with `dir`), a typed W/H
     (`setGeometry`), or a scripted `group.width`/`height` — scales descendants'

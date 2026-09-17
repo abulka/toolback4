@@ -13,7 +13,6 @@ import {
   DEFAULT_FIT_HINTS,
   DEFAULT_PROPS,
   distributeRects,
-  effectiveMargin,
   flattenObjects,
   matchSizeRects,
   newId,
@@ -35,7 +34,6 @@ import {
   type ControlKind,
   type FitHintMode,
   type FitHintOptions,
-  type Margin,
   type MatchDim,
   type Page,
   type PageObject,
@@ -591,6 +589,20 @@ export const useBookStore = defineStore('book', () => {
     sync()
   }
 
+  /**
+   * Set a fluid page's content padding (empty space kept past its content on
+   * the right/bottom). 0 clears it. Undoable.
+   */
+  function setPagePadding(pageIndex: number, value: number): void {
+    const page = book.value.pages[pageIndex]
+    if (!page) return
+    record('Page padding', `pagepadding:${page.id}`)
+    const n = Math.max(0, Math.round(value))
+    if (n > 0) page.padding = n
+    else delete page.padding
+    sync()
+  }
+
   /** move a page onto another background */
   function movePageToBackground(pageIndex: number, backgroundId: string): void {
     const page = book.value.pages[pageIndex]
@@ -1061,8 +1073,8 @@ export const useBookStore = defineStore('book', () => {
     record('Responsive', `edge:${id}`)
     const box = boxForObject(obj)
     const r = rectForObject(obj, box)
-    if (axis === 'x') obj.x = xEdgeFromRect(r, box.width, mode as XEdgeMode, effectiveMargin(obj))
-    else obj.y = yEdgeFromRect(r, box.height, mode as YEdgeMode, effectiveMargin(obj))
+    if (axis === 'x') obj.x = xEdgeFromRect(r, box.width, mode as XEdgeMode)
+    else obj.y = yEdgeFromRect(r, box.height, mode as YEdgeMode)
     // a member's new edge can change what the group must surround
     if (found.parent) expandGroup(found.parent)
     sync()
@@ -1076,57 +1088,12 @@ export const useBookStore = defineStore('book', () => {
     return renderedRectOf(obj)
   }
 
-  /** drop the object's margin on the axis a fill/center action sets, so the
-   *  action's gap / centring is measured from the control's own box */
-  function clearMarginAxis(obj: PageObject, axis: 'x' | 'y' | 'both'): void {
-    if (!obj.margin) return
-    const m: Margin = { ...obj.margin }
-    if (axis === 'x' || axis === 'both') delete m.right
-    if (axis === 'y' || axis === 'both') delete m.bottom
-    if (Object.keys(m).length) obj.margin = m
-    else delete obj.margin
-  }
-
-  /** Set an object's outer margin (one or more sides; 0 clears a side). Undoable. */
-  function setObjectMargin(id: string, patch: Margin): void {
-    const found = locateObj(id)
-    if (!found) return
-    record('Margin', `margin:${id}`)
-    const next: Margin = { ...(found.obj.margin ?? {}) }
-    for (const side of ['right', 'bottom'] as const) {
-      const v = patch[side]
-      if (v === undefined) continue
-      const n = Math.max(0, Math.round(v))
-      if (n > 0) next[side] = n
-      else delete next[side]
-    }
-    if (Object.keys(next).length) found.obj.margin = next
-    else delete found.obj.margin
-    if (found.parent) expandGroup(found.parent)
-    sync()
-  }
-
-  /**
-   * Turn an object's outer margin on or off without touching its values, so it
-   * can be previewed and re-enabled. Undoable.
-   */
-  function setObjectMarginEnabled(id: string, enabled: boolean): void {
-    const found = locateObj(id)
-    if (!found) return
-    record('Margin', `margin-enabled:${id}`)
-    if (enabled) delete found.obj.marginEnabled
-    else found.obj.marginEnabled = false
-    if (found.parent) expandGroup(found.parent)
-    sync()
-  }
-
   /** Glue a top-level object to both page edges (a fixed margin on each). */
   function fillObjectToPage(id: string, margin: number): void {
     const found = locateObj(id)
     if (!found || found.parent) return
     record('Fill page', `fill:${id}`)
     const m = Math.max(0, Math.round(margin))
-    clearMarginAxis(found.obj, 'both')
     found.obj.x = { mode: 'both', left: m, right: m }
     found.obj.y = { mode: 'both', top: m, bottom: m }
     sync()
@@ -1138,7 +1105,6 @@ export const useBookStore = defineStore('book', () => {
     if (!found || found.parent) return
     record('Fill width', `fill:${id}`)
     const m = Math.max(0, Math.round(margin))
-    clearMarginAxis(found.obj, 'x')
     found.obj.x = { mode: 'both', left: m, right: m }
     sync()
   }
@@ -1149,7 +1115,6 @@ export const useBookStore = defineStore('book', () => {
     if (!found || found.parent) return
     record('Fill height', `fill:${id}`)
     const m = Math.max(0, Math.round(margin))
-    clearMarginAxis(found.obj, 'y')
     found.obj.y = { mode: 'both', top: m, bottom: m }
     sync()
   }
@@ -1160,7 +1125,6 @@ export const useBookStore = defineStore('book', () => {
     if (!found || found.parent) return
     record('Center on page', `edge:${id}`)
     const r = rectForObject(found.obj, boxForObject(found.obj))
-    clearMarginAxis(found.obj, 'both')
     found.obj.x = { mode: 'center', width: r.w }
     found.obj.y = { mode: 'center', height: r.h }
     sync()
@@ -1639,8 +1603,7 @@ export const useBookStore = defineStore('book', () => {
     applyRects,
     updateProps,
     setObjectEdge,
-    setObjectMargin,
-    setObjectMarginEnabled,
+    setPagePadding,
     setGeometry,
     effectiveRectOf,
     fillObjectToPage,

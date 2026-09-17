@@ -553,12 +553,12 @@ body > .tb-page {
 .tb-fithint-spring,
 .tb-fithint-anchor,
 .tb-fithint-arrow,
-.tb-fithint-margin {
+.tb-fithint-padding {
   position: absolute;
 }
 
-/* the space an object's outer margin reserves, shaded gently */
-.tb-fithint-margin {
+/* the empty space a page keeps past its content, shaded gently */
+.tb-fithint-padding {
   background: rgba(100, 116, 139, 0.14);
   box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.22);
   border-radius: 2px;

@@ -324,35 +324,28 @@ Things to know:
 - **Fill to page.** The Geometry section's **Fill to page** group stretches the
   object to the page edges. **Fill page** pins both axes (**Follows both**);
   **Fill width** / **Fill height** do a single axis. The **Fill margin** field
-  is the gap left on each side (remembered between sessions); it is *not* the
-  control's outer **Margin**. **Center** sets both axes to **Centred**. Works on
-  top-level objects; a group member follows its group's box instead.
-- **Margin (space reserved on the right/bottom).** The **Margin** fields (R/B)
-  in the Geometry section reserve empty space to the right of and below the
-  control. The **Enable** tick turns the margin on or off as a preview — the R/B
-  values are kept either way, so you can compare the layout with and without it.
-  On a **Follows-right/bottom** control the margin offsets it inward (a
-  Follows-bottom control keeps its `bottom` distance **plus** its bottom margin).
-  On a **Follows-left/top** control the margin is the **far** side: a fluid page
-  grows to the outer edge of the bottom/right margin, so a **Follows-top**
-  control with a 24px bottom margin keeps 24px of empty page below it instead of
-  sitting flush on the auto-sized edge — the fix for "the page always eats my
-  bottom gap." On a **Centred** control the margin shifts its box by half
-  (a right margin moves it left). There are no left/top margin fields: on a
-  left/top control they would just be the `left`/`top` distance by another name,
-  and on a right/bottom control they would do nothing. A group wraps only its
-  members' boxes, so a margin on a member is internal spacing and does not
-  enlarge the group.
+  is the gap left on each side (remembered between sessions). **Center** sets
+  both axes to **Centred**. Works on top-level objects; a group member follows
+  its group's box instead.
+- **Page padding (space past the content).** The Page tab's **Content padding**
+  keeps that much empty space past the content on the right and bottom, so
+  content never sits on the page's auto-sized edge — the fix for "the page
+  always eats my bottom gap." It only shows up when the content is what makes
+  the page big (a narrow window, or content taller/wider than the window); in a
+  big window the page is window-sized and already leaves room. Content anchored
+  to the right/bottom still sits on the page edge — set its distance for an
+  inset.
 - **A spring shows every edge an object follows.** A solid zigzag runs from the
   object to each page edge it follows — a square anchor sits on the edge and a
   small arrowhead at the object points back at it. **Centred** draws a plain
   straight connector to each side with circle anchors. Each spring carries a
   small caption with the edge and its **pixel distance** (e.g. `right 198`,
-  `top 46`, `centre`) so you can judge the gaps at a glance. An object's
-  **outer margin** is shaded as a soft translucent band on each side that has
-  one, so you can see the reserved space even on a default left/top object.
-  Changing a margin scrolls the band into view, since a far-side margin grows
-  the page rather than moving the control.
+  `top 46`, `centre`) so you can judge the gaps at a glance. **Page padding** is
+  shaded as a soft band along the page's right/bottom edge — always in **All**,
+  and in **Sel** when the selected control follows the near (left/top) edge the
+  padding sits past *and* the padding is actually doing something (the content is
+  bigger than the window). Changing the padding scrolls that edge into view so
+  you can watch the gap grow.
   Springs are drawn **behind the controls**, so they never cover what's on the
   page. Background
   objects show their springs too, and a **group's members** show theirs inside

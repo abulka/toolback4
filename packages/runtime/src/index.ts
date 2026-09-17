@@ -1,5 +1,5 @@
 import type { Background, Book, CanvasSize, Page, PageObject, Rect } from '@toolback/format'
-import { backgroundFor, contentExtent, marginOf, rectForObject, resolvePageBox } from '@toolback/format'
+import { backgroundFor, contentExtent, pagePadding, rectForObject, resolvePageBox } from '@toolback/format'
 import { registerControls, renderObject } from '@toolback/controls'
 import { stylesCss } from './styles'
 
@@ -57,30 +57,22 @@ export function applyEdgeStyles(el: HTMLElement, obj: PageObject): void {
   s.top = ''
   s.bottom = ''
   s.height = ''
-  const m = marginOf(obj)
-  if (m.right || m.bottom) {
-    el.dataset.tbMargin = `${m.right} ${m.bottom}`
-  } else {
-    delete el.dataset.tbMargin
-  }
   switch (obj.x.mode) {
     case 'left':
       s.left = `${obj.x.left}px`
       s.width = `${obj.x.width}px`
       break
     case 'right':
-      s.right = `${obj.x.right + m.right}px`
+      s.right = `${obj.x.right}px`
       s.width = `${obj.x.width}px`
       break
     case 'both':
       s.left = `${obj.x.left}px`
-      s.right = `${obj.x.right + m.right}px`
+      s.right = `${obj.x.right}px`
       break
     case 'center': {
-      // the right margin shifts the centred margin box left by half
-      const half = obj.x.width / 2 + m.right / 2
-      s.left =
-        half < 0 ? `calc(50% + ${-half}px)` : `calc(50% - ${half}px)`
+      const half = obj.x.width / 2
+      s.left = `calc(50% - ${half}px)`
       s.width = `${obj.x.width}px`
       break
     }
@@ -91,17 +83,16 @@ export function applyEdgeStyles(el: HTMLElement, obj: PageObject): void {
       s.height = `${obj.y.height}px`
       break
     case 'bottom':
-      s.bottom = `${obj.y.bottom + m.bottom}px`
+      s.bottom = `${obj.y.bottom}px`
       s.height = `${obj.y.height}px`
       break
     case 'both':
       s.top = `${obj.y.top}px`
-      s.bottom = `${obj.y.bottom + m.bottom}px`
+      s.bottom = `${obj.y.bottom}px`
       break
     case 'center': {
-      const half = obj.y.height / 2 + m.bottom / 2
-      s.top =
-        half < 0 ? `calc(50% + ${-half}px)` : `calc(50% - ${half}px)`
+      const half = obj.y.height / 2
+      s.top = `calc(50% - ${half}px)`
       s.height = `${obj.y.height}px`
       break
     }
@@ -156,13 +147,16 @@ export function renderPage(
     pageRoot.style.width = `${page.size.width}px`
     pageRoot.style.height = `${page.size.height}px`
   } else {
-    // fluid: fill the container, grow to the content extent past the fold.
-    // `100vh` when the page is the root surface; `100%` inside a sized box.
+    // fluid: fill the container, grow to the content extent past the fold
+    // (plus the page padding). `100vh` when the page is the root surface;
+    // `100%` inside a sized box.
     const extent = contentExtent(objects)
+    const pad = pagePadding(page)
+    pageRoot.dataset.tbPadding = String(pad)
     pageRoot.style.width = '100%'
     pageRoot.style.height = container ? '100%' : '100vh'
-    pageRoot.style.minWidth = `${Math.ceil(extent.right)}px`
-    pageRoot.style.minHeight = `${Math.ceil(extent.bottom)}px`
+    pageRoot.style.minWidth = `${Math.ceil(extent.right) + pad}px`
+    pageRoot.style.minHeight = `${Math.ceil(extent.bottom) + pad}px`
   }
 
   // background objects paint below the page's own objects and are tagged so

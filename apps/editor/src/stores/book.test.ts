@@ -844,110 +844,48 @@ describe('book store — responsive edges', () => {
   })
 })
 
-describe('book store — outer margin', () => {
+describe('book store — page padding', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
   })
 
-  it('setObjectMargin stores the far-side margins and offsets a far-edge control', () => {
+  it('setPagePadding grows a fluid page past its content', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
-    const o = store.book.pages[0]!.objects[0]!
-    o.x = { mode: 'right', right: 0, width: 100 }
-    o.y = { mode: 'bottom', bottom: 0, height: 50 }
-    store.setObjectMargin(o.id, { right: 10, bottom: 24 })
-    expect(o.margin).toEqual({ right: 10, bottom: 24 })
-    // 1280 - 100 - 10 = 1170; 800 - 50 - 24 = 726
-    expect(store.effectiveRectOf(o.id)).toMatchObject({ x: 1170, y: 726 })
+    store.book.pages[0]!.objects[0]!.y = { mode: 'top', top: 900, height: 50 }
+    store.setPagePadding(0, 24)
+    // content bottom 950 + 24 padding, past the 800 viewport
+    expect(store.activeCanvasSize.height).toBe(974)
+    expect(store.activeCanvasSize.width).toBe(1280)
   })
 
-  it('a bottom margin grows the page past a near-edge control', () => {
+  it('setPagePadding is masked by a big window and clears at 0', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
-    const id = store.book.pages[0]!.objects[0]!.id
-    store.setObjectMargin(id, { bottom: 900 })
-    // object top 0 + height 50 + margin 900, past the 800 viewport
-    expect(store.activeCanvasSize.height).toBe(950)
+    store.setPagePadding(0, 24)
+    // content is small — the 800-tall viewport masks the padding
+    expect(store.activeCanvasSize.height).toBe(800)
+    expect(store.book.pages[0]!.padding).toBe(24)
+    store.setPagePadding(0, 0)
+    expect(store.book.pages[0]!.padding).toBeUndefined()
+    expect(store.activeCanvasSize.height).toBe(800)
   })
 
-  it('a zero side is dropped and an all-zero margin is removed', () => {
+  it('setPagePadding is undoable', () => {
     const store = useBookStore()
     store.hydrate(twoObjectBook())
-    const id = store.book.pages[0]!.objects[0]!.id
-    store.setObjectMargin(id, { right: 5 })
-    expect(store.book.pages[0]!.objects[0]!.margin).toEqual({ right: 5 })
-    store.setObjectMargin(id, { right: 0 })
-    expect(store.book.pages[0]!.objects[0]!.margin).toBeUndefined()
-  })
-
-  it('fill clears the margin on the axes it sets', () => {
-    const store = useBookStore()
-    store.hydrate(twoObjectBook())
-    const id = store.book.pages[0]!.objects[0]!.id
-    store.setObjectMargin(id, { right: 10, bottom: 24 })
-    store.fillObjectToPage(id, 8)
-    const o = store.book.pages[0]!.objects[0]!
-    expect(o.margin).toBeUndefined()
-    expect(o.x).toEqual({ mode: 'both', left: 8, right: 8 })
-  })
-
-  it('dragging a margined object keeps the margin without double-counting', () => {
-    const store = useBookStore()
-    store.hydrate(twoObjectBook())
-    const o = store.book.pages[0]!.objects[0]!
-    o.x = { mode: 'right', right: 0, width: 100 }
-    o.y = { mode: 'bottom', bottom: 0, height: 50 }
-    o.margin = { right: 10, bottom: 24 }
-    // rendered border box at 1170,726; drag it -40,-10
-    store.applyRects([{ id: o.id, rect: { x: 1130, y: 716, w: 100, h: 50 } }])
-    // 1280 - 1230 - 10 = 40; 800 - 766 - 24 = 10
-    expect(o.x).toEqual({ mode: 'right', right: 40, width: 100 })
-    expect(o.y).toEqual({ mode: 'bottom', bottom: 10, height: 50 })
-    expect(o.margin).toEqual({ right: 10, bottom: 24 })
-  })
-
-  it('setObjectMarginEnabled toggles the margin without touching its values', () => {
-    const store = useBookStore()
-    store.hydrate(twoObjectBook())
-    const o = store.book.pages[0]!.objects[0]!
-    o.x = { mode: 'right', right: 0, width: 100 }
-    o.y = { mode: 'bottom', bottom: 0, height: 50 }
-    store.setObjectMargin(o.id, { right: 10, bottom: 24 })
-    expect(store.effectiveRectOf(o.id)).toMatchObject({ x: 1170, y: 726 })
-    store.setObjectMarginEnabled(o.id, false)
-    expect(o.marginEnabled).toBe(false)
-    expect(o.margin).toEqual({ right: 10, bottom: 24 })
-    expect(store.effectiveRectOf(o.id)).toMatchObject({ x: 1180, y: 750 })
-    store.setObjectMarginEnabled(o.id, true)
-    expect(o.marginEnabled).toBeUndefined()
-    expect(store.effectiveRectOf(o.id)).toMatchObject({ x: 1170, y: 726 })
-  })
-
-  it('a geometry write while the margin is off does not double-count', () => {
-    const store = useBookStore()
-    store.hydrate(twoObjectBook())
-    const o = store.book.pages[0]!.objects[0]!
-    o.x = { mode: 'right', right: 0, width: 100 }
-    o.y = { mode: 'bottom', bottom: 0, height: 50 }
-    o.margin = { right: 10, bottom: 24 }
-    o.marginEnabled = false
-    // the rendered box is now at 1180,750; a drag to 1140,730 must not subtract
-    // the switched-off margin
-    store.applyRects([{ id: o.id, rect: { x: 1140, y: 730, w: 100, h: 50 } }])
-    expect(o.x).toEqual({ mode: 'right', right: 40, width: 100 })
-    expect(o.y).toEqual({ mode: 'bottom', bottom: 20, height: 50 })
-  })
-
-  it('margin enable/disable is undoable and keeps the values', () => {
-    const store = useBookStore()
-    store.hydrate(twoObjectBook())
-    const id = store.book.pages[0]!.objects[0]!.id
-    store.setObjectMargin(id, { right: 5 })
-    store.setObjectMarginEnabled(id, false)
-    expect(store.book.pages[0]!.objects[0]!.marginEnabled).toBe(false)
+    store.setPagePadding(0, 24)
+    expect(store.book.pages[0]!.padding).toBe(24)
     store.undo()
-    expect(store.book.pages[0]!.objects[0]!.marginEnabled).toBeUndefined()
-    expect(store.book.pages[0]!.objects[0]!.margin).toEqual({ right: 5 })
+    expect(store.book.pages[0]!.padding).toBeUndefined()
+  })
+
+  it('a fixed page ignores padding', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setPageSize(0, { width: 360, height: 420 })
+    store.setPagePadding(0, 24)
+    expect(store.activeCanvasSize).toEqual({ width: 360, height: 420 })
   })
 })
 

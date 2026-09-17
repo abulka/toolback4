@@ -13,6 +13,7 @@ import {
 import { sampleBook } from '@toolback/format/src/sample'
 import {
   badgePosition,
+  scrollClampShift,
   createDesignController,
   groupOutlineIds,
   isCornerHandle,
@@ -149,6 +150,50 @@ describe('design geometry helpers', () => {
 
   it('badgePosition clamps to the inset when the object is off-page', () => {
     expect(badgePosition({ x: -500, y: 900, w: 176, h: 48 }, { width: 800, height: 600 }, { width: 60, height: 18 })).toEqual({ x: 4, y: 578 })
+  })
+
+  it('scrollClampShift is a no-op when the page is not scrolled', () => {
+    expect(
+      scrollClampShift({
+        viewport: { w: 1006, h: 654 },
+        scroll: { x: 0, y: 0 },
+        padding: 200,
+        rightFixed: 0,
+        rightMoved: 780,
+        bottomFixed: 0,
+        bottomMoved: 0,
+      }),
+    ).toEqual({ dx: 0, dy: 0 })
+  })
+
+  it('scrollClampShift offsets the move by the clamped scroll so it keeps its screen spot', () => {
+    // page was 1276 wide (scroll 270); the moved object now ends at 780, so the
+    // page fits the 1006 viewport and the scroll clamps to 0 → nudge by -270
+    expect(
+      scrollClampShift({
+        viewport: { w: 1006, h: 654 },
+        scroll: { x: 270, y: 120 },
+        padding: 200,
+        rightFixed: 0,
+        rightMoved: 780,
+        bottomFixed: 0,
+        bottomMoved: 500,
+      }),
+    ).toEqual({ dx: -270, dy: -120 })
+  })
+
+  it('scrollClampShift does nothing while other content still scrolls the page', () => {
+    expect(
+      scrollClampShift({
+        viewport: { w: 1006, h: 654 },
+        scroll: { x: 270, y: 0 },
+        padding: 0,
+        rightFixed: 2000,
+        rightMoved: 780,
+        bottomFixed: 0,
+        bottomMoved: 0,
+      }),
+    ).toEqual({ dx: 0, dy: 0 })
   })
 })
 
@@ -1805,30 +1850,26 @@ describe('spring display options', () => {
     }
   })
 
-  it('shades an object’s outer margin as bands under the springs', () => {
-    const o = button('o', { mode: 'left', left: 100, width: 100 }, { mode: 'top', top: 50, height: 40 })
-    o.margin = { right: 12, bottom: 24 }
-    // nonDefaultOnly hides this default left/top object's springs — the margin
-    // is real reserved space, so its bands still show
-    const { root, cleanup } = mount(flatBook([o]), opts({ nonDefaultOnly: true }))
+  it('shades the page padding along the far edges in "all" mode', () => {
+    const book = flatBook([
+      button('o', { mode: 'left', left: 40, width: 100 }, { mode: 'top', top: 40, height: 50 }),
+    ])
+    book.pages[0]!.padding = 24
+    const { root, cleanup } = mount(book, opts({ mode: 'all' }))
     try {
-      const wrapper = root.querySelector<HTMLElement>('.tb-object[data-tb-id="o"]')!
-      expect(wrapper.dataset.tbMargin).toBe('12 24')
-      const bands = [...root.querySelectorAll<HTMLElement>('.tb-fithint-margin')]
-      const rects = bands.map((b) => ({
+      const bands = [...root.querySelectorAll<HTMLElement>('.tb-fithint-padding')].map((b) => ({
         left: parseFloat(b.style.left),
         top: parseFloat(b.style.top),
         width: parseFloat(b.style.width),
         height: parseFloat(b.style.height),
       }))
-      // the 12px strip right of the control and the 24px reserved below
-      expect(rects).toEqual(
+      // the 800x600 page (test rects), 24px strips at the right and bottom edges
+      expect(bands).toEqual(
         expect.arrayContaining([
-          { left: 200, top: 50, width: 12, height: 40 },
-          { left: 100, top: 90, width: 100, height: 24 },
+          { left: 776, top: 0, width: 24, height: 600 },
+          { left: 0, top: 576, width: 800, height: 24 },
         ]),
       )
-      expect(labels(root)).not.toContain('left 100')
     } finally {
       unpatchRects()
       cleanup()
@@ -1836,10 +1877,65 @@ describe('spring display options', () => {
     }
   })
 
-  it('scrolls the selected object’s margin bands into view when its margin changes', () => {
-    const o = button('o', { mode: 'left', left: 100, width: 100 }, { mode: 'top', top: 50, height: 40 })
-    o.margin = { right: 12 }
-    const { root, cleanup } = mount(flatBook([o]), opts({}), ['o'])
+  it('in "selected" mode shades padding only for a near-edge (left/top) selection, when it is in effect', () => {
+    const left = button('L', { mode: 'left', left: 40, width: 100 }, { mode: 'top', top: 40, height: 50 })
+    const right = button('R', { mode: 'right', right: 40, width: 100 }, { mode: 'bottom', bottom: 40, height: 50 })
+    const book = flatBook([left, right])
+    book.pages[0]!.padding = 24
+    const viewport = document.documentElement as unknown as { clientWidth?: number; clientHeight?: number }
+    // window smaller than the 800x600 page → the padding is real
+    Object.defineProperty(viewport, 'clientWidth', { value: 400, configurable: true })
+    Object.defineProperty(viewport, 'clientHeight', { value: 300, configurable: true })
+    const { root, cleanup } = mount(book, opts({ mode: 'selected' }), ['L'])
+    try {
+      expect(root.querySelectorAll('.tb-fithint-padding').length).toBe(2)
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: { type: 'toolback:load', book, design: true, fitHints: opts({ mode: 'selected' }), selection: ['R'] },
+        }),
+      )
+      expect(root.querySelectorAll('.tb-fithint-padding').length).toBe(0)
+    } finally {
+      delete viewport.clientWidth
+      delete viewport.clientHeight
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('in "selected" mode hides padding when the window already fits the content', () => {
+    const left = button('L', { mode: 'left', left: 40, width: 100 }, { mode: 'top', top: 40, height: 50 })
+    const book = flatBook([left])
+    book.pages[0]!.padding = 24
+    const viewport = document.documentElement as unknown as { clientWidth?: number; clientHeight?: number }
+    // window bigger than the 800x600 page → the padding is masked
+    Object.defineProperty(viewport, 'clientWidth', { value: 1200, configurable: true })
+    Object.defineProperty(viewport, 'clientHeight', { value: 900, configurable: true })
+    const { root, cleanup } = mount(book, opts({ mode: 'selected' }), ['L'])
+    try {
+      expect(root.querySelectorAll('.tb-fithint-padding').length).toBe(0)
+      // "all" still outlines the configured padding
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: { type: 'toolback:load', book, design: true, fitHints: opts({ mode: 'all' }), selection: ['L'] },
+        }),
+      )
+      expect(root.querySelectorAll('.tb-fithint-padding').length).toBe(2)
+    } finally {
+      delete viewport.clientWidth
+      delete viewport.clientHeight
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
+  it('scrolls the page’s far edge into view when the padding changes', () => {
+    const book = flatBook([
+      button('o', { mode: 'left', left: 100, width: 100 }, { mode: 'top', top: 50, height: 40 }),
+    ])
+    const { root, cleanup } = mount(book, opts({ mode: 'all' }))
     const proto = HTMLElement.prototype as unknown as { scrollIntoView?: () => void }
     const real = proto.scrollIntoView
     const seen: HTMLElement[] = []
@@ -1847,15 +1943,13 @@ describe('spring display options', () => {
       seen.push(this)
     }
     try {
-      // the still-selected object grows its margin, then the canvas re-renders
-      o.margin = { right: 40 }
+      book.pages[0]!.padding = 40
       window.dispatchEvent(
         new MessageEvent('message', {
-          data: { type: 'toolback:load', book: flatBook([o]), design: true, fitHints: opts({}), selection: ['o'] },
+          data: { type: 'toolback:load', book, design: true, fitHints: opts({ mode: 'all' }) },
         }),
       )
       expect(seen.length).toBeGreaterThan(0)
-      expect(seen.every((el) => el.classList.contains('tb-fithint-margin'))).toBe(true)
     } finally {
       proto.scrollIntoView = real
       unpatchRects()

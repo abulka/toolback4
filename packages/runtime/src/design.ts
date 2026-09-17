@@ -37,6 +37,46 @@ export function badgePosition(
   return { x, y }
 }
 
+/**
+ * How far a move must be nudged so it stays where it was dropped when the page
+ * shrinks and the browser clamps the scroll back. Dragging the rightmost/bottom-
+ * most control inwards reduces the content extent, so a fluid page that was
+ * scrolled to its far edge stops overflowing; the browser resets `scrollLeft`/
+ * `scrollTop`, which shifts the whole page — and the just-dropped control —
+ * sideways. The nudge shifts the committed rect by the clamped scroll amount so
+ * the control keeps its on-screen position.
+ *
+ * `rightFixed`/`bottomFixed` are the near-edge content extents from objects that
+ * don't move; `rightMoved`/`bottomMoved` are the same from the moved objects
+ * before the nudge (they shift with it). Iterates because shrinking the moved
+ * extent can shrink the page further. A no-op when the page isn't scrolled.
+ */
+export function scrollClampShift(input: {
+  viewport: { w: number; h: number }
+  scroll: { x: number; y: number }
+  padding: number
+  rightFixed: number
+  rightMoved: number
+  bottomFixed: number
+  bottomMoved: number
+}): { dx: number; dy: number } {
+  const { viewport, scroll, padding } = input
+  const maxScroll = (content: number, span: number): number =>
+    Math.max(0, Math.max(span, content + padding) - span)
+  let dx = 0
+  let dy = 0
+  for (let i = 0; i < 16; i++) {
+    const fx = Math.min(scroll.x, maxScroll(Math.max(input.rightFixed, input.rightMoved + dx), viewport.w))
+    const fy = Math.min(scroll.y, maxScroll(Math.max(input.bottomFixed, input.bottomMoved + dy), viewport.h))
+    const ndx = fx - scroll.x
+    const ndy = fy - scroll.y
+    if (ndx === dx && ndy === dy) break
+    dx = ndx
+    dy = ndy
+  }
+  return { dx, dy }
+}
+
 export function resizeRect(start: Rect, dir: HandleDir, dx: number, dy: number, min = MIN_SIZE): Rect {
   let { x, y, w, h } = start
   const ddx = snap(dx)
@@ -204,10 +244,9 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   let groupOutlines = new Map<string, HTMLElement>()
   let pageRoot: HTMLElement | null = null
   let selected = new Set<string>()
-  // the selected object's applied margin on the previous render, so a margin
-  // change (not a selection change) can scroll its reserved space into view
-  let lastMarginSelId: string | null = null
-  let lastMarginSig = ''
+  // the page padding on the previous render, so a padding change can scroll the
+  // page's far edge into view (watching the gap grow)
+  let lastPagePadding = ''
   // groups we've drilled into, outermost→innermost. Objects at the "current
   // level" live at chain[drillPath.length] under the pointer.
   let drillPath: string[] = []
@@ -768,39 +807,30 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     }
   }
 
-  /** an object's outer margin, parsed from the wrapper's `data-tb-margin` */
-  type Margins = { right: number; bottom: number }
-
-  function marginOfEl(el: HTMLElement): Margins | null {
-    const raw = el.dataset.tbMargin
-    if (!raw) return null
-    const [right, bottom] = raw.split(' ').map(Number)
-    if (![right, bottom].every(Number.isFinite)) return null
-    if (!right && !bottom) return null
-    return { right: right!, bottom: bottom! }
-  }
-
   /**
-   * The space an object's outer margin reserves, as a soft shaded band on each
-   * side that carries a margin — the area the control pushes inward from. Drawn
-   * under the springs so the zigzags stay legible on top. Bands carry their
-   * object id so the margin change can be scrolled into view.
+   * The empty space the page keeps past its content, as soft bands along the
+   * page's right/bottom edge. Drawn under the springs so the zigzags stay
+   * legible on top. Shown in "all" mode for every page; in "selected" mode only
+   * when the selected object follows the near edge on that axis (so the padding
+   * is the gap past it).
    */
-  function drawMarginAreas(
+  function drawPaddingAreas(
     hint: HTMLElement,
     doc: Document,
-    id: string,
-    r: Rect,
-    m: Margins,
+    origin: { x: number; y: number },
+    bounds: { w: number; h: number },
+    pad: number,
+    showRight: boolean,
+    showBottom: boolean,
   ): boolean {
+    if (pad <= 0) return false
     const bands: Array<[number, number, number, number]> = []
-    if (m.right > 0) bands.push([r.x + r.w, r.y, m.right, r.h])
-    if (m.bottom > 0) bands.push([r.x, r.y + r.h, r.w, m.bottom])
+    if (showRight) bands.push([origin.x + bounds.w - pad, origin.y, pad, bounds.h])
+    if (showBottom) bands.push([origin.x, origin.y + bounds.h - pad, bounds.w, pad])
     for (const [x, y, w, h] of bands) {
       if (w <= 0 || h <= 0) continue
       const e = doc.createElement('div')
-      e.className = 'tb-fithint-margin'
-      e.dataset.tbMarginFor = id
+      e.className = 'tb-fithint-padding'
       e.style.left = `${x}px`
       e.style.top = `${y}px`
       e.style.width = `${w}px`
@@ -832,15 +862,30 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     fitHint = hint
 
     let drew = false
+    const pad = Number(pageRoot.dataset.tbPadding ?? 0)
+    if (pad > 0) {
+      let showRight = fitHints.mode === 'all'
+      let showBottom = fitHints.mode === 'all'
+      if (fitHints.mode === 'selected') {
+        // only when the padding actually contributes on that axis: the page is
+        // content-sized (bigger than the window), so the gap is real
+        const docEl = doc.documentElement
+        const rightInEffect = bounds.w > docEl.clientWidth
+        const bottomInEffect = bounds.h > docEl.clientHeight
+        for (const id of selected) {
+          const el = objectEl(id)
+          if (!el) continue
+          if (rightInEffect && el.dataset.tbEdgeX === 'left') showRight = true
+          if (bottomInEffect && el.dataset.tbEdgeY === 'top') showBottom = true
+        }
+      }
+      if (drawPaddingAreas(hint, doc, origin, bounds, pad, showRight, showBottom)) drew = true
+    }
     for (const el of Array.from(pageRoot.querySelectorAll<HTMLElement>('[data-tb-id]'))) {
       const id = el.dataset.tbId
       if (!id || !modeAllows(el)) continue
       const r = rects.get(id) ?? bgRects.get(id)
       if (!r) continue
-      // margins are real reserved space, so they show even for default
-      // left/top objects whose springs the non-default filter would drop
-      const margins = marginOfEl(el)
-      if (margins) drew = drawMarginAreas(hint, doc, id, r, margins) || drew
       if (!springShown(el)) continue
       // a top-level object is measured against the page box, a member against
       // its parent group's box — both in wrapper coordinates (the hint frame)
@@ -1073,25 +1118,30 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
   }
 
   /**
-   * When the selected object's applied margin changes (an edit or the Enable
-   * toggle), scroll its shaded bands into view. A right/bottom margin on a
-   * left/top-anchored control reserves space the page grows into, so without
-   * this the effect happens off-screen. Selecting a different object or a
-   * re-render with an unchanged margin does nothing.
+   * When the page padding changes, scroll the page's far edge into view so the
+   * gap can be watched growing. Padding only grows the page past its content,
+   * so the effect can land off-screen. A re-render with an unchanged padding
+   * does nothing.
    */
-  function revealMarginChange(selection: string[]): void {
-    const id = selection.length === 1 ? selection[0]! : null
-    const sig = id ? (objectEl(id)?.dataset.tbMargin ?? '') : ''
-    const changed = id !== null && id === lastMarginSelId && sig !== lastMarginSig
-    lastMarginSelId = id
-    lastMarginSig = sig
-    if (!changed || !sig || !fitHint) return
-    for (const band of Array.from(fitHint.querySelectorAll<HTMLElement>('.tb-fithint-margin'))) {
-      if (band.dataset.tbMarginFor !== id) continue
-      if (typeof band.scrollIntoView === 'function') {
-        band.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-      }
+  function revealPaddingChange(): void {
+    const pad = pageRoot?.dataset.tbPadding ?? ''
+    const changed = pad !== lastPagePadding
+    lastPagePadding = pad
+    if (!changed || !pageRoot || !(Number(pad) > 0)) return
+    const bounds = pageBounds()
+    if (bounds.w <= 0 || bounds.h <= 0) return
+    const probe = pageRoot.ownerDocument.createElement('div')
+    probe.style.position = 'absolute'
+    probe.style.left = `${Math.max(0, bounds.w - 1)}px`
+    probe.style.top = `${Math.max(0, bounds.h - 1)}px`
+    probe.style.width = '1px'
+    probe.style.height = '1px'
+    probe.style.pointerEvents = 'none'
+    pageRoot.appendChild(probe)
+    if (typeof probe.scrollIntoView === 'function') {
+      probe.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     }
+    probe.remove()
   }
 
   function sendSelection(): void {
@@ -1269,6 +1319,57 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     }
   }
 
+  /**
+   * When a move commit shrinks a scrolled fluid page, the browser clamps the
+   * scroll and the page snaps sideways. Nudge the committed rects by that clamp
+   * so the moved objects stay where they were dropped (see `scrollClampShift`).
+   * Top-level objects only: a moved member re-hugs its group, which can't be
+   * predicted from here.
+   */
+  function compensateMoveForScroll(objects: Array<{ id: string; rect: Rect }>): void {
+    if (!pageRoot || objects.length === 0) return
+    if (objects.some((o) => groupElOf(o.id))) return
+    const doc = wrapper!.ownerDocument
+    const scrollEl = doc.scrollingElement ?? doc.documentElement
+    const moved = new Map(objects.map((o) => [o.id, o.rect]))
+    let rightFixed = 0
+    let rightMoved = 0
+    let bottomFixed = 0
+    let bottomMoved = 0
+    for (const el of Array.from(pageRoot.querySelectorAll<HTMLElement>('[data-tb-id]'))) {
+      if (el.parentElement?.closest('[data-tb-id]')) continue
+      const id = el.dataset.tbId
+      if (!id) continue
+      const r = moved.get(id) ?? rects.get(id)
+      if (!r) continue
+      const isMoved = moved.has(id)
+      if (el.dataset.tbEdgeX === 'left') {
+        const v = r.x + r.w
+        if (isMoved) rightMoved = Math.max(rightMoved, v)
+        else rightFixed = Math.max(rightFixed, v)
+      }
+      if (el.dataset.tbEdgeY === 'top') {
+        const v = r.y + r.h
+        if (isMoved) bottomMoved = Math.max(bottomMoved, v)
+        else bottomFixed = Math.max(bottomFixed, v)
+      }
+    }
+    const { dx, dy } = scrollClampShift({
+      viewport: { w: doc.documentElement.clientWidth, h: doc.documentElement.clientHeight },
+      scroll: { x: scrollEl.scrollLeft, y: scrollEl.scrollTop },
+      padding: Number(pageRoot.dataset.tbPadding ?? 0),
+      rightFixed,
+      rightMoved,
+      bottomFixed,
+      bottomMoved,
+    })
+    if (dx === 0 && dy === 0) return
+    for (const o of objects) {
+      o.rect.x += dx
+      o.rect.y += dy
+    }
+  }
+
   function onPointerUp(e: PointerEvent): void {
     if (!drag) return
     if (drag.mode === 'move' && drag.moved) {
@@ -1283,6 +1384,7 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
           rect: { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height },
         })
       }
+      compensateMoveForScroll(objects)
       send({ type: 'toolback:commit', kind: 'move', objects })
     } else if (drag.mode === 'resize' && drag.moved) {
       const objects: Array<{ id: string; rect: Rect }> = [{ id: drag.id, rect: drag.ghost }]
@@ -1421,7 +1523,7 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       refreshRects()
       drillPath = selection.length ? contextOf(selection[0]!) : []
       setSelected(selection)
-      revealMarginChange(selection)
+      revealPaddingChange()
     },
     refresh(): void {
       if (!pageRoot?.isConnected) pageRoot = wrapper?.querySelector<HTMLElement>('.tb-page') ?? null

@@ -182,21 +182,6 @@ function setGeo(field: 'x' | 'y' | 'w' | 'h', e: Event): void {
   store.setGeometry(sel.value.id, { [field]: n })
 }
 
-// ---- outer margin: space reserved around the control ----
-const margin = computed(() => sel.value?.margin ?? {})
-const marginEnabled = computed(() => sel.value?.marginEnabled !== false)
-const MARGIN_SIDES = ['right', 'bottom'] as const
-type MarginSide = (typeof MARGIN_SIDES)[number]
-function setMargin(side: MarginSide, e: Event): void {
-  if (!sel.value) return
-  const n = Math.max(0, Math.round(Number((e.target as HTMLInputElement).value)) || 0)
-  store.setObjectMargin(sel.value.id, { [side]: n })
-}
-function onToggleMargin(e: Event): void {
-  if (!sel.value) return
-  store.setObjectMarginEnabled(sel.value.id, (e.target as HTMLInputElement).checked)
-}
-
 // ---- Fill page: size a top-level object to the page (minus a margin) ----
 function readFillMargin(): number {
   try {
@@ -554,28 +539,6 @@ function onPaste(): void {
       </div>
     </div>
 
-    <div class="margin-row">
-      <div class="margin-title">
-        <span class="margin-title-text" title="Outer margin — space reserved to the right/below the control. It pushes a right/bottom-following control inward, and on a fluid page a Follows-left/top control's margin keeps that much empty page to its right/below.">
-          Margin
-        </span>
-        <label class="fixed-toggle" title="Enable margin — preview the layout with the margin applied or not. The values are kept either way.">
-          <input type="checkbox" :checked="marginEnabled" @change="onToggleMargin" />
-          Enable
-        </label>
-      </div>
-      <div class="margin-grid">
-        <label class="margin-field" title="Space reserved to the right of the control. Grows the page on a Follows-left control.">
-          R
-          <input type="number" min="0" step="4" :value="margin.right ?? 0" @change="setMargin('right', $event)" />
-        </label>
-        <label class="margin-field" title="Space reserved below the control. Grows the page on a Follows-top control.">
-          B
-          <input type="number" min="0" step="4" :value="margin.bottom ?? 0" @change="setMargin('bottom', $event)" />
-        </label>
-      </div>
-    </div>
-
     <div v-if="canFit()" class="fill-group">
       <div class="fill-group-title" title="Stretch the object to the page edges. The Fill margin gap is left on each side; it is not the control's outer Margin.">
         Fill to page
@@ -826,58 +789,6 @@ function onPaste(): void {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-}
-
-.margin-row {
-  margin: 8px 0 4px;
-}
-
-.margin-title {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--ed-text-dim);
-  margin-bottom: 4px;
-}
-
-.margin-title-text {
-  cursor: help;
-}
-
-.margin-title .fixed-toggle {
-  cursor: pointer;
-}
-
-.margin-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-}
-
-.margin-field {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: var(--ed-text-dim);
-}
-
-.margin-field input {
-  width: 100%;
-  min-width: 0;
-  background: var(--ed-bg);
-  border: 1px solid var(--ed-border);
-  border-radius: 6px;
-  color: var(--ed-text);
-  padding: 5px 6px;
-  font: 12px ui-monospace, 'SF Mono', Menlo, monospace;
-}
-
-.margin-field input:focus {
-  outline: none;
-  border-color: var(--ed-accent);
 }
 
 .fill {

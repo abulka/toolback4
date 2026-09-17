@@ -575,6 +575,10 @@ function setPageHeight(e: Event): void {
   const n = Number((e.target as HTMLInputElement).value)
   if (Number.isFinite(n)) store.setPageSize(store.currentPageIndex, { ...page.size, height: n })
 }
+function setPagePadding(e: Event): void {
+  const n = Number((e.target as HTMLInputElement).value)
+  store.setPagePadding(store.currentPageIndex, Number.isFinite(n) ? n : 0)
+}
 
 /** what the status bar calls the thing being edited */
 const targetLabel = computed(() =>
@@ -988,6 +992,20 @@ function startPaletteSplitDrag(e: PointerEvent): void {
                 @change="setPageHeight($event)"
               />
             </div>
+            <label
+              v-else
+              class="check-row content-padding"
+              title="Empty space kept past the content on the right and bottom, so content never touches the page's auto-sized edge. Only visible when the content is bigger than the window — a wide window already leaves room."
+            >
+              Content padding
+              <input
+                type="number"
+                min="0"
+                step="4"
+                :value="store.activePage.padding ?? 0"
+                @change="setPagePadding($event)"
+              />
+            </label>
           </div>
 
           <label class="check-row" title="Offer this page in the ⚡ Author menu — its scripts get the author API at authoring time">
@@ -1843,6 +1861,16 @@ body.tb-palette-dragging * {
 
 .check-row input {
   accent-color: var(--ed-accent);
+}
+
+.content-padding input {
+  width: 72px;
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 6px;
+  color: var(--ed-text);
+  padding: 6px 8px;
+  font: 12px ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
 .author-wrap {
