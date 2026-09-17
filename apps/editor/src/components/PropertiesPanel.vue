@@ -72,6 +72,8 @@ interface TextField {
   multiline?: boolean
   /** viewer fields: the rich editor with popout + VS Code file link */
   viewer?: 'markdown' | 'html'
+  /** wide panel: span both columns instead of pairing with the next field */
+  full?: boolean
 }
 
 const textFields = computed<TextField[]>(() => {
@@ -80,13 +82,13 @@ const textFields = computed<TextField[]>(() => {
     case 'button':
     case 'label':
     case 'switch':
-      return [{ key: 'text', label: 'Text', dynamic: true }]
+      return [{ key: 'text', label: 'Text', dynamic: true, full: true }]
     case 'input':
-      return [{ key: 'placeholder', label: 'Placeholder' }]
+      return [{ key: 'placeholder', label: 'Placeholder', full: true }]
     case 'image':
       return [
-        { key: 'src', label: 'Image URL' },
-        { key: 'alt', label: 'Alt text' },
+        { key: 'src', label: 'Image URL', full: true },
+        { key: 'alt', label: 'Alt text', full: true },
       ]
     case 'card':
       return [
@@ -94,9 +96,9 @@ const textFields = computed<TextField[]>(() => {
         { key: 'text', label: 'Body', dynamic: true },
       ]
     case 'markdown':
-      return [{ key: 'text', label: 'Markdown', dynamic: true, multiline: true, viewer: 'markdown' }]
+      return [{ key: 'text', label: 'Markdown', dynamic: true, multiline: true, viewer: 'markdown', full: true }]
     case 'html':
-      return [{ key: 'html', label: 'HTML', dynamic: true, multiline: true, viewer: 'html' }]
+      return [{ key: 'html', label: 'HTML', dynamic: true, multiline: true, viewer: 'html', full: true }]
     default:
       return []
   }
@@ -378,7 +380,13 @@ function onPaste(): void {
     </div>
 
     <h2>Content</h2>
-    <div v-for="f in textFields" :key="`${sel?.id ?? 'none'}:${f.key}`" class="field">
+    <div class="fields">
+    <div
+      v-for="f in textFields"
+      :key="`${sel?.id ?? 'none'}:${f.key}`"
+      class="field"
+      :class="{ 'field-full': f.full }"
+    >
       <label>{{ f.label }}</label>
       <ContentEditor
         v-if="f.viewer && !isGroupSel()"
@@ -465,6 +473,7 @@ function onPaste(): void {
         :checked="sel!.props['checked'] === true"
         @change="store.updateProps(sel!.id, { checked: ($event.target as HTMLInputElement).checked })"
       />
+    </div>
     </div>
     <p v-if="textFields.length === 0 || isGroupSel()" class="hint">
       {{ isGroupSel() ? 'Groups have no content — members do. Use Script for shared behaviour.' : 'No content properties.' }}
@@ -564,16 +573,16 @@ function onPaste(): void {
       <div class="fill-group-title" title="Stretch the object to the page edges. The Fill margin gap is left on each side; it is not the control's outer Margin.">
         Fill to page
       </div>
-      <div class="fill-row">
+      <div class="fill-actions">
         <button class="fill" title="Stretch to all four page edges, leaving the Fill margin on each side (Follows both)." @click="onFill">Fill page</button>
         <button class="fill" title="Stretch to the left and right page edges, leaving the Fill margin on each side (Follows both horizontally)." @click="onFillWidth">Fill width</button>
         <button class="fill" title="Stretch to the top and bottom page edges, leaving the Fill margin on each side (Follows both vertically)." @click="onFillHeight">Fill height</button>
         <button class="fill" title="Centre the object on the page (Centred on both axes)." @click="onCenterInPage">Center</button>
-        <label class="fill-margin-label" title="Gap left to the page edges when you click a Fill button. Remembered between sessions. This is not the control's outer Margin.">
-          Fill margin
-          <input class="fill-margin" type="number" min="0" step="4" v-model.number="fillMargin" />
-        </label>
       </div>
+      <label class="fill-margin-label" title="Gap left to the page edges when you click a Fill button. Remembered between sessions. This is not the control's outer Margin.">
+        Fill margin
+        <input class="fill-margin" type="number" min="0" step="4" v-model.number="fillMargin" />
+      </label>
     </div>
 
     <button class="delete" @click="store.removeSelected()">Delete object</button>
@@ -582,6 +591,10 @@ function onPaste(): void {
 </template>
 
 <style scoped>
+.panel {
+  container-type: inline-size;
+}
+
 .empty {
   font-size: 12px;
   color: var(--ed-text-dim);
@@ -671,6 +684,27 @@ function onPaste(): void {
 
 .field input:focus {
   outline: 1px solid var(--ed-accent);
+}
+
+/* Content fields: one column narrow, two once the panel is wide enough.
+   Long/rich controls span both columns; short ones pair up. */
+.fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px 12px;
+  align-items: start;
+}
+
+.fields .field {
+  margin-bottom: 0;
+}
+
+.field-full {
+  grid-column: 1 / -1;
+}
+
+.field-full .url-row {
+  max-width: 560px;
 }
 
 /* compact rows: nothing stretches to the panel width (selectors are
@@ -806,15 +840,13 @@ function onPaste(): void {
   margin-bottom: 6px;
 }
 
-.fill-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+.fill-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .fill {
-  flex: 1 1 auto;
   background: var(--ed-bg);
   border: 1px solid var(--ed-border);
   border-radius: 6px;
@@ -833,6 +865,7 @@ function onPaste(): void {
   display: flex;
   align-items: center;
   gap: 5px;
+  margin-top: 8px;
   font-size: 11px;
   color: var(--ed-text-dim);
 }
@@ -987,6 +1020,7 @@ function onPaste(): void {
   font-size: 11px;
   color: var(--ed-text-dim);
   margin: 4px 0 0;
+  max-width: 640px;
 }
 
 .hint code {
@@ -1117,5 +1151,20 @@ function onPaste(): void {
   border-color: #dc2626;
   color: #fff;
   background: rgba(220, 38, 38, 0.2);
+}
+
+/* wide panel: paired fields, four-up fill actions. Kept last so it wins over
+   the narrow defaults above (equal specificity — source order decides). The
+   400px threshold is the panel's content box (aside width minus its padding). */
+@container (min-width: 400px) {
+  .fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fill-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .geo {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 </style>
