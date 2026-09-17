@@ -460,6 +460,29 @@ export const FONT_STACKS: Record<FontFamily, string> = {
   rounded: "'Trebuchet MS', 'Comic Sans MS', 'Segoe UI', sans-serif",
 }
 
+/** controls whose text (and, for surfaces, fill) the text-style props apply to */
+export const TEXT_STYLE_KINDS = ['button', 'label', 'input', 'switch', 'card', 'markdown', 'html'] as const
+
+/** horizontal text alignment choices (the `textAlign` prop) */
+export const TEXT_ALIGNS = ['left', 'center', 'right'] as const
+export type TextAlign = (typeof TEXT_ALIGNS)[number]
+
+/** vertical text alignment choices (the `vAlign` prop) */
+export const VERTICAL_ALIGNS = ['top', 'middle', 'bottom'] as const
+export type VerticalAlign = (typeof VERTICAL_ALIGNS)[number]
+
+export function resolveTextAlign(value: unknown): TextAlign | null {
+  return typeof value === 'string' && (TEXT_ALIGNS as readonly string[]).includes(value)
+    ? (value as TextAlign)
+    : null
+}
+
+export function resolveVerticalAlign(value: unknown): VerticalAlign | null {
+  return typeof value === 'string' && (VERTICAL_ALIGNS as readonly string[]).includes(value)
+    ? (value as VerticalAlign)
+    : null
+}
+
 export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
   button: { text: 'Button', fontSize: 15 },
   label: { text: 'Label', fontSize: 15 },

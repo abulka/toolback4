@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { AlignMode, MatchDim, Rect } from '@toolback/format'
+import type { AlignMode, MatchDim, PageObject, Rect } from '@toolback/format'
 import {
   describeFit,
   EDGES_H,
@@ -9,12 +9,18 @@ import {
 } from '../fitModes'
 import { useBookStore } from '../stores/book'
 import { collectStoreKeys } from '../storeKeys'
-import { FONT_FAMILIES, IMAGE_PROVIDERS, randomImageUrl, type ImageProvider } from '@toolback/format'
+import {
+  IMAGE_PROVIDERS,
+  randomImageUrl,
+  TEXT_STYLE_KINDS,
+  type ImageProvider,
+} from '@toolback/format'
 import { copyText, objectsToJson } from '../copyJson'
 import ScriptEditor from './ScriptEditor.vue'
 import HelpButton from './HelpButton.vue'
 import DynamicTextEditor from './DynamicTextEditor.vue'
 import ContentEditor from './ContentEditor.vue'
+import TextStyleFields from './TextStyleFields.vue'
 
 const store = useBookStore()
 // store keys plus the built-in self binding — {{self.name}} makes every copy
@@ -104,65 +110,123 @@ const textFields = computed<TextField[]>(() => {
   }
 })
 
-// font + colour live on a compact shared row, not full-width fields
-const hasStyleRow = computed(() =>
-  ['button', 'label', 'switch', 'card', 'input', 'markdown'].includes(sel.value?.control ?? ''),
-)
-const hasColor = computed(() =>
-  ['button', 'label', 'switch', 'card', 'container', 'input', 'markdown'].includes(
-    sel.value?.control ?? '',
-  ),
-)
-const isButtonSel = computed(() => sel.value?.control === 'button')
+// ---- text style (bold/italic/align/colour/fill) ----
+// Applied through the selection: a group's props flow to its text members, and
+// a multi-selection patches every text-capable object. Surfaces (borders,
+// radii) are still per-object via drill-in.
+type TextCaps = {
+  bold: boolean
+  italic: boolean
+  textAlign: boolean
+  vAlign: boolean
+  textColor: boolean
+  background: boolean
+}
+const CAPS: Record<string, TextCaps> = {
+  button: { bold: true, italic: true, textAlign: true, vAlign: true, textColor: true, background: true },
+  label: { bold: true, italic: true, textAlign: true, vAlign: true, textColor: true, background: true },
+  input: { bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true },
+  switch: { bold: true, italic: true, textAlign: false, vAlign: false, textColor: true, background: false },
+  card: { bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true },
+  markdown: { bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true },
+  html: { bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true },
+}
+const NO_CAPS: TextCaps = { bold: false, italic: false, textAlign: false, vAlign: false, textColor: false, background: false }
+const TEXT_KINDS = new Set<string>(TEXT_STYLE_KINDS)
+
+function supportsText(o: PageObject | null | undefined): o is PageObject {
+  return !!o && TEXT_KINDS.has(o.control)
+}
+
+/** the objects a text-style edit will touch: the selection, expanding any
+ *  selected group down to its text-capable members */
+const textTargets = computed<PageObject[]>(() => {
+  const roots = multi.value ? store.selectedObjects : sel.value ? [sel.value] : []
+  const out: PageObject[] = []
+  const add = (o: PageObject): void => {
+    if (supportsText(o)) out.push(o)
+    for (const child of o.children ?? []) add(child)
+  }
+  roots.forEach(add)
+  return out
+})
+
+const textCaps = computed<TextCaps>(() => {
+  const caps = { ...NO_CAPS }
+  for (const o of textTargets.value) {
+    const c = CAPS[o.control]
+    if (!c) continue
+    caps.bold = caps.bold || c.bold
+    caps.italic = caps.italic || c.italic
+    caps.textAlign = caps.textAlign || c.textAlign
+    caps.vAlign = caps.vAlign || c.vAlign
+    caps.textColor = caps.textColor || c.textColor
+    caps.background = caps.background || c.background
+  }
+  return caps
+})
+
+const showText = computed(() => textTargets.value.length > 0)
+
+/** common prop across the text targets; undefined when absent or mixed */
+function textProp(key: string): unknown {
+  const objs = textTargets.value
+  if (!objs.length) return undefined
+  const first = objs[0]!.props[key]
+  return objs.every((o) => o.props[key] === first) ? first : undefined
+}
+function textStr(key: string): string {
+  const v = textProp(key)
+  return typeof v === 'string' ? v : ''
+}
+function textBool(key: string): boolean {
+  return textProp(key) === true
+}
+const textMixed = computed<Record<string, boolean>>(() => {
+  const objs = textTargets.value
+  const keys = ['fontSize', 'fontFamily', 'bold', 'italic', 'textAlign', 'vAlign', 'textColor', 'background']
+  const out: Record<string, boolean> = {}
+  for (const key of keys) {
+    if (objs.length < 2) {
+      out[key] = false
+      continue
+    }
+    const first = objs[0]!.props[key]
+    out[key] = objs.some((o) => o.props[key] !== first)
+  }
+  return out
+})
+function textFontSize(): string {
+  const v = textProp('fontSize')
+  if (typeof v === 'number' && Number.isFinite(v)) return String(v)
+  if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) {
+    return String(Math.round(Number(v)))
+  }
+  // a lone object with no stored size shows the CSS baseline (15px)
+  return textTargets.value.length === 1 && !multi.value ? '15' : ''
+}
+function textSwatch(key: 'textColor' | 'background'): string {
+  const v = textProp(key)
+  if (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) return v
+  const control = textTargets.value[0]?.control ?? ''
+  if (key === 'textColor') return control === 'button' ? '#ffffff' : '#111827'
+  if (control === 'button') return '#4f46e5'
+  if (control === 'container') return '#f9fafb'
+  return '#ffffff'
+}
+function setTextProp(key: string, value: unknown): void {
+  store.updateSelectedProps({ [key]: value }, TEXT_STYLE_KINDS)
+}
 
 function propValue(key: string): string {
   const v = sel.value?.props[key]
   return typeof v === 'string' ? v : ''
 }
 
-function numPropValue(key: string): string {
-  if (key === 'fontSize') return effectiveFontSize()
-  const v = sel.value?.props[key]
-  return typeof v === 'number' && Number.isFinite(v) ? String(v) : ''
-}
-
-/** the rendered font size: the stored fontSize, else the CSS baseline (15px) */
-function effectiveFontSize(): string {
-  const v = sel.value?.props['fontSize']
-  if (typeof v === 'number' && Number.isFinite(v)) return String(v)
-  if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) {
-    return String(Math.round(Number(v)))
-  }
-  return '15'
-}
-
-/** value for the <input type=color> swatch: the stored colour, else the
- *  colour the object actually renders with (never a made-up grey) */
-function swatchFor(key: string): string {
-  const v = sel.value?.props[key]
-  if (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) return v
-  const control = sel.value?.control ?? ''
-  if (control === 'button' || control === 'switch') return '#4f46e5' // --tb-accent
-  if (control === 'label') return '#111827' // --tb-text
-  if (control === 'card') return '#ffffff'
-  if (control === 'container') return '#f9fafb'
-  return '#9ca3af'
-}
-
 function onProp(key: string, e: Event): void {
   if (!sel.value) return
   const raw = (e.target as HTMLInputElement).value
-  let value: unknown = raw
-  if (key === 'fontSize') {
-    // store a real number (or remove the prop when cleared) so the field
-    // keeps showing what was typed
-    if (raw.trim() === '') value = undefined
-    else {
-      const n = Math.round(Number(raw))
-      value = Number.isFinite(n) && n >= 8 ? n : undefined
-    }
-  }
-  store.updateProps(sel.value.id, { [key]: value })
+  store.updateProps(sel.value.id, { [key]: raw })
 }
 
 function onPropValue(key: string, v: string): void {
@@ -329,6 +393,26 @@ function onPaste(): void {
     <p v-if="store.selectionIds.length >= 2 && !store.groupEligible" class="hint warn">
       Grouping needs all selected objects under the same parent.
     </p>
+    <template v-if="showText">
+      <h2>Text style</h2>
+      <div class="fields">
+        <TextStyleFields
+          :caps="textCaps"
+          :font-size="textFontSize()"
+          :font-family="textStr('fontFamily')"
+          :bold="textBool('bold')"
+          :italic="textBool('italic')"
+          :text-align="textStr('textAlign')"
+          :v-align="textStr('vAlign')"
+          :text-color="textStr('textColor')"
+          :text-color-swatch="textSwatch('textColor')"
+          :background="textStr('background')"
+          :background-swatch="textSwatch('background')"
+          :mixed="textMixed"
+          @set="setTextProp"
+        />
+      </div>
+    </template>
     <template v-if="store.groupEligible">
       <h2>Align</h2>
       <div class="align-grid">
@@ -432,39 +516,22 @@ function onPaste(): void {
           >🎲</button>
           </div>
     </div>
-    <div v-if="hasStyleRow" class="field">
-      <label>Font size · Font</label>
-      <div class="pair-row">
-        <input
-          type="number"
-          min="8"
-          placeholder="size"
-          :value="numPropValue('fontSize')"
-          @input="onProp('fontSize', $event)"
-        />
-        <select :value="propValue('fontFamily')" @change="onProp('fontFamily', $event)">
-          <option value="">default</option>
-          <option v-for="fam in FONT_FAMILIES" :key="fam" :value="fam">{{ fam }}</option>
-        </select>
-      </div>
-    </div>
-    <div v-if="hasColor" class="field">
-      <label>{{ isButtonSel ? 'Colour' : 'Text colour' }}</label>
-      <div class="color-row">
-        <input
-          class="color-input"
-          :value="propValue('color')"
-          placeholder="red, #3b82f6…"
-          @input="onProp('color', $event)"
-        />
-        <input
-          type="color"
-          class="color-swatch"
-          :value="swatchFor('color')"
-          @input="onProp('color', $event)"
-        />
-      </div>
-    </div>
+    <TextStyleFields
+      v-if="showText"
+      :caps="textCaps"
+      :font-size="textFontSize()"
+      :font-family="textStr('fontFamily')"
+      :bold="textBool('bold')"
+      :italic="textBool('italic')"
+      :text-align="textStr('textAlign')"
+      :v-align="textStr('vAlign')"
+      :text-color="textStr('textColor')"
+      :text-color-swatch="textSwatch('textColor')"
+      :background="textStr('background')"
+      :background-swatch="textSwatch('background')"
+      :mixed="textMixed"
+      @set="setTextProp"
+    />
     <div v-if="sel!.control === 'switch'" class="field">
       <label>Checked</label>
       <input
@@ -475,9 +542,11 @@ function onPaste(): void {
       />
     </div>
     </div>
-    <p v-if="textFields.length === 0 || isGroupSel()" class="hint">
-      {{ isGroupSel() ? 'Groups have no content — members do. Use Script for shared behaviour.' : 'No content properties.' }}
+    <p v-if="isGroupSel()" class="hint">
+      Groups have no content of their own — edit members for content. The Text
+      style above applies to the group's text members.
     </p>
+    <p v-else-if="textFields.length === 0" class="hint">No content properties.</p>
     </div>
 
     <div v-show="subTab === 'script'">
@@ -705,66 +774,6 @@ function onPaste(): void {
 
 .field-full .url-row {
   max-width: 560px;
-}
-
-/* compact rows: nothing stretches to the panel width (selectors are
-   higher-specificity than `.field input`, whose width: 100% would win) */
-.pair-row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.field .pair-row input[type='number'] {
-  width: 72px;
-  flex: 0 0 auto;
-  font: inherit;
-}
-
-.field .pair-row select {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 130px;
-  width: auto;
-  background: var(--ed-bg);
-  border: 1px solid var(--ed-border);
-  border-radius: 6px;
-  color: var(--ed-text);
-  padding: 6px;
-  font: inherit;
-}
-
-.color-row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.field .color-row .color-input {
-  flex: 0 1 auto;
-  width: 120px;
-  min-width: 0;
-}
-
-.field .color-row .color-swatch {
-  width: 30px;
-  height: 30px;
-  flex: 0 0 auto;
-  padding: 0;
-  background: none;
-  border: 1px solid var(--ed-border);
-  border-radius: 6px;
-  cursor: pointer;
-  overflow: hidden;
-}
-
-.color-swatch::-webkit-color-swatch-wrapper {
-  padding: 2px;
-}
-
-.color-swatch::-webkit-color-swatch {
-  border: none;
-  border-radius: 4px;
 }
 
 /* image URL field: the input shares its row with the source picker + 🎲 */

@@ -1,6 +1,12 @@
 import { marked } from 'marked'
-import type { ControlKind, PageObject } from '@toolback/format'
-import { FONT_STACKS, resolveColor, type FontFamily } from '@toolback/format'
+import type { ControlKind, PageObject, TextAlign, VerticalAlign } from '@toolback/format'
+import {
+  FONT_STACKS,
+  resolveColor,
+  resolveTextAlign,
+  resolveVerticalAlign,
+  type FontFamily,
+} from '@toolback/format'
 
 export type ControlRenderer = (obj: PageObject) => HTMLElement
 
@@ -37,16 +43,133 @@ export function numProp(obj: PageObject, key: string): number | null {
   return null
 }
 
-/** shared prop styling: color (names + CSS strings) and fontFamily */
-export function applyStyleProps(el: HTMLElement, obj: PageObject, kind: 'surface' | 'text'): void {
-  const color = resolveColor(obj.props['color'])
+const VERTICAL_JUSTIFY: Record<VerticalAlign, string> = {
+  top: 'flex-start',
+  middle: 'center',
+  bottom: 'flex-end',
+}
+
+/** fontFamily + fontSize; clearing the prop restores the control's CSS default */
+export function applyFontProps(el: HTMLElement, obj: PageObject): void {
   const font = obj.props['fontFamily']
-  if (color) {
-    if (kind === 'surface') el.style.background = color
-    else el.style.color = color
-  }
-  if (typeof font === 'string' && font in FONT_STACKS) {
-    el.style.fontFamily = FONT_STACKS[font as FontFamily]
+  el.style.fontFamily =
+    typeof font === 'string' && font in FONT_STACKS ? FONT_STACKS[font as FontFamily] : ''
+  const fs = numProp(obj, 'fontSize')
+  el.style.fontSize = fs ? `${fs}px` : ''
+}
+
+/** bold / italic toggles */
+export function applyTextDecoration(el: HTMLElement, obj: PageObject): void {
+  el.style.fontWeight = obj.props['bold'] === true ? '600' : ''
+  el.style.fontStyle = obj.props['italic'] === true ? 'italic' : ''
+}
+
+/**
+ * `textColor` wins; `colorAsText` lets the legacy `color` prop stand in as the
+ * text colour for text-kind controls (labels, viewers).
+ */
+export function applyTextColor(
+  el: HTMLElement,
+  obj: PageObject,
+  opts: { colorAsText?: boolean } = {},
+): void {
+  const c = resolveColor(obj.props['textColor']) ?? (opts.colorAsText ? resolveColor(obj.props['color']) : null)
+  el.style.color = c ?? ''
+}
+
+/**
+ * `background` wins; `colorAsSurface` lets the legacy `color` prop stand in as
+ * the fill for surface-kind controls (buttons, cards, containers).
+ */
+export function applyBackground(
+  el: HTMLElement,
+  obj: PageObject,
+  opts: { colorAsSurface?: boolean } = {},
+): void {
+  const b = resolveColor(obj.props['background']) ?? (opts.colorAsSurface ? resolveColor(obj.props['color']) : null)
+  el.style.background = b ?? ''
+}
+
+/** horizontal alignment — `text-align` (label/button are flex columns whose
+ *  text item stretches full width, so this is the horizontal axis) */
+export function applyTextAlign(el: HTMLElement, obj: PageObject): void {
+  el.style.textAlign = resolveTextAlign(obj.props['textAlign']) ?? ''
+}
+
+/** vertical alignment for flex columns (labels, buttons) — the main axis */
+export function applyVerticalAlign(el: HTMLElement, obj: PageObject): void {
+  const v = resolveVerticalAlign(obj.props['vAlign'])
+  el.style.justifyContent = v ? VERTICAL_JUSTIFY[v] : ''
+}
+
+/**
+ * Apply every text-style prop to a rendered control's element tree — the single
+ * place that knows which node each kind paints. Renderers call it on a fresh
+ * element; the runtime calls it again after a live prop write, so the two stay
+ * in lockstep.
+ */
+export function applyTextStyleToTree(root: HTMLElement, obj: PageObject): void {
+  switch (obj.control) {
+    case 'button':
+      applyFontProps(root, obj)
+      applyTextDecoration(root, obj)
+      applyTextColor(root, obj)
+      applyBackground(root, obj, { colorAsSurface: true })
+      applyVerticalAlign(root, obj)
+      applyTextAlign(root, obj)
+      root.classList.toggle('tb-colored', Boolean(resolveColor(obj.props['color'])))
+      return
+    case 'label':
+      applyFontProps(root, obj)
+      applyTextDecoration(root, obj)
+      applyTextColor(root, obj, { colorAsText: true })
+      applyBackground(root, obj)
+      applyVerticalAlign(root, obj)
+      applyTextAlign(root, obj)
+      return
+    case 'input':
+      applyFontProps(root, obj)
+      applyTextDecoration(root, obj)
+      applyTextColor(root, obj, { colorAsText: true })
+      applyBackground(root, obj)
+      applyTextAlign(root, obj)
+      return
+    case 'switch': {
+      const txt = root.querySelector<HTMLElement>('.tb-switch-text')
+      if (!txt) return
+      applyFontProps(txt, obj)
+      applyTextDecoration(txt, obj)
+      applyTextColor(txt, obj)
+      return
+    }
+    case 'card': {
+      applyFontProps(root, obj)
+      applyBackground(root, obj, { colorAsSurface: true })
+      const fs = numProp(obj, 'fontSize')
+      for (const part of Array.from(root.querySelectorAll<HTMLElement>('.tb-card-title, .tb-card-body'))) {
+        applyFontProps(part, obj)
+        const scaled = part.classList.contains('tb-card-title') && fs ? Math.round(fs * 1.15) : fs
+        part.style.fontSize = scaled ? `${scaled}px` : ''
+        applyTextDecoration(part, obj)
+        applyTextColor(part, obj, { colorAsText: true })
+        applyTextAlign(part, obj)
+      }
+      return
+    }
+    case 'markdown':
+    case 'html':
+      applyFontProps(root, obj)
+      applyTextDecoration(root, obj)
+      applyTextColor(root, obj, { colorAsText: true })
+      applyBackground(root, obj)
+      applyTextAlign(root, obj)
+      return
+    case 'container':
+      applyFontProps(root, obj)
+      applyBackground(root, obj, { colorAsSurface: true })
+      return
+    default:
+      return
   }
 }
 
@@ -129,11 +252,7 @@ export function renderButton(obj: PageObject): HTMLElement {
   el.type = 'button'
   el.className = 'tb-button'
   el.textContent = textProp(obj, 'text', 'Button')
-  const fs = numProp(obj, 'fontSize')
-  if (fs) el.style.fontSize = `${fs}px`
-  // coloured buttons get a themed hover/press via the tb-colored class
-  if (resolveColor(obj.props['color'])) el.classList.add('tb-colored')
-  applyStyleProps(el, obj, 'surface')
+  applyTextStyleToTree(el, obj)
   return el
 }
 
@@ -141,9 +260,7 @@ export function renderLabel(obj: PageObject): HTMLElement {
   const el = document.createElement('div')
   el.className = 'tb-label'
   el.textContent = textProp(obj, 'text', 'Label')
-  const fs = numProp(obj, 'fontSize')
-  if (fs) el.style.fontSize = `${fs}px`
-  applyStyleProps(el, obj, 'text')
+  applyTextStyleToTree(el, obj)
   return el
 }
 
@@ -168,15 +285,7 @@ export function renderSwitch(obj: PageObject): HTMLElement {
   if (color) el.style.setProperty('--tb-switch-on', color)
   // text styling goes ON the text span — its own `font` shorthand would
   // otherwise override anything inherited from the switch element
-  const font = obj.props['fontFamily']
-  const fs = numProp(obj, 'fontSize')
-  const txtEl = el.querySelector<HTMLElement>('.tb-switch-text')
-  if (txtEl) {
-    if (typeof font === 'string' && font in FONT_STACKS) {
-      txtEl.style.fontFamily = FONT_STACKS[font as FontFamily]
-    }
-    if (fs) txtEl.style.fontSize = `${fs}px`
-  }
+  applyTextStyleToTree(el, obj)
   return el
 }
 
@@ -185,12 +294,7 @@ export function renderInput(obj: PageObject): HTMLElement {
   el.type = 'text'
   el.className = 'tb-input'
   el.placeholder = textProp(obj, 'placeholder', 'Type here')
-  const fs = numProp(obj, 'fontSize')
-  if (fs) el.style.fontSize = `${fs}px`
-  const font = obj.props['fontFamily']
-  if (typeof font === 'string' && font in FONT_STACKS) {
-    el.style.fontFamily = FONT_STACKS[font as FontFamily]
-  }
+  applyTextStyleToTree(el, obj)
   return el
 }
 
@@ -221,12 +325,7 @@ export function renderCard(obj: PageObject): HTMLElement {
   el.appendChild(title)
   el.appendChild(body)
   applyContent(el, 'card', textProp(obj, 'text'))
-  const fs = numProp(obj, 'fontSize')
-  if (fs) {
-    body.style.fontSize = `${fs}px`
-    title.style.fontSize = `${Math.round(fs * 1.15)}px`
-  }
-  applyStyleProps(el, obj, 'surface')
+  applyTextStyleToTree(el, obj)
   return el
 }
 
@@ -234,9 +333,7 @@ export function renderCard(obj: PageObject): HTMLElement {
 export function renderMarkdown(obj: PageObject): HTMLElement {
   const el = document.createElement('div')
   el.className = 'tb-markdown'
-  applyStyleProps(el, obj, 'text')
-  const fs = numProp(obj, 'fontSize')
-  if (fs) el.style.fontSize = `${fs}px`
+  applyTextStyleToTree(el, obj)
   applyContent(el, 'markdown', textProp(obj, 'text'))
   return el
 }
@@ -245,6 +342,7 @@ export function renderMarkdown(obj: PageObject): HTMLElement {
 export function renderHtml(obj: PageObject): HTMLElement {
   const el = document.createElement('div')
   el.className = 'tb-html'
+  applyTextStyleToTree(el, obj)
   applyContent(el, 'html', textProp(obj, 'html'))
   return el
 }
@@ -252,7 +350,7 @@ export function renderHtml(obj: PageObject): HTMLElement {
 export function renderContainer(obj: PageObject): HTMLElement {
   const el = document.createElement('div')
   el.className = 'tb-container'
-  applyStyleProps(el, obj, 'surface')
+  applyTextStyleToTree(el, obj)
   return el
 }
 

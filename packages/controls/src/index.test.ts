@@ -94,6 +94,62 @@ describe('controls', () => {
     expect(span.style.fontSize).toBe('18px')
   })
 
+  it('applies bold/italic and horizontal/vertical alignment', () => {
+    const obj = createObject('label', 'l1', { x: 0, y: 0, w: 100, h: 40 }, {
+      text: 'A', bold: true, italic: true, textAlign: 'center', vAlign: 'middle',
+    })
+    const el = renderLabel(obj)
+    expect(el.style.fontWeight).toBe('600')
+    expect(el.style.fontStyle).toBe('italic')
+    expect(el.style.textAlign).toBe('center')
+    expect(el.style.justifyContent).toBe('center')
+
+    // clearing a value restores the default rather than leaving it stuck
+    const plain = renderLabel(createObject('label', 'l2', { x: 0, y: 0, w: 100, h: 40 }, { text: 'B' }))
+    expect(plain.style.fontWeight).toBe('')
+    expect(plain.style.textAlign).toBe('')
+    expect(plain.style.justifyContent).toBe('')
+  })
+
+  it('textColor/background override the role-based color prop', () => {
+    // a label can carry both a text colour and a background fill
+    const both = renderLabel(createObject('label', 'l1', { x: 0, y: 0, w: 100, h: 40 }, {
+      text: 'A', color: 'red', textColor: 'navy', background: '#eeeeee',
+    }))
+    expect(both.style.color).toBe('#1e3a8a')
+    expect(both.style.background).toBe('#eeeeee')
+
+    // `color` still stands in when no explicit override is set
+    const fallback = renderLabel(createObject('label', 'l2', { x: 0, y: 0, w: 100, h: 40 }, { text: 'B', color: 'red' }))
+    expect(fallback.style.color).toBe('#ef4444')
+
+    // button text colour is independent of its surface colour
+    const btn = renderButton(createObject('button', 'b1', { x: 0, y: 0, w: 100, h: 40 }, {
+      text: 'C', color: 'green', textColor: 'black',
+    }))
+    expect(btn.style.background).toBe('#22c55e')
+    expect(btn.style.color).toBe('#111827')
+
+    // input now paints its colour on first render (was previously ignored)
+    const input = renderInput(createObject('input', 'i1', { x: 0, y: 0, w: 100, h: 40 }, { color: 'blue' }))
+    expect(input.style.color).toBe('#3b82f6')
+  })
+
+  it('applies viewer text style to markdown and html', () => {
+    const md = renderMarkdown(createObject('markdown', 'md1', { x: 0, y: 0, w: 100, h: 100 }, {
+      text: '# Hi', textColor: 'purple', textAlign: 'right', background: 'light', bold: true,
+    }))
+    expect(md.style.color).toBe('#a855f7')
+    expect(md.style.textAlign).toBe('right')
+    expect(md.style.background).toBe('#f3f4f6')
+    expect(md.style.fontWeight).toBe('600')
+
+    const html = renderHtml(createObject('html', 'h1', { x: 0, y: 0, w: 100, h: 100 }, {
+      html: '<p>x</p>', textColor: 'teal',
+    }))
+    expect(html.style.color).toBe('#0d9488')
+  })
+
   it('registry covers every control kind', () => {
     for (const kind of [
       'button',

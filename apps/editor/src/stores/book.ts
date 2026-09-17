@@ -1060,6 +1060,32 @@ export const useBookStore = defineStore('book', () => {
   }
 
   /**
+   * Apply one props patch across the whole selection — the multi-select and
+   * group "Text style" rows. A selected group contributes its descendants too,
+   * so a group's text style flows to its members (surfaces still need
+   * drill-in). `kinds` limits the patch to controls the props make sense on.
+   */
+  function updateSelectedProps(patch: Record<string, unknown>, kinds?: readonly string[]): void {
+    const targets: PageObject[] = []
+    const add = (obj: PageObject): void => {
+      if (!kinds || kinds.includes(obj.control)) targets.push(obj)
+      if (obj.children?.length) for (const child of obj.children) add(child)
+    }
+    for (const id of selectionIds.value) {
+      const obj = locateObj(id)?.obj
+      if (obj) add(obj)
+    }
+    if (!targets.length) return
+    record('Edit properties', `props:${targets.map((o) => o.id).sort().join(',')}`)
+    for (const obj of targets) {
+      const next = { ...obj.props, ...patch }
+      for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k]
+      obj.props = next
+    }
+    sync()
+  }
+
+  /**
    * Set one axis's edge choice (left/right/both/center or top/bottom/both/
    * center). Switching re-derives the distances from the current rendered rect,
    * so the object stays put now and only changes how it follows its page/group
@@ -1602,6 +1628,7 @@ export const useBookStore = defineStore('book', () => {
     applyRect,
     applyRects,
     updateProps,
+    updateSelectedProps,
     setObjectEdge,
     setPagePadding,
     setGeometry,

@@ -1372,3 +1372,52 @@ describe('book store — align / distribute / match / fill helpers', () => {
     expect(JSON.stringify(useBookStore().activePage.objects)).toBe(before)
   })
 })
+
+describe('book store — updateSelectedProps', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {} })
+    setActivePinia(createPinia())
+  })
+
+  it('patches every selected text control', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a', 'b'])
+    store.updateSelectedProps({ bold: true }, ['label'])
+    const [a, b] = store.activePage.objects
+    expect(a!.props['bold']).toBe(true)
+    expect(b!.props['bold']).toBe(true)
+  })
+
+  it('flows a group edit to its text members and skips surfaces', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    const label = createObject('label', 'kidLabel', { x: 0, y: 0, w: 40, h: 20 })
+    const image = createObject('image', 'kidImage', { x: 0, y: 30, w: 40, h: 20 })
+    store.book.pages[0]!.objects.push(
+      createGroup('g1', { x: 300, y: 300, w: 100, h: 100 }, [label, image]),
+    )
+    const group = store.activePage.objects[2]!
+    store.setSelection([group.id])
+    store.updateSelectedProps({ textColor: 'red', background: 'light' }, ['label'])
+    const kids = flattenObjects(store.activePage.objects).filter((o) => o.name.startsWith('kid'))
+    const kidLabel = kids.find((o) => o.control === 'label')!
+    const kidImage = kids.find((o) => o.control === 'image')!
+    expect(kidLabel.props['textColor']).toBe('red')
+    expect(kidLabel.props['background']).toBe('light')
+    expect(kidImage.props['textColor']).toBeUndefined()
+    expect(kidImage.props['background']).toBeUndefined()
+    expect(group.props).toEqual({})
+  })
+
+  it('is one undoable step', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.setSelection(['a', 'b'])
+    store.updateSelectedProps({ italic: true }, ['label'])
+    store.undo()
+    const [a, b] = useBookStore().activePage.objects
+    expect(a!.props['italic']).toBeUndefined()
+    expect(b!.props['italic']).toBeUndefined()
+  })
+})

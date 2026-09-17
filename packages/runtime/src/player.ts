@@ -1,6 +1,6 @@
 import type { Background, Book, CanvasSize, PageObject, Rect } from '@toolback/format'
 import { backgroundFor, DEFAULT_DIALOG_SIZE, flattenObjects, FONT_STACKS, rectForObject, resolveColor, scaleSubtreeEdges, writeRectPart } from '@toolback/format'
-import { applyContent, contentKeyFor } from '@toolback/controls'
+import { applyContent, applyTextStyleToTree, contentKeyFor } from '@toolback/controls'
 import { applyEdgeStyles, measureViewport, pageBoxFor, parentBoxMap, renderBookPage } from './index'
 import { rewriteLibImports, toolbackImport } from './libs'
 
@@ -48,6 +48,18 @@ export interface ControlApi {
   color: string
   /** simplified font family (system, sans, serif, mono, rounded) */
   fontFamily: string
+  /** bold text */
+  bold: boolean
+  /** italic text */
+  italic: boolean
+  /** horizontal text alignment: 'left' | 'center' | 'right' */
+  textAlign: string
+  /** vertical text alignment: 'top' | 'middle' | 'bottom' */
+  vAlign: string
+  /** explicit text colour (overrides `color` on text controls) */
+  textColor: string
+  /** explicit background/fill colour (overrides `color` on surface controls) */
+  background: string
   on(event: string, fn: (e: Event) => void): void
 }
 
@@ -200,18 +212,14 @@ export function makeControlApi(
     },
     set color(v: string) {
       obj.props = { ...obj.props, color: v }
-      const resolved = resolveColor(v)
-      if (!resolved) return
-      // surface controls paint their background; labels/switches paint text
-      if (el.classList.contains('tb-card') || el.classList.contains('tb-container')) {
-        el.style.background = resolved
-      } else if (el.classList.contains('tb-button')) {
-        el.style.background = resolved
-      } else if (checkbox) {
-        el.style.setProperty('--tb-switch-on', resolved)
-      } else {
-        el.style.color = resolved
+      // switches paint their toggle track with `color`; the text span is
+      // untouched (use textColor for that)
+      if (checkbox) {
+        const resolved = resolveColor(v)
+        if (resolved) el.style.setProperty('--tb-switch-on', resolved)
+        return
       }
+      applyTextStyleToTree(el, obj)
     },
     get fontFamily() {
       return typeof obj.props['fontFamily'] === 'string' ? (obj.props['fontFamily'] as string) : ''
@@ -219,7 +227,49 @@ export function makeControlApi(
     set fontFamily(v: string) {
       if (!(v in FONT_STACKS)) return
       obj.props = { ...obj.props, fontFamily: v }
-      el.style.fontFamily = FONT_STACKS[v as keyof typeof FONT_STACKS]
+      applyTextStyleToTree(el, obj)
+    },
+    get bold() {
+      return obj.props['bold'] === true
+    },
+    set bold(v: boolean) {
+      obj.props = { ...obj.props, bold: v === true }
+      applyTextStyleToTree(el, obj)
+    },
+    get italic() {
+      return obj.props['italic'] === true
+    },
+    set italic(v: boolean) {
+      obj.props = { ...obj.props, italic: v === true }
+      applyTextStyleToTree(el, obj)
+    },
+    get textAlign() {
+      return typeof obj.props['textAlign'] === 'string' ? (obj.props['textAlign'] as string) : ''
+    },
+    set textAlign(v: string) {
+      obj.props = { ...obj.props, textAlign: v }
+      applyTextStyleToTree(el, obj)
+    },
+    get vAlign() {
+      return typeof obj.props['vAlign'] === 'string' ? (obj.props['vAlign'] as string) : ''
+    },
+    set vAlign(v: string) {
+      obj.props = { ...obj.props, vAlign: v }
+      applyTextStyleToTree(el, obj)
+    },
+    get textColor() {
+      return typeof obj.props['textColor'] === 'string' ? (obj.props['textColor'] as string) : ''
+    },
+    set textColor(v: string) {
+      obj.props = { ...obj.props, textColor: v }
+      applyTextStyleToTree(el, obj)
+    },
+    get background() {
+      return typeof obj.props['background'] === 'string' ? (obj.props['background'] as string) : ''
+    },
+    set background(v: string) {
+      obj.props = { ...obj.props, background: v }
+      applyTextStyleToTree(el, obj)
     },
     on(event: string, fn: (e: Event) => void) {
       el.addEventListener(event, fn)

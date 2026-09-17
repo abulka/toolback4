@@ -57,6 +57,11 @@ body > .tb-page {
   cursor: pointer;
   transition: filter 100ms ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  text-align: center;
 }
 
 .tb-button:hover {
@@ -82,7 +87,10 @@ body > .tb-page {
   font: 500 15px/1.45 var(--tb-font);
   color: var(--tb-text);
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
   padding: 3px 4px;
   overflow: hidden;
   overflow-wrap: break-word;

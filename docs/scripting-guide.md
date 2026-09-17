@@ -201,9 +201,27 @@ Get/set properties:
   `'gold'`… or any CSS colour (`'#3b82f6'`, `'rgb(59 130 246)'`). Buttons,
   cards and containers paint their surface; labels and switches paint their
   text/toggle. `''` restores the default. Also settable from the Selection
-  panel's Colour field (with a colour swatch).
+  panel. `textColor`/`background` (below) override it per role.
 - `fontFamily` — `'system' | 'sans' | 'serif' | 'mono' | 'rounded'` (a
   simplified, web-safe set; works on switches too)
+- `fontSize` — text size in pixels (buttons, labels, switches, inputs, cards,
+  viewers). Not currently a script accessor — set it in the Selection panel.
+- `bold`, `italic` — `true`/`false` text weight/style
+- `textAlign` — `'left' | 'center' | 'right'` (horizontal text alignment)
+- `vAlign` — `'top' | 'middle' | 'bottom'` (vertical alignment; labels and
+  buttons, which are flex boxes — ignored elsewhere)
+- `textColor` — explicit text colour; wins over `color` on text controls, so a
+  label can have both a text colour and a `background` fill
+- `background` — explicit fill colour; wins over `color` on surface controls
+  (buttons, cards, containers) and adds a background to text controls
+  (labels, viewers, inputs)
+
+`''` clears any of the colour/alignment props back to the control's default.
+
+The same fields appear in the Selection panel as **Text style** (font size,
+font, B/I, alignment, text colour, background). With several objects selected —
+or with a **group** selected — an edit applies to every text control in the
+selection (a group's edit flows to its text members).
 
 Geometry changes apply immediately, and they stick for the whole run — even
 across `page.go` navigations. A geometry write moves the control now while
@@ -239,8 +257,8 @@ controls.inc.on('click', () => store.set('score', (store.get('score') ?? 0) + 1)
 ```
 
 Scripting them: `viewer.text` reads/writes the source (`'# New heading'`) and
-re-renders immediately. Markdown viewers also honour the Font size / Font and
-Colour fields in the Selection panel.
+re-renders immediately. Both viewers honour the **Text style** section (font,
+size, bold/italic, alignment, text colour, background) in the Selection panel.
 
 **Sizing and editing.** A viewer is a fixed box the size you give it; content
 that doesn't fit **scrolls inside it** — at run time and while designing (hover
@@ -503,10 +521,12 @@ I am {{self.name}}
 
 This is how object state becomes visible text.
 
-**Text sizing**: labels and buttons have a **Font size (px)** field in the
-Selection panel (the `fontSize` property). Long text wraps inside the object's
-box and clips if it doesn't fit — give a paragraph label a smaller size (14)
-and a taller box, or use a card for long body text.
+**Text style**: labels, buttons, switches, inputs and viewers have a **Text
+style** section in the Selection panel — font size, font, **B**/**I**,
+horizontal/vertical alignment, text colour and background fill. Long text wraps
+inside the object's box and clips if it doesn't fit — give a paragraph label a
+smaller size (14) and a taller box, or use a card for long body text. The same
+fields apply across a multi-selection, or to a group's text members in one go.
 
 ## Events reference
 

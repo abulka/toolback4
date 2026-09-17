@@ -78,14 +78,19 @@ YEdge = { mode:'top'; top; height }
 - Groups are **parent objects**: a member constrains to the group box; a group's
   box is its own `x`/`y` and hugs its members. A group handle resize (or a typed
   W/H / scripted size) scales the members with it (see §5).
-- Style props: `color` (colour names via `resolveColor` — a curated map plus
-  any CSS colour string — or raw CSS) and `fontFamily` (one of the five
-  simplified stacks in `FONT_STACKS`) are applied at render
-  (`applyStyleProps`) and are also live accessors on `ControlApi`
-  (`color`/`fontFamily` getters/setters that write the prop AND the inline
-  style, surface vs text depending on the control). Switches apply
-  fontFamily/size to their text span and `color` to the toggle track
-  (`--tb-switch-on`).
+- Style props are all optional keys on `props`; renderers apply them through
+  `applyTextStyleToTree` (`packages/controls`), the single place that knows
+  which node each kind paints. `color` (colour names via `resolveColor` — a
+  curated map plus any CSS colour string — or raw CSS) keeps its role meaning:
+  surface fill for buttons/cards/containers, text for labels/viewers, toggle
+  track for switches. `textColor` and `background` are explicit overrides that
+  win over `color` per role. `fontFamily` (one of five stacks in `FONT_STACKS`),
+  `fontSize`, `bold`, `italic`, `textAlign`, `vAlign` round out the set.
+  Labels and buttons are flex **columns** (horizontal alignment is `text-align`
+  on a stretched text item; vertical is `justify-content`), so alignment maps
+  cleanly on both axes. Every prop is also a live `ControlApi` accessor that
+  writes the prop AND re-applies the inline styles. Switches apply text styling
+  to their text span and `color` to the toggle track (`--tb-switch-on`).
 - Pinia reactive proxies are **not structured-cloneable** — the book always
   crosses the iframe boundary as `JSON.parse(JSON.stringify(book))`.
 
