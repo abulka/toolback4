@@ -10,7 +10,7 @@ ToolBook or HyperCard, you'll feel at home — everything else is 2026.
 
 ![toolback — authoring a book in the browser](docs/screenshots/Screenshot-Toolback-1.png)
 
-Books are **open data** (a single `.toolbook.json`), editing is local-first
+Books are **open data** (a single `.toolback.json`), editing is local-first
 (an autosave in IndexedDB keeps nothing hostage), and *publish* produces one
 self-contained HTML file you can drop anywhere. No backend, no build step for
 your books, nothing to install for your readers.
@@ -125,7 +125,7 @@ packages/
   runtime/        @toolback/runtime     — the player: no Vue. Renders JSON,
                                           runs scripts, editor↔canvas protocol
   libs/           @toolback/libs        — the "library shelf" for npm-in-books
-examples/         ready-made .toolbook.json books + a test that runs every page
+examples/         ready-made .toolback.json books + a test that runs every page
 docs/             scripting-guide.md (author-facing), runtime-internals.md,
                   llm-authoring.md (AI authoring spec), screenshots/
 plans/            internal design notes & the milestone/progress log
@@ -152,10 +152,10 @@ pnpm build        # production build
 Hungry for a quick tour? Open an example book with **File → Open…** and press
 **Run** (F3 or ⌥3):
 
-- `examples/hello-counter.toolbook.json` — the classic first book
-- `examples/quiz.toolbook.json` — navigation + a score in the shared store
-- `examples/kitchen-sink.toolbook.json` — an 8-page guided tour of every feature
-- `examples/author-plugin.toolbook.json` — an author-mode plugin driving the editor
+- `examples/hello-counter.toolback.json` — the classic first book
+- `examples/quiz.toolback.json` — navigation + a score in the shared store
+- `examples/kitchen-sink.toolback.json` — an 8-page guided tour of every feature
+- `examples/author-plugin.toolback.json` — an author-mode plugin driving the editor
 
 (More detail on each in [examples/README.md](examples/README.md).)
 
@@ -170,7 +170,7 @@ The editor is a fully client-side app — deploy it to any static host, includin
 A `netlify.toml` and a `pnpm-lock.yaml` are included, so a Netlify deploy with
 *Base directory:* `/` and *Build command:* `pnpm install && pnpm build` works
 out of the box. Because everything is local-first, an exported book
-(`.toolbook.json` *or* a published `.html`) runs from any static host without a
+(`.toolback.json` *or* a published `.html`) runs from any static host without a
 server of any kind.
 
 > The File System Access API used by **Open…**, **Save** and **⇄ file** linking

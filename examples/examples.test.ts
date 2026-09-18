@@ -7,7 +7,7 @@ import { runBook } from '../packages/runtime/src/player'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const BOOKS = readdirSync(HERE)
-  .filter((f) => f.endsWith('.toolbook.json'))
+  .filter((f) => f.endsWith('.toolback.json'))
   .sort()
 
 function load(name: string): Book {
@@ -18,9 +18,9 @@ describe('example books', () => {
   it('ships at least the three showcase books', () => {
     expect(BOOKS).toEqual(
       expect.arrayContaining([
-        'hello-counter.toolbook.json',
-        'quiz.toolbook.json',
-        'kitchen-sink.toolbook.json',
+        'hello-counter.toolback.json',
+        'quiz.toolback.json',
+        'kitchen-sink.toolback.json',
       ]),
     )
   })

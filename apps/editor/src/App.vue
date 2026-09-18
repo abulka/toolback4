@@ -426,7 +426,7 @@ async function onSave(): Promise<void> {
   await store.save()
 }
 
-/** export the project as a .toolbook.json file */
+/** export the project as a .toolback.json file */
 async function onExport(): Promise<void> {
   try {
     const result = await saveBookFile(store.book)

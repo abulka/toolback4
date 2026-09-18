@@ -19,7 +19,7 @@ packages/format/    @toolback/format   — zod schemas + factories + geometry/tr
 packages/controls/  @toolback/controls — plain-DOM renderers per control, zero framework
 packages/runtime/   @toolback/runtime  — the player (no Vue) + design controller + editorLink protocol
 packages/libs/      @toolback/libs     — the npm "library shelf" (its dependencies are the shelf)
-examples/           ready-made .toolbook.json books; a test runs every page of every book
+examples/           ready-made .toolback.json books; a test runs every page of every book
 docs/               scripting-guide.md, runtime-internals.md, llm-authoring.md, screenshots/
 plans/              internal design notes + PLAN.md (milestone/progress log)
 ```

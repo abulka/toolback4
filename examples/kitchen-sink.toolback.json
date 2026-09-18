@@ -249,7 +249,7 @@
           },
           "props": {
             "title": "The tour",
-            "text": "Everything here is one ordinary .toolbook.json book built from the same palette controls. Open any object's Script panel while designing — scripted events are marked with a • in the event dropdown. While a run is active, the Store tab on the right shows every store.set live."
+            "text": "Everything here is one ordinary .toolback.json book built from the same palette controls. Open any object's Script panel while designing — scripted events are marked with a • in the event dropdown. While a run is active, the Store tab on the right shows every store.set live."
           },
           "on": {}
         },

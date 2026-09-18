@@ -678,7 +678,7 @@ match what will resolve at runtime:
 ## 9. Persistence & publish
 
 - Autosave: debounced 800 ms after every `sync()`, into IndexedDB (`kv` store).
-- `.toolbook.json` via File System Access API with download/input fallbacks.
+- `.toolback.json` via File System Access API with download/input fallbacks.
 - Publish: `player-entry.ts` self-plays an embedded, `<`-escaped book;
   esbuild bundles it to `public/toolback-player.js`; `buildStandaloneHtml`
   wraps runtime + book into one HTML file.

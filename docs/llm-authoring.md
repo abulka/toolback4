@@ -208,7 +208,7 @@ script holds the state machine; each button calls one helper.
 }
 ```
 
-The full 16-button version lives at `examples/calculator.toolbook.json`; open it
+The full 16-button version lives at `examples/calculator.toolback.json`; open it
 to see the complete layout. Every button follows the same pattern:
 
 ```json

@@ -14,7 +14,7 @@ dispatch chain, the editor↔canvas protocol — see
 > The on-disk link file is also `.js`, so VS Code treats it the same way.
 
 > **AI-authored books are ordinary books.** The editor's **AI** panel generates a
-> regular `.toolbook.json`; scripts it writes use exactly the API in this guide,
+> regular `.toolback.json`; scripts it writes use exactly the API in this guide,
 > and everything it creates is editable like anything else. The spec the model is
 > given is [`llm-authoring.md`](./llm-authoring.md).
 
@@ -1163,7 +1163,7 @@ const all = await card.get()              // …or the whole snapshot
 Everything a plugin does is ordinary book mutation: **undo (⌘Z) reverts it**,
 autosave and save/open cover it, and publish is unaffected.
 
-A working demo ships as `examples/author-plugin.toolbook.json` — the
+A working demo ships as `examples/author-plugin.toolback.json` — the
 plugin-flagged **Poster** page with both recipes below as buttons, and a
 **Playground** page of objects to practise on.
 

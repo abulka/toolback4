@@ -24,12 +24,12 @@ declare global {
 
 const FILE_TYPE = {
   description: 'toolback book',
-  accept: { 'application/json': ['.toolbook.json', '.json'] },
+  accept: { 'application/json': ['.toolback.json', '.json'] },
 }
 
 export function bookFileName(book: Book): string {
   const base = book.title.trim().replace(/[^\w-]+/g, '-') || 'untitled'
-  return `${base}.toolbook.json`
+  return `${base}.toolback.json`
 }
 
 function downloadJson(name: string, json: string): void {
@@ -100,7 +100,7 @@ export async function openBookFile(): Promise<Book | undefined> {
   return new Promise<Book | undefined>((resolve, reject) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = 'application/json,.json'
+    input.accept = 'application/json,.toolback.json,.json'
     input.onchange = async () => {
       const file = input.files?.[0]
       if (!file) return resolve(undefined)

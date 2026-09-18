@@ -759,10 +759,10 @@ describe('book store — save / rename / delete (IndexedDB)', () => {
     await new Promise((r) => setTimeout(r, 0))
     expect(store.book.title).toBe('Hello-Toolbook-Andy')
     const { bookFileName } = await import('../files')
-    expect(bookFileName(store.book)).toBe('Hello-Toolbook-Andy.toolbook.json')
+    expect(bookFileName(store.book)).toBe('Hello-Toolbook-Andy.toolback.json')
     store.newBook()
     expect(store.book.title).toBe('Untitled')
-    expect(bookFileName(store.book)).toBe('Untitled.toolbook.json')
+    expect(bookFileName(store.book)).toBe('Untitled.toolback.json')
   })
 
   it('deleteRecent removes the snapshot and the recents entry', async () => {

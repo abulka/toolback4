@@ -105,7 +105,7 @@ function confirmDelete(id: string, title: string): void {
 
       <template v-else>
         <p class="empty">No saved projects yet.</p>
-        <p class="hint">Save stores the current project here, or Import a .toolbook.json from disk.</p>
+        <p class="hint">Save stores the current project here, or Import a .toolback.json from disk.</p>
       </template>
 
       <div class="foot">

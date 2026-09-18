@@ -1,15 +1,15 @@
 # toolback example books
 
-Ready-made `.toolbook.json` books you can open in the editor and play or take
+Ready-made `.toolback.json` books you can open in the editor and play or take
 apart: **Open…** in the file bar (or just open one from your OS's file dialog).
 
 | Book | Demonstrates |
 | --- | --- |
-| `hello-counter.toolbook.json` | The classic first book: `pageEnter` seeding the store, a click script, a `{{count}}` dynamic label. Start here. |
-| `calculator.toolbook.json` | A working calculator in the canonical `x`/`y` edge format: page-script state machine, `{{display}}` binding, a button grid. |
-| `quiz.toolbook.json` | Two pages with `page.go` navigation, per-page `pageEnter` lifecycle, a score travelling through the shared store. |
-| `author-plugin.toolbook.json` | **Author-mode plugin**: the "Poster" page is plugin-flagged (⚡) with buttons that recolour the current selection and group-and-move it. See below. |
-| `kitchen-sink.toolbook.json` | Everything at once — see below. |
+| `hello-counter.toolback.json` | The classic first book: `pageEnter` seeding the store, a click script, a `{{count}}` dynamic label. Start here. |
+| `calculator.toolback.json` | A working calculator in the canonical `x`/`y` edge format: page-script state machine, `{{display}}` binding, a button grid. |
+| `quiz.toolback.json` | Two pages with `page.go` navigation, per-page `pageEnter` lifecycle, a score travelling through the shared store. |
+| `author-plugin.toolback.json` | **Author-mode plugin**: the "Poster" page is plugin-flagged (⚡) with buttons that recolour the current selection and group-and-move it. See below. |
+| `kitchen-sink.toolback.json` | Everything at once — see below. |
 
 ## Author plugin demo
 
