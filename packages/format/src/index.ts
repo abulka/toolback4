@@ -11,6 +11,7 @@ export const CONTROL_KINDS = [
   'group',
   'markdown',
   'html',
+  'shape',
 ] as const
 export type ControlKind = (typeof CONTROL_KINDS)[number]
 
@@ -283,6 +284,7 @@ export const DEFAULT_SIZES: Record<ControlKind, { w: number; h: number }> = {
   group: { w: 200, h: 200 },
   markdown: { w: 420, h: 260 },
   html: { w: 420, h: 260 },
+  shape: { w: 120, h: 120 },
 }
 
 /** simplified web-safe font families offered in the editor */
@@ -306,11 +308,11 @@ export const FONT_STACKS: Record<FontFamily, string> = {
 /** controls whose text (and, for surfaces, fill) the text-style props apply to */
 export const TEXT_STYLE_KINDS = ['button', 'label', 'input', 'switch', 'card', 'markdown', 'html'] as const
 
-/** controls that can paint a surface/text colour (text kinds plus containers) */
-export const APPEARANCE_KINDS = [...TEXT_STYLE_KINDS, 'container'] as const
+/** controls that can paint a surface/text colour (text kinds plus surfaces) */
+export const APPEARANCE_KINDS = [...TEXT_STYLE_KINDS, 'container', 'shape'] as const
 
 /** controls with a rendered box that border/radius/opacity apply to */
-export const BOX_KINDS = ['button', 'label', 'input', 'card', 'container', 'image', 'markdown', 'html'] as const
+export const BOX_KINDS = ['button', 'label', 'input', 'card', 'container', 'image', 'markdown', 'html', 'shape'] as const
 
 /** which control kinds each style prop writes to — the shared table the editor
  *  selection patch and the runtime group propagation both read */
@@ -351,6 +353,27 @@ export function resolveBorderStyle(value: unknown): BorderStyle {
   return value === 'dashed' ? 'dashed' : 'solid'
 }
 
+/** the shape control's geometry options (the `shape` prop) */
+export const SHAPE_TYPES = [
+  'rectangle',
+  'ellipse',
+  'circle',
+  'line',
+  'arrow',
+  'triangle',
+  'diamond',
+  'polygon',
+  'star',
+  'path',
+] as const
+export type ShapeType = (typeof SHAPE_TYPES)[number]
+
+export function resolveShapeType(value: unknown): ShapeType {
+  return typeof value === 'string' && (SHAPE_TYPES as readonly string[]).includes(value)
+    ? (value as ShapeType)
+    : 'ellipse'
+}
+
 export interface BorderDefault {
   width: number
   style: BorderStyle
@@ -374,6 +397,7 @@ export const BORDER_DEFAULTS: Record<ControlKind, BorderDefault> = {
   group: { width: 0, style: 'solid', color: '#d1d5db' },
   markdown: { width: 0, style: 'solid', color: '#d1d5db' },
   html: { width: 0, style: 'solid', color: '#d1d5db' },
+  shape: { width: 0, style: 'solid', color: '#6b7280' },
 }
 
 export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
@@ -387,6 +411,7 @@ export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
   group: {},
   markdown: { text: '# Heading\n\nBody…', fontSize: 15 },
   html: { html: '<p>Hello</p>' },
+  shape: { shape: 'ellipse', background: '#e5e7eb' },
 }
 
 /**
@@ -516,6 +541,37 @@ const P_OPACITY: PropSpec = {
   scriptable: true,
   doc: 'Opacity, 0–1 (1 = solid)',
 }
+const P_SHAPE: PropSpec = {
+  name: 'shape',
+  type: 'enum',
+  enum: SHAPE_TYPES,
+  default: 'ellipse',
+  doc: 'Shape geometry: rectangle, ellipse, circle, line, arrow, triangle, diamond, polygon, star or path',
+}
+const P_SIDES: PropSpec = {
+  name: 'sides',
+  type: 'number',
+  default: 5,
+  doc: 'Polygon side count, 3–20 (the `polygon` shape)',
+}
+const P_POINTS: PropSpec = {
+  name: 'points',
+  type: 'number',
+  default: 5,
+  doc: 'Star point count, 3–20 (the `star` shape)',
+}
+const P_INNER_RATIO: PropSpec = {
+  name: 'innerRatio',
+  type: 'number',
+  default: 0.5,
+  doc: 'Star inner radius as a fraction of the outer radius, 0–1 (the `star` shape)',
+}
+const P_PATH: PropSpec = {
+  name: 'path',
+  type: 'string',
+  default: 'M 10 90 L 50 10 L 90 90 Z',
+  doc: 'SVG path data for the `path` shape, in a 0–100 coordinate box',
+}
 
 const TEXT_STYLE_PROPS: PropSpec[] = [
   P_FONT_SIZE,
@@ -547,6 +603,7 @@ export const CONTROL_PROPS: Record<ControlKind, PropSpec[]> = {
   group: [],
   markdown: [P_TEXT, ...TEXT_STYLE_PROPS, ...BOX_PROPS],
   html: [P_HTML, ...TEXT_STYLE_PROPS, ...BOX_PROPS],
+  shape: [P_SHAPE, P_SIDES, P_POINTS, P_INNER_RATIO, P_PATH, P_BACKGROUND, P_COLOR, ...BOX_PROPS],
 }
 
 export interface ScriptApiMember {
@@ -631,7 +688,7 @@ export const SCRIPT_API: ScriptApiNamespace[] = [
 ]
 
 /** Bump when the manifest changes so a stale AI conversation is detectable. */
-export const CAPABILITY_VERSION = 2
+export const CAPABILITY_VERSION = 3
 
 /**
  * Free, key-less image hosts behind the image control's "generate" button. All

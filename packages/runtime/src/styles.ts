@@ -163,6 +163,27 @@ body > .tb-page {
   border-radius: 12px;
 }
 
+/* shape: inline SVG geometry filling the object box (viewBox 0–100) */
+.tb-shape {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.tb-shape-geom {
+  fill: #e5e7eb;
+  stroke: none;
+  stroke-width: 0;
+}
+
+.tb-shape-geom[data-shape='line'],
+.tb-shape-geom[data-shape='arrow'] {
+  fill: none;
+  stroke: #6b7280;
+  stroke-width: 2;
+}
+
 /* markdown / HTML viewers: read-only rich content, scrollable inside the object */
 .tb-markdown,
 .tb-html {

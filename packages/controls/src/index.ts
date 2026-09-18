@@ -6,6 +6,7 @@ import {
   FONT_STACKS,
   resolveBorderStyle,
   resolveColor,
+  resolveShapeType,
   resolveTextAlign,
   resolveVerticalAlign,
   type FontFamily,
@@ -132,6 +133,160 @@ export function applyBoxStyle(el: HTMLElement, obj: PageObject): void {
   el.style.opacity = opacity !== null ? String(Math.min(1, Math.max(0, opacity))) : ''
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg'
+const ARROW_MARKER = 'M0,0 L10,5 L0,10 Z'
+
+/**
+ * The shape control paints an SVG `<path>`-style geometry. `fill` comes from
+ * `background`/`color`, the outline from the border props (mapped to
+ * `stroke`), and `radius` rounds the rectangle. Line/arrow have no fill and a
+ * default stroke so they show even before a border is set.
+ */
+function applyShapeStyle(root: HTMLElement, obj: PageObject): void {
+  const geom = root.querySelector<SVGElement>('.tb-shape-geom')
+  if (!geom) return
+  const type = resolveShapeType(obj.props['shape'])
+  const strokeOnly = type === 'line' || type === 'arrow'
+  const fill = resolveColor(obj.props['background']) ?? resolveColor(obj.props['color'])
+  geom.style.fill = fill ?? (strokeOnly ? 'none' : '')
+  if (geom.tagName.toLowerCase() === 'rect') {
+    const r = numProp(obj, 'radius')
+    if (r !== null && r > 0) {
+      geom.setAttribute('rx', String(Math.min(50, r)))
+      geom.setAttribute('ry', String(Math.min(50, r)))
+    } else {
+      geom.removeAttribute('rx')
+      geom.removeAttribute('ry')
+    }
+  }
+  const touched =
+    obj.props['borderWidth'] !== undefined ||
+    obj.props['borderStyle'] !== undefined ||
+    obj.props['borderColor'] !== undefined
+  if (touched) {
+    const def = BORDER_DEFAULTS[obj.control]
+    const w = numProp(obj, 'borderWidth') ?? def.width
+    const style = obj.props['borderStyle'] !== undefined ? resolveBorderStyle(obj.props['borderStyle']) : def.style
+    const color = resolveColor(obj.props['borderColor']) ?? def.color
+    geom.style.stroke = color
+    geom.style.strokeWidth = `${Math.max(0, w)}px`
+    geom.style.strokeDasharray = style === 'dashed' ? '6 4' : ''
+  } else {
+    geom.style.stroke = ''
+    geom.style.strokeWidth = ''
+    geom.style.strokeDasharray = ''
+  }
+  const opacity = numProp(obj, 'opacity')
+  root.style.opacity = opacity !== null ? String(Math.min(1, Math.max(0, opacity))) : ''
+}
+
+function polygonPoints(sides: number): string {
+  const n = Math.min(20, Math.max(3, Math.round(sides)))
+  const out: string[] = []
+  const step = (Math.PI * 2) / n
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI / 2 + i * step
+    out.push(`${(50 + 50 * Math.cos(a)).toFixed(2)},${(50 + 50 * Math.sin(a)).toFixed(2)}`)
+  }
+  return out.join(' ')
+}
+
+function starPoints(points: number, innerRatio: number): string {
+  const n = Math.min(20, Math.max(3, Math.round(points)))
+  const ratio = Math.min(1, Math.max(0.05, innerRatio))
+  const out: string[] = []
+  const step = Math.PI / n
+  for (let i = 0; i < n * 2; i++) {
+    const r = i % 2 === 0 ? 50 : 50 * ratio
+    const a = -Math.PI / 2 + i * step
+    out.push(`${(50 + r * Math.cos(a)).toFixed(2)},${(50 + r * Math.sin(a)).toFixed(2)}`)
+  }
+  return out.join(' ')
+}
+
+function shapeGeometry(doc: Document, obj: PageObject): SVGElement {
+  const type = resolveShapeType(obj.props['shape'])
+  const make = <K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameMap[K] =>
+    doc.createElementNS(SVG_NS, tag)
+  const polygon = (points: string): SVGElement => {
+    const el = make('polygon')
+    el.setAttribute('points', points)
+    return el
+  }
+  switch (type) {
+    case 'rectangle': {
+      const el = make('rect')
+      el.setAttribute('x', '0')
+      el.setAttribute('y', '0')
+      el.setAttribute('width', '100')
+      el.setAttribute('height', '100')
+      const r = numProp(obj, 'radius')
+      if (r !== null && r > 0) {
+        el.setAttribute('rx', String(Math.min(50, r)))
+        el.setAttribute('ry', String(Math.min(50, r)))
+      }
+      return el
+    }
+    case 'circle': {
+      const el = make('circle')
+      el.setAttribute('cx', '50')
+      el.setAttribute('cy', '50')
+      el.setAttribute('r', '50')
+      return el
+    }
+    case 'line':
+    case 'arrow': {
+      const el = make('line')
+      el.setAttribute('x1', '0')
+      el.setAttribute('y1', '0')
+      el.setAttribute('x2', '100')
+      el.setAttribute('y2', '100')
+      if (type === 'arrow') el.setAttribute('marker-end', `url(#tb-arrow-${obj.id})`)
+      return el
+    }
+    case 'triangle':
+      return polygon('50,2 98,98 2,98')
+    case 'diamond':
+      return polygon('50,2 98,50 50,98 2,50')
+    case 'polygon':
+      return polygon(polygonPoints(numProp(obj, 'sides') ?? 5))
+    case 'star':
+      return polygon(starPoints(numProp(obj, 'points') ?? 5, numProp(obj, 'innerRatio') ?? 0.5))
+    case 'path': {
+      const el = make('path')
+      el.setAttribute('d', textProp(obj, 'path', 'M 10 90 L 50 10 L 90 90 Z'))
+      return el
+    }
+    default: {
+      const el = make('ellipse')
+      el.setAttribute('cx', '50')
+      el.setAttribute('cy', '50')
+      el.setAttribute('rx', '50')
+      el.setAttribute('ry', '50')
+      return el
+    }
+  }
+}
+
+function arrowDefs(doc: Document, obj: PageObject): SVGElement {
+  const defs = doc.createElementNS(SVG_NS, 'defs')
+  const marker = doc.createElementNS(SVG_NS, 'marker')
+  marker.setAttribute('id', `tb-arrow-${obj.id}`)
+  marker.setAttribute('markerWidth', '6')
+  marker.setAttribute('markerHeight', '6')
+  marker.setAttribute('refX', '8')
+  marker.setAttribute('refY', '5')
+  marker.setAttribute('orient', 'auto-start-reverse')
+  marker.setAttribute('markerUnits', 'strokeWidth')
+  marker.setAttribute('viewBox', '0 0 10 10')
+  const head = doc.createElementNS(SVG_NS, 'path')
+  head.setAttribute('d', ARROW_MARKER)
+  head.setAttribute('fill', 'context-stroke')
+  marker.appendChild(head)
+  defs.appendChild(marker)
+  return defs
+}
+
 const BOX_KIND_SET = new Set<string>(BOX_KINDS)
 
 /**
@@ -141,8 +296,11 @@ const BOX_KIND_SET = new Set<string>(BOX_KINDS)
  * in lockstep.
  */
 export function applyStyleToTree(root: HTMLElement, obj: PageObject): void {
-  if (BOX_KIND_SET.has(obj.control)) applyBoxStyle(root, obj)
+  if (BOX_KIND_SET.has(obj.control) && obj.control !== 'shape') applyBoxStyle(root, obj)
   switch (obj.control) {
+    case 'shape':
+      applyShapeStyle(root, obj)
+      return
     case 'button':
       applyFontProps(root, obj)
       applyTextDecoration(root, obj)
@@ -390,6 +548,23 @@ export function renderContainer(obj: PageObject): HTMLElement {
   return el
 }
 
+/** shape: an inline SVG geometry sized to the object box (viewBox 0–100) */
+export function renderShape(obj: PageObject): HTMLElement {
+  const type = resolveShapeType(obj.props['shape'])
+  const el = document.createElementNS(SVG_NS, 'svg') as unknown as HTMLElement
+  el.setAttribute('class', 'tb-shape')
+  el.setAttribute('viewBox', '0 0 100 100')
+  el.setAttribute('preserveAspectRatio', type === 'circle' ? 'xMidYMid meet' : 'none')
+  if (type === 'arrow') el.appendChild(arrowDefs(document, obj))
+  const geom = shapeGeometry(document, obj)
+  geom.setAttribute('class', 'tb-shape-geom')
+  geom.setAttribute('vector-effect', 'non-scaling-stroke')
+  geom.setAttribute('data-shape', type)
+  el.appendChild(geom)
+  applyStyleToTree(el, obj)
+  return el
+}
+
 /**
  * Groups render as an invisible wrapper; the runtime injects member objects
  * (each in its own .tb-object) inside it. pointer-events: none on the wrapper
@@ -414,4 +589,5 @@ export function registerControls(): void {
   registerControl('group', renderGroup)
   registerControl('markdown', renderMarkdown)
   registerControl('html', renderHtml)
+  registerControl('shape', renderShape)
 }

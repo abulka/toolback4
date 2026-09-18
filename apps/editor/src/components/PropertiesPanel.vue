@@ -26,6 +26,7 @@ import DynamicTextEditor from './DynamicTextEditor.vue'
 import ContentEditor from './ContentEditor.vue'
 import TextStyleFields from './TextStyleFields.vue'
 import BoxStyleFields from './BoxStyleFields.vue'
+import ShapeFields from './ShapeFields.vue'
 
 const store = useBookStore()
 // store keys plus the built-in self binding — {{self.name}} makes every copy
@@ -147,6 +148,7 @@ const CAPS: Record<string, StyleCaps> = {
   markdown: { font: true, bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true, trackColor: false, border: true, radius: true, opacity: true },
   html: { font: true, bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true, trackColor: false, border: true, radius: true, opacity: true },
   image: { font: false, bold: false, italic: false, textAlign: false, vAlign: false, textColor: false, background: false, trackColor: false, border: true, radius: true, opacity: true },
+  shape: { font: false, bold: false, italic: false, textAlign: false, vAlign: false, textColor: false, background: true, trackColor: false, border: true, radius: false, opacity: true },
 }
 const APPEARANCE = new Set<string>(APPEARANCE_KINDS)
 const BOX = new Set<string>(BOX_KINDS)
@@ -284,6 +286,19 @@ function onProp(key: string, e: Event): void {
 function onPropValue(key: string, v: string): void {
   if (!sel.value) return
   store.updateProps(sel.value.id, { [key]: v })
+}
+
+/** numeric property value as a field string (shape geometry props) */
+function shapeNum(key: string): string {
+  const v = sel.value?.props[key]
+  if (typeof v === 'number' && Number.isFinite(v)) return String(v)
+  if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) return String(Number(v))
+  return ''
+}
+
+function onShapeProp(key: string, value: unknown): void {
+  if (!sel.value) return
+  store.updateProps(sel.value.id, { [key]: value })
 }
 
 // image "generate": fill the selected image object's `src` with a random URL
@@ -581,8 +596,18 @@ function onPaste(): void {
           >🎲</button>
           </div>
     </div>
+    <ShapeFields
+      v-if="sel && sel.control === 'shape'"
+      :shape="propValue('shape')"
+      :sides="shapeNum('sides')"
+      :points="shapeNum('points')"
+      :inner-ratio="shapeNum('innerRatio')"
+      :path="propValue('path')"
+      :radius="shapeNum('radius')"
+      @set="onShapeProp"
+    />
     </div>
-    <p v-if="textFields.length === 0 && !isGroupSel()" class="hint">No content properties.</p>
+    <p v-if="textFields.length === 0 && !isGroupSel() && sel?.control !== 'shape'" class="hint">No content properties.</p>
     <template v-if="showStyle">
     <h2>Style</h2>
     <div class="fields">

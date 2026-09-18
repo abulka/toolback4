@@ -1021,13 +1021,16 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
     return !!objectEl(id)?.firstElementChild?.classList.contains('tb-group')
   }
 
-  /** is this object a borderless control (label, markdown/HTML viewer)? Its box
-   *  is invisible otherwise, so design mode traces it. */
+  /** is this object a borderless control (label, markdown/HTML viewer, shape)?
+   *  Its box is invisible otherwise, so design mode traces it. */
   function isBorderlessObject(id: string): boolean {
     const cls = objectEl(id)?.firstElementChild?.classList
     return (
       !!cls &&
-      (cls.contains('tb-label') || cls.contains('tb-markdown') || cls.contains('tb-html'))
+      (cls.contains('tb-label') ||
+        cls.contains('tb-markdown') ||
+        cls.contains('tb-html') ||
+        cls.contains('tb-shape'))
     )
   }
 

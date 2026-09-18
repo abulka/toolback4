@@ -287,17 +287,48 @@ editing affordances scripts have:
 Things to know:
 
 - **Empty sources show a placeholder** instead of an empty box.
-- **Borderless controls are outlined while you design.** A label or a
-  markdown/HTML viewer has no border or background of its own, so at design time
-  one that isn't selected shows a faint dashed outline tracing its box (just like
-  an unselected group) — which is also where its edge springs anchor. Selecting
-  it shows the usual selection box instead; the outline never appears at run time
-  or in the published book.
+- **Borderless controls are outlined while you design.** A label, a
+  markdown/HTML viewer or a shape has no border or background of its own, so at
+  design time one that isn't selected shows a faint dashed outline tracing its
+  box (just like an unselected group) — which is also where its edge springs
+  anchor. Selecting it shows the usual selection box instead; the outline never
+  appears at run time or in the published book.
 - **The canvas is a same-origin sandbox where authored scripts already run, so
   viewer content is trusted.** HTML is injected with **no sanitizer**, and
   Markdown passes raw HTML through — only open books you trust.
 - **Markdown is bundled with the player**, so published books render it
   **offline** — no library-shelf or network involved.
+
+### Shapes
+
+The **shape** palette control draws a vector graphic sized to its object box —
+no image file needed, and it scales cleanly. Pick the geometry in the Selection
+panel's **Shape** dropdown:
+
+- `rectangle` (with a **Corner radius**), `ellipse`, `circle` (kept round when
+  the box isn't square), `triangle`, `diamond`
+- `polygon` — choose **Sides** (3–20)
+- `star` — choose **Points** (3–20) and **Inner radius** (0.05–1)
+- `line` and `arrow` — a diagonal stroke; an arrow gets an arrowhead
+- `path` — paste any SVG path data (`d`) drawn in a `0–100` box
+
+Styling: `background` (or `color`) is the **fill**, and the Box row's border
+props are the **stroke** (`borderWidth`, `borderStyle`, `borderColor`). `opacity`
+fades the whole shape. Line/arrow have no fill and a default grey stroke until
+you set a border. As with every control you can move, resize, group, name and
+**Responsive**-anchor a shape.
+
+Scripting uses the same accessors as other controls — `shapeObj.background`,
+`shapeObj.borderColor`, `shapeObj.opacity`, and so on write the fill/stroke
+live. The geometry props (`shape`, `sides`, `points`, `innerRatio`, `path`) are
+set in the Selection panel.
+
+```js
+// recolour a shape when a switch is toggled
+controls.toggle.on('click', () => {
+  controls.badge.background = controls.toggle.value ? 'red' : 'green'
+})
+```
 
 ### Responsive edges
 

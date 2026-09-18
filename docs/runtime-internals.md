@@ -41,7 +41,7 @@ Background {
 Page    { id, name, script, backgroundId, author?, size?: {w,h}, objects: PageObject[] }
 PageObject {
   id, name,                       // name = unique per page/background; the `controls[name]` handle
-  control: 'button'|'label'|'input'|'image'|'card'|'container'|'switch'|'group',
+  control: 'button'|'label'|'input'|'image'|'card'|'container'|'switch'|'group'|'shape',
   x: XEdge,                       // horizontal edge constraint (see §4.1)
   y: YEdge,                       // vertical edge constraint
   props: Record<string, unknown>, // control-specific, e.g. { text }
@@ -95,7 +95,12 @@ YEdge = { mode:'top'; top; height }
   that win over `color` per role. `fontFamily` (one of five stacks in
   `FONT_STACKS`), `fontSize`, `bold`, `italic`, `textAlign`, `vAlign` round out
   the text set; `borderWidth`/`borderStyle`/`borderColor`, `radius` and
-  `opacity` are box decoration (`applyBoxStyle`, applied for `BOX_KINDS`).
+  `opacity` are box decoration (`applyBoxStyle`, applied for `BOX_KINDS`). A
+  **shape** is an SVG geometry in a `0 0 100 100` viewBox and applies its own
+  paint (`applyShapeStyle`): `background`/`color` become `fill`, the border
+  props become `stroke`/`stroke-width`/`stroke-dasharray`, `radius` rounds a
+  rectangle, and `shape`/`sides`/`points`/`innerRatio`/`path` select the
+  geometry.
   `styleKindsForProp` (`format`) is the shared prop→kinds table the editor
   selection patch and the runtime group propagation both read. Labels and
   buttons are flex **columns** (horizontal alignment is `text-align` on a

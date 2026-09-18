@@ -13,6 +13,7 @@ import {
   renderLabel,
   renderMarkdown,
   renderObject,
+  renderShape,
   renderSwitch,
 } from './index'
 
@@ -51,6 +52,50 @@ describe('controls', () => {
   it('renders a container', () => {
     const obj = createObject('container', 'ct1', { x: 0, y: 0, w: 100, h: 100 })
     expect(renderContainer(obj).className).toBe('tb-container')
+  })
+
+  it('renders a shape as SVG geometry with a default fill', () => {
+    const obj = createObject('shape', 'sh1', { x: 0, y: 0, w: 100, h: 100 })
+    const el = renderShape(obj)
+    expect(el.tagName.toLowerCase()).toBe('svg')
+    expect(el.getAttribute('viewBox')).toBe('0 0 100 100')
+    const geom = el.firstElementChild as SVGElement
+    expect(geom.tagName.toLowerCase()).toBe('ellipse')
+    expect(geom.style.fill).toBe('')
+  })
+
+  it('renders each shape geometry and maps fill/border to SVG paint', () => {
+    const poly = renderShape(createObject('shape', 'p', { x: 0, y: 0, w: 100, h: 100 }, { shape: 'polygon', sides: 6, background: 'red' }))
+    const polyGeom = poly.firstElementChild as SVGElement
+    expect(polyGeom.tagName.toLowerCase()).toBe('polygon')
+    expect(polyGeom.getAttribute('points')?.split(' ')).toHaveLength(6)
+    expect(polyGeom.style.fill).toBe('#ef4444')
+
+    const star = renderShape(createObject('shape', 's', { x: 0, y: 0, w: 100, h: 100 }, { shape: 'star', points: 5 }))
+    expect((star.firstElementChild as SVGElement).getAttribute('points')?.split(' ')).toHaveLength(10)
+
+    const line = renderShape(createObject('shape', 'l', { x: 0, y: 0, w: 100, h: 100 }, { shape: 'line', borderColor: 'blue', borderWidth: 3 }))
+    const lineGeom = line.firstElementChild as SVGElement
+    expect(lineGeom.tagName.toLowerCase()).toBe('line')
+    expect(lineGeom.style.stroke).toBe('#3b82f6')
+    expect(lineGeom.style.strokeWidth).toBe('3px')
+
+    const rect = renderShape(createObject('shape', 'r', { x: 0, y: 0, w: 100, h: 100 }, { shape: 'rectangle', radius: 12 }))
+    expect((rect.firstElementChild as SVGElement).getAttribute('rx')).toBe('12')
+
+    const path = renderShape(createObject('shape', 'pa', { x: 0, y: 0, w: 100, h: 100 }, { shape: 'path', path: 'M 0 0 L 100 100' }))
+    expect((path.firstElementChild as SVGElement).getAttribute('d')).toBe('M 0 0 L 100 100')
+
+    const circle = renderShape(createObject('shape', 'c', { x: 0, y: 0, w: 100, h: 100 }, { shape: 'circle' }))
+    expect(circle.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet')
+
+    // arrow: a stroked line with a marker; the defs must not swallow the paint
+    const arrow = renderShape(createObject('shape', 'ar', { x: 0, y: 0, w: 100, h: 100 }, { shape: 'arrow', borderColor: 'blue', borderWidth: 2 }))
+    expect(arrow.querySelector('defs')).toBeTruthy()
+    const arrowGeom = arrow.querySelector('.tb-shape-geom') as SVGElement
+    expect(arrowGeom.tagName.toLowerCase()).toBe('line')
+    expect(arrowGeom.getAttribute('marker-end')).toMatch(/^url\(#tb-arrow-/)
+    expect(arrowGeom.style.stroke).toBe('#3b82f6')
   })
 
   it('renders a switch with a checkbox, label text and checked state', () => {
@@ -212,6 +257,7 @@ describe('controls', () => {
       'switch',
       'markdown',
       'html',
+      'shape',
     ] as const) {
       const obj = createObject(kind, 'x', { x: 0, y: 0, w: 100, h: 100 })
       expect(() => renderObject(obj)).not.toThrow()

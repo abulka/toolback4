@@ -1,0 +1,201 @@
+{
+  "formatVersion": 1,
+  "id": "book_shapes_demo",
+  "title": "Shapes",
+  "backgrounds": [
+    {
+      "id": "bg_shapes",
+      "name": "Background 1",
+      "color": "#f8fafc",
+      "script": "",
+      "objects": []
+    }
+  ],
+  "pages": [
+    {
+      "id": "page_shapes",
+      "name": "Shapes",
+      "script": "",
+      "backgroundId": "bg_shapes",
+      "objects": [
+        {
+          "id": "obj_sh_title",
+          "name": "shTitle",
+          "control": "label",
+          "x": { "mode": "left", "left": 48, "width": 900 },
+          "y": { "mode": "top", "top": 32, "height": 48 },
+          "props": { "text": "Shapes — vector controls", "fontSize": 24, "bold": true },
+          "on": {}
+        },
+        {
+          "id": "obj_sh_hint",
+          "name": "shHint",
+          "control": "label",
+          "x": { "mode": "left", "left": 48, "width": 1120 },
+          "y": { "mode": "top", "top": 88, "height": 48 },
+          "props": {
+            "text": "Every shape is an SVG geometry in a 0–100 box; fill = Background, outline = Border. The badge colour is changed from a script.",
+            "fontSize": 15
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_sh_rect",
+          "name": "shRect",
+          "control": "shape",
+          "x": { "mode": "left", "left": 48, "width": 120 },
+          "y": { "mode": "top", "top": 180, "height": 120 },
+          "props": {
+            "shape": "rectangle",
+            "radius": 16,
+            "background": "#dbeafe",
+            "borderWidth": 2,
+            "borderColor": "#2563eb"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_sh_ellipse",
+          "name": "shEllipse",
+          "control": "shape",
+          "x": { "mode": "left", "left": 196, "width": 160 },
+          "y": { "mode": "top", "top": 180, "height": 120 },
+          "props": {
+            "shape": "ellipse",
+            "background": "#fde68a",
+            "borderWidth": 2,
+            "borderColor": "#d97706"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_sh_circle",
+          "name": "shCircle",
+          "control": "shape",
+          "x": { "mode": "left", "left": 388, "width": 120 },
+          "y": { "mode": "top", "top": 180, "height": 120 },
+          "props": {
+            "shape": "circle",
+            "background": "#bbf7d0",
+            "borderWidth": 2,
+            "borderColor": "#16a34a"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_sh_star",
+          "name": "shStar",
+          "control": "shape",
+          "x": { "mode": "left", "left": 548, "width": 120 },
+          "y": { "mode": "top", "top": 180, "height": 120 },
+          "props": {
+            "shape": "star",
+            "points": 5,
+            "innerRatio": 0.45,
+            "background": "#fecdd3",
+            "borderWidth": 2,
+            "borderColor": "#e11d48"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_sh_triangle",
+          "name": "shTriangle",
+          "control": "shape",
+          "x": { "mode": "left", "left": 48, "width": 120 },
+          "y": { "mode": "top", "top": 340, "height": 120 },
+          "props": {
+            "shape": "triangle",
+            "background": "#e9d5ff",
+            "borderWidth": 2,
+            "borderColor": "#7c3aed"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_sh_diamond",
+          "name": "shDiamond",
+          "control": "shape",
+          "x": { "mode": "left", "left": 196, "width": 120 },
+          "y": { "mode": "top", "top": 340, "height": 120 },
+          "props": {
+            "shape": "diamond",
+            "background": "#cffafe",
+            "borderWidth": 2,
+            "borderColor": "#0891b2"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_sh_polygon",
+          "name": "shPolygon",
+          "control": "shape",
+          "x": { "mode": "left", "left": 344, "width": 120 },
+          "y": { "mode": "top", "top": 340, "height": 120 },
+          "props": {
+            "shape": "polygon",
+            "sides": 6,
+            "background": "#fee2e2",
+            "borderWidth": 2,
+            "borderColor": "#dc2626"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_sh_line",
+          "name": "shLine",
+          "control": "shape",
+          "x": { "mode": "left", "left": 512, "width": 160 },
+          "y": { "mode": "top", "top": 340, "height": 60 },
+          "props": { "shape": "line", "borderWidth": 3, "borderColor": "#334155" },
+          "on": {}
+        },
+        {
+          "id": "obj_sh_arrow",
+          "name": "shArrow",
+          "control": "shape",
+          "x": { "mode": "left", "left": 700, "width": 160 },
+          "y": { "mode": "top", "top": 340, "height": 60 },
+          "props": { "shape": "arrow", "borderWidth": 3, "borderColor": "#334155" },
+          "on": {}
+        },
+        {
+          "id": "obj_sh_path",
+          "name": "shPath",
+          "control": "shape",
+          "x": { "mode": "left", "left": 48, "width": 140 },
+          "y": { "mode": "top", "top": 500, "height": 120 },
+          "props": {
+            "shape": "path",
+            "path": "M 10 10 L 90 50 L 10 90 Z",
+            "background": "#fef3c7",
+            "borderWidth": 2,
+            "borderColor": "#b45309"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_sh_badge",
+          "name": "badge",
+          "control": "shape",
+          "x": { "mode": "left", "left": 232, "width": 100 },
+          "y": { "mode": "top", "top": 510, "height": 100 },
+          "props": { "shape": "circle", "background": "#3b82f6" },
+          "on": {}
+        },
+        {
+          "id": "obj_sh_recolour",
+          "name": "shRecolour",
+          "control": "button",
+          "x": { "mode": "left", "left": 372, "width": 220 },
+          "y": { "mode": "top", "top": 536, "height": 48 },
+          "props": { "text": "Recolour badge" },
+          "on": {
+            "click": "badge.background = badge.background === 'red' ? 'blue' : 'red'"
+          }
+        }
+      ]
+    }
+  ],
+  "store": []
+}

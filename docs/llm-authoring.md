@@ -92,10 +92,11 @@ of truth). Only use a control kind and property names that appear there.
 Unknown properties are ignored and reported as warnings.
 
 Most text controls also accept a set of styling props, and box controls
-(button, label, input, card, container, image, markdown, html) accept
+(button, label, input, card, container, image, markdown, html, shape) accept
 `borderWidth`, `borderStyle` (`'solid' | 'dashed'`), `borderColor`, `radius` and
-`opacity` (0–1); a switch accepts `trackColor`. Use these to give an app a
-consistent look instead of inventing CSS.
+`opacity` (0–1); a switch accepts `trackColor`. On a shape these are SVG paint:
+`background`/`color` fill it and the border props stroke its outline. Use these
+to give an app a consistent look instead of inventing CSS.
 
 ---
 
