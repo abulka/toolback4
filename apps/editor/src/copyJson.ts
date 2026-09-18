@@ -1,9 +1,18 @@
-import type { PageObject } from '@toolback/format'
+import type { Background, Page, PageObject } from '@toolback/format'
 
 /** pretty-printed JSON of the selection: a single object (including any
  *  sub-objects) or an array for multi-selections */
 export function objectsToJson(objs: PageObject[]): string {
   return JSON.stringify(objs.length === 1 ? objs[0] : objs, null, 2)
+}
+
+/**
+ * Pretty-printed JSON of a page for debugging. Pass its background to copy
+ * both: the payload becomes `{ page, background }` so the shared objects
+ * travel alongside the page.
+ */
+export function pageToJson(page: Page, background?: Background | null): string {
+  return JSON.stringify(background ? { page, background } : page, null, 2)
 }
 
 /** the special key that marks a clipboard payload as toolback copy data */

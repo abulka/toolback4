@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createGroup, createObject } from '@toolback/format'
-import { CLIPBOARD_KEY, clipboardToJson, objectsToJson, parseClipboardJson } from './copyJson'
+import { createBackground, createGroup, createObject, createPage } from '@toolback/format'
+import { CLIPBOARD_KEY, clipboardToJson, objectsToJson, pageToJson, parseClipboardJson } from './copyJson'
 
 describe('objectsToJson', () => {
   it('serializes a single object with its sub-object subtree', () => {
@@ -19,6 +19,27 @@ describe('objectsToJson', () => {
     const parsed = JSON.parse(objectsToJson([a, b]))
     expect(Array.isArray(parsed)).toBe(true)
     expect(parsed.map((o: { name: string }) => o.name)).toEqual(['a', 'b'])
+  })
+})
+
+describe('pageToJson', () => {
+  it('serializes a page on its own as pretty JSON', () => {
+    const page = createPage('Page 1', 'bg_1')
+    page.objects.push(createObject('label', 'hi', { x: 0, y: 0, w: 10, h: 10 }))
+    const json = pageToJson(page)
+    const parsed = JSON.parse(json)
+    expect(parsed.name).toBe('Page 1')
+    expect(parsed.background).toBeUndefined()
+    expect(parsed.objects[0].name).toBe('hi')
+    expect(json.split('\n').length).toBeGreaterThan(1)
+  })
+
+  it('wraps the page with its background when one is supplied', () => {
+    const page = createPage('Page 1', 'bg_1')
+    const bg = createBackground('Background 1')
+    const parsed = JSON.parse(pageToJson(page, bg))
+    expect(parsed.page.name).toBe('Page 1')
+    expect(parsed.background.name).toBe('Background 1')
   })
 })
 

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { ControlKind, PageObject } from '@toolback/format'
-import { treeRows } from '@toolback/format'
+import { backgroundFor, treeRows } from '@toolback/format'
 import { isDeleteSelectionKey, isDuplicateKey, isGroupKey, isUndoKey, isCopyKey, isCutKey, isPasteKey, shouldToggleRun, zOrderActionOf } from '@toolback/runtime'
 import { wireCanvas } from './canvasClient'
 import { startPaletteDrag } from './paletteDrag'
 import { useBookStore } from './stores/book'
 import { openBookFile, saveBookFile, saveTextFile, bookFileName } from './files'
+import { copyText, pageToJson } from './copyJson'
 import { basePackageName, buildStandaloneHtml, libUrlMapFor, scanLibImports, standaloneFileName } from './publish'
 import PropertiesPanel from './components/PropertiesPanel.vue'
 import ScriptEditor from './components/ScriptEditor.vue'
@@ -358,6 +359,19 @@ const pageBackgroundId = computed(
 function onPageBackgroundChange(e: Event): void {
   const id = (e.target as HTMLSelectElement).value
   if (id) store.movePageToBackground(store.currentPageIndex, id)
+}
+
+// copy the page's JSON (debugging aid); optionally include its background
+const pageJsonCopied = ref(false)
+const pageJsonWithBackground = ref(false)
+let pageJsonTimer: ReturnType<typeof setTimeout> | undefined
+async function copyPageJson(): Promise<void> {
+  const page = store.activePage
+  const bg = pageJsonWithBackground.value ? backgroundFor(store.book, page) : null
+  const ok = await copyText(pageToJson(page, bg))
+  pageJsonCopied.value = ok
+  clearTimeout(pageJsonTimer)
+  pageJsonTimer = setTimeout(() => (pageJsonCopied.value = false), 1500)
 }
 
 function selectInList(obj: PageObject): void {
@@ -940,7 +954,21 @@ function startPaletteSplitDrag(e: PointerEvent): void {
       <div v-show="propsTab === 'page'">
         <template v-if="store.editing.kind === 'page'">
           <div class="field">
-            <label>Page name</label>
+            <div class="field-head">
+              <label>Page name</label>
+              <div class="json-row">
+                <label class="json-bg-toggle" title="Also include this page's background object (colour, script, shared objects) in the copied JSON">
+                  <input type="checkbox" v-model="pageJsonWithBackground" />
+                  background
+                </label>
+                <button
+                  class="copy-json"
+                  :class="{ ok: pageJsonCopied }"
+                  title="Copy this page's JSON to the clipboard (debugging)"
+                  @click="copyPageJson"
+                >{{ pageJsonCopied ? '✓ Copied' : '{ } JSON' }}</button>
+              </div>
+            </div>
             <input :value="store.activePage.name" disabled />
           </div>
           <div class="field">
@@ -1743,6 +1771,61 @@ body.tb-palette-dragging * {
 
 .tab-head {
   margin-top: 4px;
+}
+
+.field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.json-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.field-head .json-bg-toggle {
+  font-size: 10px;
+}
+
+.json-bg-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--ed-text-dim);
+  cursor: pointer;
+}
+
+.json-bg-toggle input {
+  width: 11px;
+  height: 11px;
+  margin: 0;
+  accent-color: var(--ed-accent);
+}
+
+.copy-json {
+  flex: none;
+  font: 500 10px/1 system-ui, sans-serif;
+  color: var(--ed-text-dim);
+  background: var(--ed-bg);
+  border: 1px solid var(--ed-border);
+  border-radius: 4px;
+  padding: 3px 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.copy-json:hover {
+  color: var(--ed-text);
+  border-color: var(--ed-accent);
+}
+
+.copy-json.ok {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.5);
 }
 
 .mono-hint {
