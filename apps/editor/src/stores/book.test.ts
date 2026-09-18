@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import {
+  createBook,
   createGroup,
   createObject,
   DEFAULT_FIT_HINTS,
@@ -8,7 +9,7 @@ import {
   parseBook,
   type Book,
 } from '@toolback/format'
-import { useBookStore } from './book'
+import { useBookStore, setSyncSender } from './book'
 import type { RecentEntry } from '../persist'
 
 // persist talks to IndexedDB, which this node test env lacks — back it with
@@ -1419,5 +1420,162 @@ describe('book store — updateSelectedProps', () => {
     const [a, b] = useBookStore().activePage.objects
     expect(a!.props['italic']).toBeUndefined()
     expect(b!.props['italic']).toBeUndefined()
+  })
+})
+
+describe('book store — AI generated book load', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {} })
+    setActivePinia(createPinia())
+  })
+
+  it('appends a generated book, de-duplicating page names, in one undo step', () => {
+    const store = useBookStore()
+    store.hydrate(createBook('Current'))
+    const incoming = createBook('Generated')
+    incoming.pages[0]!.objects.push(
+      createObject('button', 'goBtn', { x: 0, y: 0, w: 100, h: 40 }, { text: 'Go' }),
+    )
+
+    const report = store.loadGeneratedBook(incoming, 'append')
+    expect(report.ok).toBe(true)
+    expect(store.book.pages).toHaveLength(2)
+    expect(store.book.pages[1]!.name).toBe('Page 1 2')
+    expect(report.renamedPages).toEqual(['Page 1 → Page 1 2'])
+    expect(store.canUndo).toBe(true)
+
+    store.undo()
+    expect(store.book.pages).toHaveLength(1)
+  })
+
+  it('replaces the whole project and can undo it', () => {
+    const store = useBookStore()
+    store.hydrate(createBook('Current'))
+    const incoming = createBook('Replaced')
+
+    expect(store.loadGeneratedBook(incoming, 'replace').ok).toBe(true)
+    expect(store.book.title).toBe('Replaced')
+
+    store.undo()
+    expect(store.book.title).toBe('Current')
+  })
+
+  it('rejects an invalid generated book', () => {
+    const store = useBookStore()
+    store.hydrate(createBook('Current'))
+    const report = store.loadGeneratedBook({ title: 'nope' }, 'append')
+    expect(report.ok).toBe(false)
+    expect(report.error).toBeTruthy()
+    expect(store.book.pages).toHaveLength(1)
+  })
+})
+
+describe('book store — AI modify current page', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {} })
+    setActivePinia(createPinia())
+  })
+
+  it('replaces only the current page and can undo', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    expect(store.activePage.name).toBe('P')
+
+    const generated = parseBook({
+      id: 'g',
+      title: 'G',
+      pages: [
+        {
+          id: 'gp',
+          name: 'P',
+          script: 'function pageEnter() {}',
+          objects: [
+            {
+              id: 'x',
+              name: 'onlyLabel',
+              control: 'label',
+              x: { mode: 'left', left: 0, width: 10 },
+              y: { mode: 'top', top: 0, height: 10 },
+              props: { text: 'hi' },
+            },
+          ],
+        },
+      ],
+    })
+
+    const report = store.loadGeneratedBook(generated, 'modify')
+    expect(report.ok).toBe(true)
+    expect(store.activePage.name).toBe('P')
+    expect(store.activePage.objects.map((o) => o.name)).toEqual(['onlyLabel'])
+    expect(store.activePage.script).toBe('function pageEnter() {}')
+
+    store.undo()
+    expect(store.activePage.objects.map((o) => o.name)).toEqual(['labelA', 'labelB'])
+  })
+
+  it('renames page objects that collide with the background', () => {
+    const store = useBookStore()
+    store.hydrate(twoObjectBook())
+    store.book.backgrounds[0]!.objects.push(
+      createObject('label', 'onlyLabel', { x: 0, y: 0, w: 10, h: 10 }, { text: 'bg' }),
+    )
+
+    const generated = parseBook({
+      id: 'g',
+      title: 'G',
+      pages: [
+        {
+          id: 'gp',
+          name: 'P',
+          objects: [
+            {
+              id: 'x',
+              name: 'onlyLabel',
+              control: 'label',
+              x: { mode: 'left', left: 0, width: 10 },
+              y: { mode: 'top', top: 0, height: 10 },
+              props: { text: 'hi' },
+            },
+          ],
+        },
+      ],
+    })
+
+    const report = store.loadGeneratedBook(generated, 'modify')
+    expect(report.renamedObjects).toEqual(['onlyLabel → onlyLabel2'])
+    expect(store.activePage.objects.map((o) => o.name)).toEqual(['onlyLabel2'])
+  })
+})
+
+describe('book store — AI Before/After compare', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {} })
+    setActivePinia(createPinia())
+  })
+
+  it('renders the compare snapshot instead of the live book, and restores', () => {
+    const sent: Array<{ type: string; book?: Book }> = []
+    setSyncSender((msg) => sent.push(msg as { type: string; book?: Book }))
+    const store = useBookStore()
+    store.hydrate(createBook('Live'))
+
+    const before = createBook('Before')
+    store.setCompare(before)
+    expect(store.compareBook?.title).toBe('Before')
+    expect(sent.at(-1)?.book?.title).toBe('Before')
+
+    store.setCompare(null)
+    expect(store.compareBook).toBeNull()
+    expect(sent.at(-1)?.book?.title).toBe('Live')
+  })
+
+  it('clears compare on a real edit', () => {
+    setSyncSender(() => {})
+    const store = useBookStore()
+    store.hydrate(createBook('Live'))
+    store.setCompare(createBook('Before'))
+    expect(store.compareBook).not.toBeNull()
+    store.renameBook('Renamed')
+    expect(store.compareBook).toBeNull()
   })
 })

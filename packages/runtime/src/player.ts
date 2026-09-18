@@ -911,6 +911,11 @@ export function stopRun(): void {
   active = null
 }
 
+/** whether a book is currently running (used to keep smoke tests from disturbing it) */
+export function isRunActive(): boolean {
+  return active !== null
+}
+
 export function runBook(
   book: Book,
   root: HTMLElement,

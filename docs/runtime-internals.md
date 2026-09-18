@@ -533,6 +533,7 @@ iframe.
 | `toolback:authorStart` | book, pageIndex | run a plugin page in author mode (M6c) |
 | `toolback:authorStop` | — | stop the running plugin |
 | `toolback:authorReply` | id, ok, result / error | resolves one pending bridge call |
+| `toolback:smoke` | id, book | run a book off-screen and report script errors (AI generation); skipped while a run is active |
 
 | Canvas → editor | payload | meaning |
 |---|---|---|
@@ -547,6 +548,7 @@ iframe.
 | `toolback:popups` | open names | run-mode popup stack changed |
 | `toolback:authorCall` | id, op, args | plugin script called `author.<op>` (async bridge) |
 | `toolback:authorState` | active, pageName | plugin started/stopped (✕ in the box) |
+| `toolback:smokeResult` | id, errors | result of a `toolback:smoke` run (empty = clean) |
 | `toolback:reorder` / `deleteSelection` / `undo` / `redo` / `duplicate` / `group` / `ungroup` | — | canvas-focused shortcuts forwarded |
 
 Keyboard routing: canvas-side keydowns never reach the editor window, so
@@ -741,3 +743,67 @@ match what will resolve at runtime:
     (`rehugStretchedGroups`) so a page box change caused by an edit can never
     leave a group larger than its members — never re-hug on a pure viewport
     resize (no store mutation), which must stay CSS-only.
+11. **The capability manifest is the source of truth for what a book can
+    contain.** A new control kind, property or script API member must be added
+    to `CONTROL_PROPS`/`SCRIPT_API` in `@toolback/format` and
+    `CAPABILITY_VERSION` bumped, so the AI prompt, validation and drift tests
+    stay correct (see §11).
+
+## 11. AI authoring (`apps/editor/src/{ai,aiPrompt,aiConfig,providers,aiIntent,aiDiff,mergeBook}.ts`)
+
+The AI panel turns a prompt into an ordinary `Book`; there is no second format
+and no server. Everything it produces goes through the same validation and store
+paths as a hand-built book.
+
+**Capability manifest (single source of truth).** `packages/format/src/index.ts`
+exports `CONTROL_PROPS` (per control kind: name, type, enum, default,
+`scriptable`, doc), `SCRIPT_API` (the runtime globals) and `CAPABILITY_VERSION`.
+`apps/editor/src/ai.ts` (`manifestText`/`styleGuide`) renders those into the
+system prompt, which `aiPrompt.ts` appends to `docs/llm-authoring.md` at its
+`<!-- CAPABILITY_MANIFEST -->` marker. `validateBook` flags props not in
+`CONTROL_PROPS`, and `capabilities.test.ts` asserts every `CONTROL_KINDS` entry
+is covered and every `DEFAULT_PROPS` key is declared. **Add a control, property
+or script API member → edit the manifest and bump `CAPABILITY_VERSION`** (see
+AGENTS.md).
+
+**Generation loop.** `generateBook(systemPrompt, request, settings, opts)`:
+
+1. `chatComplete` dispatches on `settings.api` — OpenAI-compatible
+   `/chat/completions` (the default) or Anthropic `/messages` (with the
+   `anthropic-dangerous-direct-browser-access` opt-in header).
+2. Parse the reply (`extractJson` tolerates markdown fences).
+3. `normalizeBook` fills gaps only — ids/names, geometry from `DEFAULT_SIZES`,
+   `DEFAULT_PROPS` — returning notes and never overriding an explicit value.
+4. `validateBook` = zod `safeParseBook` + semantic lints (unique/valid names,
+   `controls.<x>` / `page.go` / `popupOpen` targets, `{{key}}` seeds, unknown
+   props as warnings, deprecated shapes).
+5. `smokeBook` runs the parsed book off-screen in the canvas
+   (`toolback:smoke`) and returns any script errors.
+6. Failures are fed back for a bounded number of repair turns; `notes` and
+   issues surface in the panel log.
+
+**Load modes** — `loadGeneratedBook(raw, mode, { keepExisting })`, each one undo
+step:
+
+- `append` — `mergeGeneratedBook`: incoming backgrounds/pages are re-idded and
+  page names de-duplicated (references rewritten).
+- `modify` — `applyModifiedPage`: replaces the current page's objects/script,
+  keeping its id, name and background; names colliding with the background are
+  renamed. With `keepExisting` (strict add-only) the existing objects are kept
+  verbatim and only new names are added, so an "add a button" request can never
+  recolour what is already there. `aiIntent.ts` derives the mode + flag from the
+  prompt text.
+- `replace` — swap the whole book.
+
+**Provider layer.** `providers.ts` holds the presets (base URL, API shape,
+keyless, curated models); `aiConfig.ts` persists per-provider keys/models and
+global style tokens, migrating the legacy single-provider shape; `fetchModels`
+reads `GET {base}/models` and filters to chat models using modality metadata
+(Groq `output_modalities`, OpenRouter `architecture.modality`) with id
+heuristics as fallback.
+
+**Compare & history.** After applying, the panel can show the pre-change book:
+the store's `compareBook` makes `sync()` send that snapshot instead of the live
+book, and `canvasClient` exits compare before any mutating canvas message. The
+capped `history` messages are sent to the model on follow-ups, while `turns` is
+the visible prompt list (click to restore a prompt).

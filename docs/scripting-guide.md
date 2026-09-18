@@ -13,6 +13,11 @@ dispatch chain, the editor↔canvas protocol — see
 > ("Type annotations can only be used in TypeScript files") before you hit Run.
 > The on-disk link file is also `.js`, so VS Code treats it the same way.
 
+> **AI-authored books are ordinary books.** The editor's **AI** panel generates a
+> regular `.toolbook.json`; scripts it writes use exactly the API in this guide,
+> and everything it creates is editable like anything else. The spec the model is
+> given is [`llm-authoring.md`](./llm-authoring.md).
+
 ## Where scripts live
 
 There are two places a script can live:

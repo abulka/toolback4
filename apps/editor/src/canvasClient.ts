@@ -1,8 +1,33 @@
 import type { CanvasToEditorMessage, EditorToCanvasMessage } from '@toolback/runtime'
+import type { Book } from '@toolback/format'
 import { executeAuthorOp } from './authorBridge'
 import { setDirectSender, setSyncSender, useBookStore } from './stores/book'
 
 let wired = false
+
+let smokeSend: ((msg: EditorToCanvasMessage) => void) | null = null
+let smokeSeq = 0
+const smokePending = new Map<number, (errors: string[]) => void>()
+
+/**
+ * Ask the canvas to run `book` off-screen and report script errors. Resolves
+ * with the errors (empty = clean); resolves empty if the canvas isn't ready.
+ */
+export function smokeBook(book: Book): Promise<string[]> {
+  if (!smokeSend) return Promise.resolve([])
+  const id = ++smokeSeq
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      smokePending.delete(id)
+      resolve([])
+    }, 2500)
+    smokePending.set(id, (errors) => {
+      clearTimeout(timer)
+      resolve(errors)
+    })
+    smokeSend!({ type: 'toolback:smoke', id, book: JSON.parse(JSON.stringify(book)) })
+  })
+}
 
 export function wireCanvas(iframe: HTMLIFrameElement): void {
   if (wired) return
@@ -17,23 +42,31 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
     store.setPageRect({ x: r.left, y: r.top, w: r.width, h: r.height })
   }
 
-  const sendLoad = (): void => {
-    const msg: EditorToCanvasMessage = {
-      type: 'toolback:load',
-      book: JSON.parse(JSON.stringify(store.book)),
-      pageIndex: store.currentPageIndex,
-      view:
-        store.editing.kind === 'background'
-          ? { kind: 'background', id: store.editing.id }
-          : { kind: 'page', index: store.currentPageIndex },
-      design: !store.isRunning,
-      selection: [...store.selectionIds],
-      fitHints: { ...store.fitHints },
-    }
-    iframe.contentWindow?.postMessage(msg, '*')
+  /**
+   * Post a load to the canvas. `sync()` builds the message each time (so it can
+   * send the AI Before/After snapshot instead of the live book); when called
+   * with no message (on the ready handshake) it builds the current load.
+   */
+  const sendLoad = (msg?: EditorToCanvasMessage): void => {
+    const out: EditorToCanvasMessage =
+      msg ??
+      {
+        type: 'toolback:load',
+        book: JSON.parse(JSON.stringify(store.book)),
+        pageIndex: store.currentPageIndex,
+        view:
+          store.editing.kind === 'background'
+            ? { kind: 'background', id: store.editing.id }
+            : { kind: 'page', index: store.currentPageIndex },
+        design: !store.isRunning,
+        selection: [...store.selectionIds],
+        fitHints: { ...store.fitHints },
+      }
+    iframe.contentWindow?.postMessage(out, '*')
   }
   setSyncSender(sendLoad)
   setDirectSender((msg) => iframe.contentWindow?.postMessage(msg, '*'))
+  smokeSend = (msg) => iframe.contentWindow?.postMessage(msg, '*')
 
   // Dev-only stale-canvas guard (AGENTS.md "Stale canvas bundle"): a hot-reloaded
   // editor can sit next to a canvas iframe still running an old runtime, which
@@ -53,6 +86,22 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
   window.addEventListener('message', (e: MessageEvent) => {
     const msg = e.data as CanvasToEditorMessage | undefined
     if (!msg?.type?.startsWith('toolback:')) return
+
+    // While the AI Before/After compare shows a snapshot, any canvas-driven
+    // edit exits compare first so it can't mutate the real book against the
+    // wrong render.
+    const MUTATING = new Set([
+      'toolback:selection',
+      'toolback:commit',
+      'toolback:deleteSelection',
+      'toolback:reorder',
+      'toolback:duplicate',
+      'toolback:group',
+      'toolback:ungroup',
+      'toolback:cut',
+      'toolback:paste',
+    ])
+    if (store.compareBook && MUTATING.has(msg.type)) store.setCompare(null)
 
     switch (msg.type) {
       case 'toolback:ready':
@@ -88,6 +137,14 @@ export function wireCanvas(iframe: HTMLIFrameElement): void {
       case 'toolback:popups':
         store.popupsOpen = msg.open
         break
+      case 'toolback:smokeResult': {
+        const resolve = smokePending.get(msg.id)
+        if (resolve) {
+          smokePending.delete(msg.id)
+          resolve(msg.errors)
+        }
+        break
+      }
       case 'toolback:authorCall': {
         try {
           const result = executeAuthorOp(store, msg.op, msg.args)

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createBook, createObject, type Book, type XEdge, type YEdge } from '@toolback/format'
 import { sampleBook } from '@toolback/format/src/sample'
-import { getObjectRects, isCopyKey, isCutKey, isGroupKey, isPasteKey, listenForEditor, renderBook, renderBookPage, renderObjectInto, shouldToggleRun } from './index'
+import { getObjectRects, isCopyKey, isCutKey, isGroupKey, isPasteKey, listenForEditor, renderBook, renderBookPage, renderObjectInto, shouldToggleRun, stopRun } from './index'
 
 const BG = { id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', objects: [] }
 
@@ -510,5 +510,31 @@ describe('runtime', () => {
       expect(isCopyKey(notInput)).toBe(true)
       input.remove()
     })
+  })
+})
+
+describe('smoke run', () => {
+  it('reports script errors from a generated book', async () => {
+    const sent: Array<{ type: string; id?: number; errors?: string[] }> = []
+    const send = (msg: { type: string }) => sent.push(msg as { type: string })
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const cleanup = listenForEditor(root, send)
+    try {
+      stopRun()
+      const book = createBook('Smoke')
+      book.pages[0]!.script = "function pageEnter() { throw new Error('boom from smoke') }"
+      window.dispatchEvent(
+        new MessageEvent('message', { data: { type: 'toolback:smoke', id: 7, book } }),
+      )
+      await new Promise((r) => setTimeout(r, 600))
+      const result = sent.find((m) => m.type === 'toolback:smokeResult')
+      expect(result).toBeDefined()
+      expect(result?.id).toBe(7)
+      expect(result?.errors?.join(' ')).toContain('boom from smoke')
+    } finally {
+      cleanup()
+      root.remove()
+    }
   })
 })

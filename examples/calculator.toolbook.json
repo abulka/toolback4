@@ -1,0 +1,184 @@
+{
+  "id": "book_calculator",
+  "title": "Calculator",
+  "backgrounds": [
+    {
+      "id": "bg_calc",
+      "name": "Calculator",
+      "color": "#0f172a",
+      "script": "",
+      "objects": []
+    }
+  ],
+  "pages": [
+    {
+      "id": "page_calc",
+      "name": "Calculator",
+      "script": "function pageEnter() {\n  store.set('display', '0')\n  store.set('acc', null)\n  store.set('op', null)\n  store.set('fresh', true)\n}\n\nfunction digit(d) {\n  const cur = String(store.get('display'))\n  let next\n  if (store.get('fresh') || cur === '0') next = String(d)\n  else next = cur + d\n  store.set('display', next)\n  store.set('fresh', false)\n}\n\nfunction compute() {\n  const acc = store.get('acc')\n  const op = store.get('op')\n  const cur = Number(store.get('display'))\n  if (op === null || acc === null) {\n    store.set('acc', cur)\n    return\n  }\n  let result = acc\n  if (op === '+') result = acc + cur\n  else if (op === '-') result = acc - cur\n  else if (op === '*') result = acc * cur\n  else if (op === '/') result = cur === 0 ? 0 : acc / cur\n  store.set('acc', result)\n  store.set('display', String(Math.round(result * 1e10) / 1e10))\n}\n\nfunction chooseOp(o) {\n  compute()\n  store.set('op', o)\n  store.set('fresh', true)\n}\n\nfunction equals() {\n  compute()\n  store.set('op', null)\n  store.set('acc', null)\n  store.set('fresh', true)\n}\n\nfunction clearAll() {\n  store.set('display', '0')\n  store.set('acc', null)\n  store.set('op', null)\n  store.set('fresh', true)\n}\n",
+      "backgroundId": "bg_calc",
+      "objects": [
+        {
+          "id": "obj_calc_display",
+          "name": "display",
+          "control": "label",
+          "x": { "mode": "left", "left": 40, "width": 310 },
+          "y": { "mode": "top", "top": 30, "height": 60 },
+          "props": {
+            "text": "{{display}}",
+            "fontSize": 28,
+            "textAlign": "right",
+            "textColor": "#f8fafc",
+            "background": "#1e293b"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_calc_c",
+          "name": "btnClear",
+          "control": "button",
+          "x": { "mode": "left", "left": 40, "width": 70 },
+          "y": { "mode": "top", "top": 110, "height": 50 },
+          "props": { "text": "C", "fontSize": 18 },
+          "on": { "click": "clearAll()" }
+        },
+        {
+          "id": "obj_calc_div",
+          "name": "btnDiv",
+          "control": "button",
+          "x": { "mode": "left", "left": 120, "width": 70 },
+          "y": { "mode": "top", "top": 110, "height": 50 },
+          "props": { "text": "÷", "fontSize": 18 },
+          "on": { "click": "chooseOp('/')" }
+        },
+        {
+          "id": "obj_calc_mul",
+          "name": "btnMul",
+          "control": "button",
+          "x": { "mode": "left", "left": 200, "width": 70 },
+          "y": { "mode": "top", "top": 110, "height": 50 },
+          "props": { "text": "×", "fontSize": 18 },
+          "on": { "click": "chooseOp('*')" }
+        },
+        {
+          "id": "obj_calc_sub",
+          "name": "btnSub",
+          "control": "button",
+          "x": { "mode": "left", "left": 280, "width": 70 },
+          "y": { "mode": "top", "top": 110, "height": 50 },
+          "props": { "text": "−", "fontSize": 18 },
+          "on": { "click": "chooseOp('-')" }
+        },
+        {
+          "id": "obj_calc_7",
+          "name": "btn7",
+          "control": "button",
+          "x": { "mode": "left", "left": 40, "width": 70 },
+          "y": { "mode": "top", "top": 170, "height": 50 },
+          "props": { "text": "7", "fontSize": 18 },
+          "on": { "click": "digit(7)" }
+        },
+        {
+          "id": "obj_calc_8",
+          "name": "btn8",
+          "control": "button",
+          "x": { "mode": "left", "left": 120, "width": 70 },
+          "y": { "mode": "top", "top": 170, "height": 50 },
+          "props": { "text": "8", "fontSize": 18 },
+          "on": { "click": "digit(8)" }
+        },
+        {
+          "id": "obj_calc_9",
+          "name": "btn9",
+          "control": "button",
+          "x": { "mode": "left", "left": 200, "width": 70 },
+          "y": { "mode": "top", "top": 170, "height": 50 },
+          "props": { "text": "9", "fontSize": 18 },
+          "on": { "click": "digit(9)" }
+        },
+        {
+          "id": "obj_calc_add",
+          "name": "btnAdd",
+          "control": "button",
+          "x": { "mode": "left", "left": 280, "width": 70 },
+          "y": { "mode": "top", "top": 170, "height": 50 },
+          "props": { "text": "+", "fontSize": 18 },
+          "on": { "click": "chooseOp('+')" }
+        },
+        {
+          "id": "obj_calc_4",
+          "name": "btn4",
+          "control": "button",
+          "x": { "mode": "left", "left": 40, "width": 70 },
+          "y": { "mode": "top", "top": 230, "height": 50 },
+          "props": { "text": "4", "fontSize": 18 },
+          "on": { "click": "digit(4)" }
+        },
+        {
+          "id": "obj_calc_5",
+          "name": "btn5",
+          "control": "button",
+          "x": { "mode": "left", "left": 120, "width": 70 },
+          "y": { "mode": "top", "top": 230, "height": 50 },
+          "props": { "text": "5", "fontSize": 18 },
+          "on": { "click": "digit(5)" }
+        },
+        {
+          "id": "obj_calc_6",
+          "name": "btn6",
+          "control": "button",
+          "x": { "mode": "left", "left": 200, "width": 70 },
+          "y": { "mode": "top", "top": 230, "height": 50 },
+          "props": { "text": "6", "fontSize": 18 },
+          "on": { "click": "digit(6)" }
+        },
+        {
+          "id": "obj_calc_1",
+          "name": "btn1",
+          "control": "button",
+          "x": { "mode": "left", "left": 40, "width": 70 },
+          "y": { "mode": "top", "top": 290, "height": 50 },
+          "props": { "text": "1", "fontSize": 18 },
+          "on": { "click": "digit(1)" }
+        },
+        {
+          "id": "obj_calc_2",
+          "name": "btn2",
+          "control": "button",
+          "x": { "mode": "left", "left": 120, "width": 70 },
+          "y": { "mode": "top", "top": 290, "height": 50 },
+          "props": { "text": "2", "fontSize": 18 },
+          "on": { "click": "digit(2)" }
+        },
+        {
+          "id": "obj_calc_3",
+          "name": "btn3",
+          "control": "button",
+          "x": { "mode": "left", "left": 200, "width": 70 },
+          "y": { "mode": "top", "top": 290, "height": 50 },
+          "props": { "text": "3", "fontSize": 18 },
+          "on": { "click": "digit(3)" }
+        },
+        {
+          "id": "obj_calc_eq",
+          "name": "btnEquals",
+          "control": "button",
+          "x": { "mode": "left", "left": 280, "width": 70 },
+          "y": { "mode": "top", "top": 290, "height": 50 },
+          "props": { "text": "=", "fontSize": 18, "color": "gold" },
+          "on": { "click": "equals()" }
+        },
+        {
+          "id": "obj_calc_0",
+          "name": "btn0",
+          "control": "button",
+          "x": { "mode": "left", "left": 40, "width": 70 },
+          "y": { "mode": "top", "top": 350, "height": 50 },
+          "props": { "text": "0", "fontSize": 18 },
+          "on": { "click": "digit(0)" }
+        }
+      ]
+    }
+  ],
+  "startPageId": "page_calc",
+  "store": []
+}

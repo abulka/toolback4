@@ -44,6 +44,7 @@ import {
 import { sampleBook } from '@toolback/format/src/sample'
 import type { EditorToCanvasMessage, HandleDir, ObjectRects } from '@toolback/runtime'
 import { clipboardToJson, copyText } from '../copyJson'
+import { applyModifiedPage, mergeGeneratedBook } from '../mergeBook'
 import {
   getRecentBook,
   getRecents,
@@ -67,6 +68,17 @@ export function setDirectSender(fn: (msg: EditorToCanvasMessage) => void): void 
   sendDirect = fn
 }
 
+export interface LoadGeneratedResult {
+  ok: boolean
+  error?: string
+  pagesAdded?: number
+  backgroundsAdded?: number
+  renamedPages?: string[]
+  renamedObjects?: string[]
+  keptObjects?: number
+  addedObjects?: number
+}
+
 export const useBookStore = defineStore('book', () => {
   const book = ref(sampleBook())
   /** the measured canvas viewport; fluid pages fill it and grow past it */
@@ -85,6 +97,12 @@ export const useBookStore = defineStore('book', () => {
   const currentPageIndex = ref(0)
   /** what the canvas is editing: a page, or a background's own objects */
   const editing = ref<{ kind: 'page' } | { kind: 'background'; id: string }>({ kind: 'page' })
+  /**
+   * When set, the canvas renders this book instead of `book.value` — a
+   * view-only "before" snapshot for the AI Before/After compare. Any real edit
+   * or undo clears it.
+   */
+  const compareBook = ref<Book | null>(null)
   const backgroundDialogId = ref<string | null>(null)
   /** author-mode plugin: null, or the running plugin page's name */
   const authorActive = ref<null | string>(null)
@@ -255,6 +273,7 @@ export const useBookStore = defineStore('book', () => {
 
   function record(label: string, coalesceKey?: string): void {
     if (isRunning.value) return
+    compareBook.value = null
     const at = Date.now()
     const last = undoStack.value[undoStack.value.length - 1]
     // merge continuous edits (typing in Monaco / a prop field) into one step
@@ -272,6 +291,7 @@ export const useBookStore = defineStore('book', () => {
   }
 
   function restoreSnapshot(snapshot: HistorySnapshot): void {
+    compareBook.value = null
     book.value = snapshot.book
     currentPageIndex.value = Math.max(
       0,
@@ -320,16 +340,23 @@ export const useBookStore = defineStore('book', () => {
     // re-renders
     rehugStretchedGroups()
     if (!sendSync) return
+    const comparing = compareBook.value
+    const source = comparing ?? book.value
+    const pageIndex = Math.max(
+      0,
+      Math.min(currentPageIndex.value, source.pages.length - 1),
+    )
     sendSync({
       type: 'toolback:load',
-      book: JSON.parse(JSON.stringify(book.value)),
-      pageIndex: currentPageIndex.value,
-      view:
-        editing.value.kind === 'background'
+      book: JSON.parse(JSON.stringify(source)),
+      pageIndex,
+      view: comparing
+        ? { kind: 'page', index: pageIndex }
+        : editing.value.kind === 'background'
           ? { kind: 'background', id: editing.value.id }
           : { kind: 'page', index: currentPageIndex.value },
       design: !isRunning.value,
-      selection: selectionIds.value,
+      selection: comparing ? [] : [...selectionIds.value],
       fitHints: { ...fitHints.value },
     })
     clearTimeout(autosaveTimer)
@@ -341,13 +368,18 @@ export const useBookStore = defineStore('book', () => {
     }, 800)
   }
 
+  /** Show `book` in the canvas view-only (AI Before/After); null restores. */
+  function setCompare(book: Book | null): void {
+    compareBook.value = book ? (JSON.parse(JSON.stringify(book)) as Book) : null
+    sync()
+  }
+
   function uniquePageName(): string {
     const existing = new Set(book.value.pages.map((p) => p.name))
     let n = book.value.pages.length + 1
     while (existing.has(`Page ${n}`)) n++
     return `Page ${n}`
   }
-
   interface Located {
     obj: PageObject
     siblings: PageObject[]
@@ -702,6 +734,79 @@ export const useBookStore = defineStore('book', () => {
     currentPageIndex.value = resolveStartPageIndex(book.value)
     sync()
     return true
+  }
+
+  /**
+   * Load an AI-generated book: `replace` swaps the whole project, `append` adds
+   * the generated backgrounds + pages, and `modify` replaces just the current
+   * page's content (keeping its name and background). Each is one undo step.
+   */
+  function loadGeneratedBook(
+    raw: unknown,
+    mode: 'replace' | 'append' | 'modify',
+    options: { keepExisting?: boolean } = {},
+  ): LoadGeneratedResult {
+    let incoming: Book
+    try {
+      incoming = parseBook(JSON.parse(JSON.stringify(raw)))
+    } catch (err) {
+      return { ok: false, error: `Invalid book: ${String(err)}` }
+    }
+    if (mode === 'replace') {
+      record('Replace project (AI)')
+      book.value = incoming
+      viewport.value = { width: 1280, height: 800 }
+      selectionIds.value = []
+      editing.value = { kind: 'page' }
+      isRunning.value = false
+      popupsOpen.value = []
+      savedAt.value = null
+      currentPageIndex.value = resolveStartPageIndex(book.value)
+      sync()
+      return {
+        ok: true,
+        pagesAdded: incoming.pages.length,
+        backgroundsAdded: incoming.backgrounds.length,
+        renamedPages: [],
+      }
+    }
+    if (mode === 'modify') {
+      const current = book.value.pages[currentPageIndex.value]
+      if (!current) return { ok: false, error: 'No current page to modify' }
+      const generated =
+        incoming.pages.find((p) => p.name === current.name) ?? incoming.pages[0]
+      if (!generated) return { ok: false, error: 'The generated book has no pages' }
+      const reserved = flattenObjects(backgroundFor(book.value, current).objects).map(
+        (o) => o.name,
+      )
+      record('Modify page (AI)')
+      const { renamedObjects, keptObjects, addedObjects } = applyModifiedPage(
+        current,
+        generated,
+        reserved,
+        options,
+      )
+      selectionIds.value = []
+      sync()
+      return {
+        ok: true,
+        pagesAdded: 1,
+        backgroundsAdded: 0,
+        renamedPages: [],
+        renamedObjects,
+        keptObjects,
+        addedObjects,
+      }
+    }
+    const firstNewPage = book.value.pages.length
+    const { book: merged, report } = mergeGeneratedBook(book.value, incoming)
+    record('Add AI pages')
+    book.value = merged
+    currentPageIndex.value = Math.min(firstNewPage, merged.pages.length - 1)
+    editing.value = { kind: 'page' }
+    selectionIds.value = []
+    sync()
+    return { ok: true, ...report }
   }
 
   async function restoreAutosave(): Promise<boolean> {
@@ -1543,6 +1648,8 @@ export const useBookStore = defineStore('book', () => {
 
   return {
     book,
+    compareBook,
+    setCompare,
     viewport,
     pageRect,
     selectionIds,
@@ -1616,6 +1723,7 @@ export const useBookStore = defineStore('book', () => {
     movePageToBackground,
     newBook,
     hydrate,
+    loadGeneratedBook,
     restoreAutosave,
     refreshRecents,
     rememberCurrent,

@@ -74,6 +74,12 @@ toggle) — but the words you type are JavaScript.
 - **Author-mode plugins** — a page flagged *Plugin page* can run as a floating
   tool *while you author*, driving the editor through a small `author`
   bridge. Everything a plugin does is ordinary undoable book history.
+- **Build with AI** — describe an app in plain words and a model writes a
+  toolback book: it's validated and smoke-run for script errors, then added as
+  pages, used to extend the current page (existing objects kept intact), or
+  swapped in for the project. Bring your own key — DeepSeek, OpenAI, Anthropic,
+  Groq, OpenRouter, Gemini, Mistral, Together, xAI, OpenCode Zen/Go, or local
+  Ollama / LM Studio. See [llm-authoring.md](docs/llm-authoring.md).
 - **npm libraries in books** — `await import('@tonejs/midi')` just works
   (esm.sh at runtime, or pre-bundled onto a local "library shelf" for fully
   offline publishes). The kitchen-sink example builds a two-note MIDI in-browser.
@@ -121,7 +127,7 @@ packages/
   libs/           @toolback/libs        — the "library shelf" for npm-in-books
 examples/         ready-made .toolbook.json books + a test that runs every page
 docs/             scripting-guide.md (author-facing), runtime-internals.md,
-                  screenshots/
+                  llm-authoring.md (AI authoring spec), screenshots/
 plans/            internal design notes & the milestone/progress log
 ```
 
@@ -176,7 +182,8 @@ server of any kind.
 
 M0–M6c (core authoring, scripting, pages/popups/backgrounds, groups, store,
 npm-in-books, author plugins) are complete, along with copy/paste, responsive
-edge constraints (follows left/right/both/centred) and npm library support. The
-full plan, architecture and milestone log live in
-[plans/PLAN.md](plans/PLAN.md); the architecture reference is
-[docs/runtime-internals.md](docs/runtime-internals.md).
+edge constraints (follows left/right/both/centred), npm library support, and
+**AI authoring** (generate / extend / edit / replace a book from a prompt, with
+validation, a runtime smoke-run and repair). The full plan, architecture and
+milestone log live in [plans/PLAN.md](plans/PLAN.md); the architecture reference
+is [docs/runtime-internals.md](docs/runtime-internals.md).

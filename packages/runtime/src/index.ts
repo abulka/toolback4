@@ -9,6 +9,7 @@ export type { HandleDir, DesignController } from './design'
 export {
   runBook,
   stopRun,
+  isRunActive,
   createStore,
   extractFunctionNames,
   shortNamesFor,

@@ -14,6 +14,7 @@ import HelpButton from './components/HelpButton.vue'
 import ImportHelper from './components/ImportHelper.vue'
 import PagesPanel from './components/PagesPanel.vue'
 import StoreBrowser from './components/StoreBrowser.vue'
+import AiPanel from './components/AiPanel.vue'
 import BackgroundDialog from './components/BackgroundDialog.vue'
 import OpenDialog from './components/OpenDialog.vue'
 
@@ -28,12 +29,13 @@ function bumpLayout(): void {
 }
 
 // --- RHS panel tabs (Objects and Store live in their own tabs)
-type PropsTab = 'page' | 'selection' | 'objects' | 'store'
+type PropsTab = 'page' | 'selection' | 'objects' | 'store' | 'ai'
 const TABS: Array<{ id: PropsTab; label: string }> = [
   { id: 'page', label: 'Page' },
   { id: 'selection', label: 'Selection' },
   { id: 'objects', label: 'Objects' },
   { id: 'store', label: 'Store' },
+  { id: 'ai', label: 'AI' },
 ]
 const propsTab = ref<PropsTab>(
   (localStorage.getItem('toolback.propsTab') as PropsTab | null) ?? 'page',
@@ -1123,6 +1125,10 @@ function startPaletteSplitDrag(e: PointerEvent): void {
 
       <div v-show="propsTab === 'store'">
         <StoreBrowser />
+      </div>
+
+      <div v-show="propsTab === 'ai'">
+        <AiPanel />
       </div>
     </aside>
 

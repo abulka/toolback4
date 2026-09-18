@@ -547,6 +547,250 @@ export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
 }
 
 /**
+ * The machine-readable capability manifest. Single source of truth for what a
+ * control kind can carry and what the runtime script API offers — consumed by
+ * the AI prompt/schema builders and (later) the IntelliSense lib and the
+ * properties panel, so adding a control or prop reaches all of them at once
+ * instead of via hand-copied docs that drift.
+ */
+export interface PropSpec {
+  name: string
+  type: 'string' | 'number' | 'boolean' | 'color' | 'enum' | 'url' | 'markdown' | 'html'
+  enum?: readonly string[]
+  default?: unknown
+  /** writable from a runtime script (`controls.x.<name> = …`) */
+  scriptable?: boolean
+  doc: string
+}
+
+const P_TEXT: PropSpec = {
+  name: 'text',
+  type: 'string',
+  scriptable: true,
+  doc: 'Button/label text, an input value, a switch label, or a markdown viewer source',
+}
+const P_HTML: PropSpec = {
+  name: 'html',
+  type: 'html',
+  scriptable: true,
+  doc: 'Raw HTML source of an html viewer',
+}
+const P_PLACEHOLDER: PropSpec = {
+  name: 'placeholder',
+  type: 'string',
+  doc: 'Grey hint text shown in an empty input',
+}
+const P_TITLE: PropSpec = { name: 'title', type: 'string', doc: 'Heading at the top of a card' }
+const P_SRC: PropSpec = { name: 'src', type: 'url', doc: 'Image URL' }
+const P_ALT: PropSpec = { name: 'alt', type: 'string', doc: 'Alternative text for an image' }
+const P_CHECKED: PropSpec = {
+  name: 'checked',
+  type: 'boolean',
+  default: false,
+  scriptable: true,
+  doc: "A switch's on/off state (script: the switch's .value)",
+}
+const P_FONT_SIZE: PropSpec = {
+  name: 'fontSize',
+  type: 'number',
+  doc: 'Text size in pixels; set in the Selection panel, not from scripts',
+}
+const P_BOLD: PropSpec = { name: 'bold', type: 'boolean', scriptable: true, doc: 'Bold text' }
+const P_ITALIC: PropSpec = { name: 'italic', type: 'boolean', scriptable: true, doc: 'Italic text' }
+const P_FONT_FAMILY: PropSpec = {
+  name: 'fontFamily',
+  type: 'enum',
+  enum: FONT_FAMILIES,
+  scriptable: true,
+  doc: 'Simplified web-safe font family',
+}
+const P_TEXT_ALIGN: PropSpec = {
+  name: 'textAlign',
+  type: 'enum',
+  enum: TEXT_ALIGNS,
+  scriptable: true,
+  doc: 'Horizontal text alignment',
+}
+const P_V_ALIGN: PropSpec = {
+  name: 'vAlign',
+  type: 'enum',
+  enum: VERTICAL_ALIGNS,
+  scriptable: true,
+  doc: 'Vertical text alignment (labels and buttons)',
+}
+const P_TEXT_COLOR: PropSpec = {
+  name: 'textColor',
+  type: 'color',
+  scriptable: true,
+  doc: 'Explicit text colour; wins over `color` on text controls',
+}
+const P_BACKGROUND: PropSpec = {
+  name: 'background',
+  type: 'color',
+  scriptable: true,
+  doc: 'Explicit fill colour; wins over `color` on surfaces and adds a background to text controls',
+}
+const P_COLOR: PropSpec = {
+  name: 'color',
+  type: 'color',
+  scriptable: true,
+  doc: 'Object colour: surface fill for buttons/cards/containers, text/toggle for labels and switches',
+}
+const P_TRACK_COLOR: PropSpec = {
+  name: 'trackColor',
+  type: 'color',
+  scriptable: true,
+  doc: "A switch's toggle-track colour",
+}
+const P_BORDER_WIDTH: PropSpec = {
+  name: 'borderWidth',
+  type: 'number',
+  scriptable: true,
+  doc: 'Border thickness in px (0 = none)',
+}
+const P_BORDER_STYLE: PropSpec = {
+  name: 'borderStyle',
+  type: 'enum',
+  enum: BORDER_STYLES,
+  scriptable: true,
+  doc: 'Border line style',
+}
+const P_BORDER_COLOR: PropSpec = {
+  name: 'borderColor',
+  type: 'color',
+  scriptable: true,
+  doc: 'Border colour',
+}
+const P_RADIUS: PropSpec = {
+  name: 'radius',
+  type: 'number',
+  scriptable: true,
+  doc: 'Corner radius in px',
+}
+const P_OPACITY: PropSpec = {
+  name: 'opacity',
+  type: 'number',
+  scriptable: true,
+  doc: 'Opacity, 0–1 (1 = solid)',
+}
+
+const TEXT_STYLE_PROPS: PropSpec[] = [
+  P_FONT_SIZE,
+  P_BOLD,
+  P_ITALIC,
+  P_FONT_FAMILY,
+  P_TEXT_ALIGN,
+  P_TEXT_COLOR,
+  P_BACKGROUND,
+]
+
+/** border/radius/opacity — every `BOX_KINDS` member accepts these */
+const BOX_PROPS: PropSpec[] = [
+  P_BORDER_WIDTH,
+  P_BORDER_STYLE,
+  P_BORDER_COLOR,
+  P_RADIUS,
+  P_OPACITY,
+]
+
+export const CONTROL_PROPS: Record<ControlKind, PropSpec[]> = {
+  button: [P_TEXT, ...TEXT_STYLE_PROPS, P_V_ALIGN, P_COLOR, ...BOX_PROPS],
+  label: [P_TEXT, ...TEXT_STYLE_PROPS, P_V_ALIGN, P_COLOR, ...BOX_PROPS],
+  input: [P_PLACEHOLDER, ...TEXT_STYLE_PROPS, ...BOX_PROPS],
+  image: [P_SRC, P_ALT, ...BOX_PROPS],
+  card: [P_TITLE, P_TEXT, ...TEXT_STYLE_PROPS, P_COLOR, ...BOX_PROPS],
+  container: [P_COLOR, P_BACKGROUND, ...BOX_PROPS],
+  switch: [P_TEXT, P_CHECKED, P_FONT_SIZE, P_BOLD, P_ITALIC, P_FONT_FAMILY, P_COLOR, P_TRACK_COLOR],
+  group: [],
+  markdown: [P_TEXT, ...TEXT_STYLE_PROPS, ...BOX_PROPS],
+  html: [P_HTML, ...TEXT_STYLE_PROPS, ...BOX_PROPS],
+}
+
+export interface ScriptApiMember {
+  name: string
+  detail: string
+}
+export interface ScriptApiNamespace {
+  name: string
+  detail: string
+  members: ScriptApiMember[]
+}
+
+/** What every script can call, with no imports — the AI prompt's API section. */
+export const SCRIPT_API: ScriptApiNamespace[] = [
+  {
+    name: 'store',
+    detail: 'Shared key/value state for the whole run',
+    members: [
+      { name: 'store.get(key)', detail: 'read a value (undefined if never set)' },
+      { name: 'store.set(key, value)', detail: 'write a value and refresh {{key}} labels' },
+    ],
+  },
+  {
+    name: 'controls',
+    detail: 'Every object by name; object names are also bare identifiers in a script',
+    members: [
+      { name: '<name>.text', detail: 'text content (an input value, switch label, markdown source)' },
+      { name: '<name>.value', detail: "an input's value; a switch's checked state" },
+      { name: '<name>.visible', detail: 'show/hide the object' },
+      { name: '<name>.enabled', detail: 'enable/disable buttons and inputs' },
+      { name: '<name>.x / .y / .width / .height', detail: 'position and size in pixels' },
+      { name: '<name>.color', detail: "colour name or any CSS colour; '' resets" },
+      { name: '<name>.fontFamily / .bold / .italic / .textAlign / .vAlign / .textColor / .background', detail: 'text style' },
+      { name: '<name>.trackColor', detail: "a switch's toggle-track colour" },
+      { name: '<name>.borderWidth / .borderStyle / .borderColor / .radius / .opacity', detail: 'box style (border, corner radius, opacity)' },
+      { name: '<name>.on(event, fn)', detail: 'attach an extra handler in code' },
+      { name: '<name>.el', detail: 'the raw DOM element' },
+    ],
+  },
+  {
+    name: 'page',
+    detail: 'Navigation and dialogs',
+    members: [
+      { name: 'page.name', detail: 'current page name' },
+      { name: 'page.names', detail: 'every page name' },
+      { name: "page.go('Name')", detail: "navigate; fires pageLeave then the target's pageEnter" },
+      { name: "page.popupOpen('Name', opts?)", detail: 'open a page as a popup ({ modal, chrome, x, y })' },
+      { name: 'page.popupClose(name?) / page.popupCloseAll()', detail: 'close popups' },
+      { name: 'page.popups', detail: 'open popup names, bottom → top' },
+    ],
+  },
+  {
+    name: 'event',
+    detail: 'The DOM event that fired (object event scripts)',
+    members: [{ name: 'event.target.value', detail: 'the element value (input/change scripts)' }],
+  },
+  {
+    name: 'target',
+    detail: 'The object that received the event (a full control API)',
+    members: [],
+  },
+  {
+    name: 'self',
+    detail: 'The object whose script is running (`this` is an alias)',
+    members: [],
+  },
+  {
+    name: 'forward',
+    detail: 'Pass the event to the enclosing group handler',
+    members: [],
+  },
+  {
+    name: 'author',
+    detail: 'Async editor bridge, available on plugin pages only',
+    members: [
+      { name: 'author.selected() / getSelection() / selectionJson()', detail: 'read the editor selection' },
+      { name: "author.insertControl(kind, { x, y, w, h, props })", detail: 'add an object, returns a handle' },
+      { name: "author.command('group'|'ungroup'|'delete'|'duplicate'|'front'|'back'|'forward'|'backward')", detail: 'editor commands' },
+      { name: 'author.updateProps(id, patch) / author.message(text) / author.pageInfo()', detail: 'patch props, status message, page info' },
+    ],
+  },
+]
+
+/** Bump when the manifest changes so a stale AI conversation is detectable. */
+export const CAPABILITY_VERSION = 2
+
+/**
  * Free, key-less image hosts behind the image control's "generate" button. All
  * work in a plain `<img src>` (no CORS, no auth) — which is all a page needs.
  * `picsum` returns *actual* photographs; `dummyimage` returns a solid-colour
@@ -624,6 +868,479 @@ export function safeParseBook(data: unknown) {
   return BookSchema.safeParse(
     migrateConstraints(migrateSizes(migrateObjects(migrateBackgrounds(data)))),
   )
+}
+
+export type IssueSeverity = 'error' | 'warning'
+export interface ValidationIssue {
+  path: string
+  message: string
+  severity: IssueSeverity
+}
+export interface ValidationResult {
+  ok: boolean
+  book?: Book
+  issues: ValidationIssue[]
+}
+
+const IDENT_RE = /^[A-Za-z_$][\w$]*$/
+const TEMPLATE_KEY_RE = /{{([A-Za-z_$][\w$]*)}}/g
+const GO_RE = /page\.go\(\s*['"]([^'"]+)['"]/g
+const POPUP_RE = /popupOpen\(\s*['"]([^'"]+)['"]/g
+const CONTROLS_RE = /controls\.([A-Za-z_$][\w$]*)/g
+const STORE_SET_RE = /store\.set\(\s*['"]([^'"]+)['"]/g
+const TS_ANNOTATION_RE = /:\s*(string|number|boolean)\b/
+
+function collectObjectPaths(
+  objects: PageObject[],
+  base: string,
+): Array<{ obj: PageObject; path: string }> {
+  const out: Array<{ obj: PageObject; path: string }> = []
+  const walk = (objs: PageObject[], p: string): void => {
+    objs.forEach((o, i) => {
+      const here = `${p}[${i}]`
+      out.push({ obj: o, path: here })
+      if (o.children?.length) walk(o.children, `${here}.children`)
+    })
+  }
+  walk(objects, base)
+  return out
+}
+
+function matchAll(re: RegExp, source: string): string[] {
+  const out: string[] = []
+  for (const m of source.matchAll(re)) if (m[1]) out.push(m[1])
+  return out
+}
+
+function allObjectPaths(book: Book): Array<{ obj: PageObject; path: string }> {
+  return [
+    ...book.backgrounds.flatMap((b, i) =>
+      collectObjectPaths(b.objects, `backgrounds[${i}].objects`),
+    ),
+    ...book.pages.flatMap((p, i) => collectObjectPaths(p.objects, `pages[${i}].objects`)),
+  ]
+}
+
+function legacyIssues(data: unknown): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  if (!data || typeof data !== 'object') return issues
+  const raw = data as Record<string, unknown>
+  if ('canvas' in raw) {
+    issues.push({
+      path: 'canvas',
+      message: 'deprecated `canvas` block — the current format has no per-breakpoint sizes',
+      severity: 'warning',
+    })
+  }
+  const scan = (objs: unknown, base: string): void => {
+    if (!Array.isArray(objs)) return
+    objs.forEach((o, i) => {
+      if (!o || typeof o !== 'object') return
+      const obj = o as Record<string, unknown>
+      for (const key of ['rects', 'fit'] as const) {
+        if (key in obj) {
+          issues.push({
+            path: `${base}[${i}].${key}`,
+            message: `deprecated \`${key}\` — use the canonical \`x\`/\`y\` edge constraints`,
+            severity: 'warning',
+          })
+        }
+      }
+      scan(obj['children'], `${base}[${i}].children`)
+    })
+  }
+  if (Array.isArray(raw['pages'])) {
+    ;(raw['pages'] as Array<Record<string, unknown>>).forEach((p, i) => {
+      if (!p || typeof p !== 'object') return
+      if ('background' in p) {
+        issues.push({
+          path: `pages[${i}].background`,
+          message: 'deprecated page `background` colour — backgrounds live in `book.backgrounds`',
+          severity: 'warning',
+        })
+      }
+      scan(p['objects'], `pages[${i}].objects`)
+    })
+  }
+  if (Array.isArray(raw['backgrounds'])) {
+    ;(raw['backgrounds'] as Array<Record<string, unknown>>).forEach((b, i) => {
+      if (b && typeof b === 'object') scan(b['objects'], `backgrounds[${i}].objects`)
+    })
+  }
+  return issues
+}
+
+function lintBook(book: Book): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+  const pageNames: string[] = []
+  const pageNameSet = new Set<string>()
+  for (const [i, page] of book.pages.entries()) {
+    if (pageNameSet.has(page.name)) {
+      issues.push({
+        path: `pages[${i}]`,
+        message: `duplicate page name "${page.name}" — page.go resolves pages by name`,
+        severity: 'error',
+      })
+    }
+    pageNameSet.add(page.name)
+    pageNames.push(page.name)
+  }
+
+  const allNames = new Set<string>()
+  const allIds = new Set<string>()
+  const addObjects = (paths: Array<{ obj: PageObject; path: string }>, container: string): void => {
+    const names = new Set<string>()
+    for (const { obj, path } of paths) {
+      if (allIds.has(obj.id)) {
+        issues.push({ path, message: `duplicate object id "${obj.id}"`, severity: 'error' })
+      }
+      allIds.add(obj.id)
+      allNames.add(obj.name)
+      if (!IDENT_RE.test(obj.name)) {
+        issues.push({
+          path,
+          message: `object name "${obj.name}" is not a valid JavaScript identifier`,
+          severity: 'error',
+        })
+      }
+      if (names.has(obj.name)) {
+        issues.push({
+          path,
+          message: `duplicate object name "${obj.name}" in ${container}`,
+          severity: 'error',
+        })
+      }
+      names.add(obj.name)
+      const allowed = new Set(CONTROL_PROPS[obj.control].map((p) => p.name))
+      for (const key of Object.keys(obj.props)) {
+        if (!allowed.has(key)) {
+          issues.push({
+            path: `${path}.props.${key}`,
+            message: `unknown property "${key}" on ${obj.control}`,
+            severity: 'warning',
+          })
+        }
+      }
+    }
+  }
+
+  book.backgrounds.forEach((bg, i) =>
+    addObjects(
+      collectObjectPaths(bg.objects, `backgrounds[${i}].objects`),
+      `background "${bg.name}"`,
+    ),
+  )
+  book.pages.forEach((page, i) => {
+    const paths = collectObjectPaths(page.objects, `pages[${i}].objects`)
+    addObjects(paths, `page "${page.name}"`)
+    const bg = backgroundFor(book, page)
+    const bgNames = new Set(flattenObjects(bg.objects).map((o) => o.name))
+    for (const o of flattenObjects(page.objects)) {
+      if (bgNames.has(o.name)) {
+        issues.push({
+          path: `pages[${i}]`,
+          message: `object name "${o.name}" collides with page background "${bg.name}" (one namespace per run)`,
+          severity: 'error',
+        })
+      }
+    }
+  })
+
+  const definedStoreKeys = new Set((book.store ?? []).map(([k]) => k))
+  const scripts: Array<{ path: string; source: string }> = []
+  book.backgrounds.forEach((bg, i) => {
+    scripts.push({ path: `backgrounds[${i}].script`, source: bg.script })
+    for (const { obj, path } of collectObjectPaths(bg.objects, `backgrounds[${i}].objects`)) {
+      for (const [ev, src] of Object.entries(obj.on)) scripts.push({ path: `${path}.on.${ev}`, source: src })
+    }
+  })
+  book.pages.forEach((page, i) => {
+    scripts.push({ path: `pages[${i}].script`, source: page.script })
+    for (const { obj, path } of collectObjectPaths(page.objects, `pages[${i}].objects`)) {
+      for (const [ev, src] of Object.entries(obj.on)) scripts.push({ path: `${path}.on.${ev}`, source: src })
+    }
+  })
+
+  for (const { path, source } of scripts) {
+    if (!source) continue
+    for (const name of matchAll(GO_RE, source)) {
+      if (!pageNameSet.has(name)) {
+        issues.push({ path, message: `page.go("${name}") — no page with that name`, severity: 'error' })
+      }
+    }
+    for (const name of matchAll(POPUP_RE, source)) {
+      if (!pageNameSet.has(name)) {
+        issues.push({ path, message: `page.popupOpen("${name}") — no page with that name`, severity: 'error' })
+      }
+    }
+    for (const name of matchAll(CONTROLS_RE, source)) {
+      if (!allNames.has(name)) {
+        issues.push({ path, message: `controls.${name} — no object with that name`, severity: 'error' })
+      }
+    }
+    for (const key of matchAll(STORE_SET_RE, source)) definedStoreKeys.add(key)
+    if (TS_ANNOTATION_RE.test(source)) {
+      issues.push({
+        path,
+        message: 'looks like a TypeScript annotation — scripts must be plain JavaScript',
+        severity: 'warning',
+      })
+    }
+  }
+
+  for (const { obj, path } of allObjectPaths(book)) {
+    for (const [key, value] of Object.entries(obj.props)) {
+      if (typeof value !== 'string' || !value.includes('{{')) continue
+      for (const name of matchAll(TEMPLATE_KEY_RE, value)) {
+        if (!definedStoreKeys.has(name)) {
+          issues.push({
+            path: `${path}.props.${key}`,
+            message: `{{${name}}} is never seeded or set by a script`,
+            severity: 'warning',
+          })
+        }
+      }
+    }
+  }
+
+  return issues
+}
+
+/**
+ * Parse + lint a book for AI generation. Structural failures come back as
+ * `error` issues (a repair turn can feed them straight to the model); semantic
+ * misses are linted after a successful parse. Unknown props and deprecated
+ * shapes are warnings so forward-compatible or legacy books still load.
+ */
+export function validateBook(data: unknown): ValidationResult {
+  const legacy = legacyIssues(data)
+  const parsed = safeParseBook(data)
+  if (!parsed.success) {
+    return {
+      ok: false,
+      issues: [
+        ...parsed.error.issues.map((i) => ({
+          path: i.path.join('.') || '(root)',
+          message: i.message,
+          severity: 'error' as const,
+        })),
+        ...legacy,
+      ],
+    }
+  }
+  const issues = [...legacy, ...lintBook(parsed.data)]
+  return { ok: !issues.some((i) => i.severity === 'error'), book: parsed.data, issues }
+}
+
+/** Compact issue list for feeding back into an AI repair turn. */
+export function formatIssues(issues: ValidationIssue[]): string {
+  if (issues.length === 0) return ''
+  return issues.map((i) => `- [${i.severity}] ${i.path}: ${i.message}`).join('\n')
+}
+
+export interface NormalizeResult {
+  book: unknown
+  notes: string[]
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
+function sanitizeIdent(base: string, fallback: string): string {
+  const cleaned = base.replace(/[^A-Za-z0-9_$]/g, '')
+  if (/^[A-Za-z_$][\w$]*$/.test(cleaned)) return cleaned
+  if (/^[0-9]/.test(cleaned)) return `_${cleaned}`
+  return fallback
+}
+
+function uniqueIdent(base: string, taken: Set<string>): string {
+  let name = base
+  if (taken.has(name)) {
+    let n = 2
+    while (taken.has(`${name}${n}`)) n++
+    name = `${name}${n}`
+  }
+  taken.add(name)
+  return name
+}
+
+/** Page names are free text (page.go resolves them) — only unique them. */
+function uniquePageName(base: string, taken: Set<string>): string {
+  let name = base.trim() || 'Page'
+  if (taken.has(name)) {
+    let n = 2
+    while (taken.has(`${name} ${n}`)) n++
+    name = `${name} ${n}`
+  }
+  taken.add(name)
+  return name
+}
+
+/**
+ * Fill the gaps an AI-generated book commonly has, so more first attempts pass
+ * validation without a repair round. Only ever fills missing/invalid values —
+ * it never overrides an explicit one, and never invents a control kind. Every
+ * change is reported as a note. Returns the input unchanged if it isn't an
+ * object (the schema validator will describe the failure).
+ */
+export function normalizeBook(data: unknown): NormalizeResult {
+  const notes: string[] = []
+  if (!isRecord(data)) return { book: data, notes }
+  const book = JSON.parse(JSON.stringify(data)) as Record<string, unknown>
+
+  if (typeof book['id'] !== 'string' || !book['id']) {
+    book['id'] = newId('book')
+    notes.push('assigned a book id')
+  }
+  if (typeof book['title'] !== 'string' || !book['title']) {
+    book['title'] = 'Untitled'
+    notes.push('defaulted the title')
+  }
+  if (!Array.isArray(book['backgrounds'])) book['backgrounds'] = []
+  if (!Array.isArray(book['pages'])) book['pages'] = []
+
+  const backgrounds = book['backgrounds'] as unknown[]
+  for (let i = backgrounds.length - 1; i >= 0; i--) {
+    if (!isRecord(backgrounds[i])) {
+      const fresh = { id: newId('bg'), name: `Background ${i + 1}`, color: '#ffffff', script: '', objects: [] }
+      backgrounds[i] = fresh
+      notes.push('repaired an invalid background')
+      continue
+    }
+    const bg = backgrounds[i] as Record<string, unknown>
+    if (typeof bg['id'] !== 'string' || !bg['id']) bg['id'] = newId('bg')
+    if (typeof bg['name'] !== 'string' || !bg['name']) bg['name'] = `Background ${i + 1}`
+    if (typeof bg['color'] !== 'string') bg['color'] = '#ffffff'
+    if (typeof bg['script'] !== 'string') bg['script'] = ''
+    if (!Array.isArray(bg['objects'])) bg['objects'] = []
+  }
+
+  const bgIds = new Set(
+    backgrounds.filter(isRecord).map((b) => (b as Record<string, unknown>)['id'] as string),
+  )
+  if (bgIds.size === 0) {
+    const bg = { id: newId('bg'), name: 'Background 1', color: '#ffffff', script: '', objects: [] }
+    backgrounds.push(bg)
+    bgIds.add(bg.id)
+    notes.push('added a default background')
+  }
+  const fallbackBgId = backgrounds.find(isRecord)!['id'] as string
+
+  const pages = book['pages'] as unknown[]
+  const pageNames = new Set<string>()
+  const refMap = new Map<string, string>()
+
+  const normalizeObjects = (objs: unknown[]): void => {
+    for (let i = objs.length - 1; i >= 0; i--) {
+      if (!isRecord(objs[i])) {
+        objs.splice(i, 1)
+        notes.push('dropped a non-object')
+      }
+    }
+    const taken = new Set<string>()
+    for (const raw of objs) {
+      const o = raw as Record<string, unknown>
+      if (typeof o['id'] !== 'string' || !o['id']) o['id'] = newId('obj')
+      const control = typeof o['control'] === 'string' ? o['control'] : ''
+      const kind = (CONTROL_KINDS as readonly string[]).includes(control)
+        ? (control as ControlKind)
+        : null
+      const declared = typeof o['name'] === 'string' ? o['name'] : ''
+      const name = uniqueIdent(sanitizeIdent(declared, kind ?? 'item'), taken)
+      if (name !== declared) {
+        if (declared) refMap.set(declared, name)
+        o['name'] = name
+      }
+      const size = kind ? DEFAULT_SIZES[kind] : { w: 120, h: 40 }
+      const legacyRect = 'rect' in o || 'rects' in o
+      if (!isRecord(o['x']) && !legacyRect) {
+        o['x'] = { mode: 'left', left: 0, width: size.w }
+      }
+      if (!isRecord(o['y']) && !legacyRect) {
+        o['y'] = { mode: 'top', top: 0, height: size.h }
+      }
+      const props = isRecord(o['props']) ? (o['props'] as Record<string, unknown>) : {}
+      if (kind) {
+        for (const [k, v] of Object.entries(DEFAULT_PROPS[kind])) {
+          if (!(k in props)) props[k] = v
+        }
+      }
+      o['props'] = props
+      if (!isRecord(o['on'])) o['on'] = {}
+      if (Array.isArray(o['children'])) normalizeObjects(o['children'] as unknown[])
+    }
+  }
+
+  for (const raw of pages) {
+    if (!isRecord(raw)) continue
+    const page = raw as Record<string, unknown>
+    if (typeof page['id'] !== 'string' || !page['id']) page['id'] = newId('page')
+    const declared = typeof page['name'] === 'string' ? page['name'] : ''
+    const name = uniquePageName(declared, pageNames)
+    if (name !== declared) {
+      if (declared) refMap.set(declared, name)
+      page['name'] = name
+      notes.push(`renamed page "${declared || '(unnamed)'}" → ${name}`)
+    }
+    if (typeof page['script'] !== 'string') page['script'] = ''
+    if (typeof page['backgroundId'] !== 'string' || !bgIds.has(page['backgroundId'])) {
+      page['backgroundId'] = fallbackBgId
+      notes.push(`pointed page "${name}" at a valid background`)
+    }
+    if (!Array.isArray(page['objects'])) page['objects'] = []
+    normalizeObjects(page['objects'] as unknown[])
+  }
+
+  for (let i = pages.length - 1; i >= 0; i--) {
+    if (!isRecord(pages[i])) {
+      pages.splice(i, 1)
+      notes.push('dropped a non-page')
+    }
+  }
+
+  if (refMap.size) {
+    const rewrite = (src: string): string => {
+      let out = src
+      for (const [from, to] of refMap) {
+        if (!from || from === to) continue
+        out = out
+          .split(`'${from}'`)
+          .join(`'${to}'`)
+          .split(`"${from}"`)
+          .join(`"${to}"`)
+          .replace(new RegExp(`\\b${from}\\b`, 'g'), to)
+      }
+      return out
+    }
+    const walk = (objs: unknown[]): void => {
+      for (const raw of objs) {
+        if (!isRecord(raw)) continue
+        const o = raw as Record<string, unknown>
+        if (isRecord(o['on'])) {
+          const on = o['on'] as Record<string, unknown>
+          for (const k of Object.keys(on)) {
+            if (typeof on[k] === 'string') on[k] = rewrite(on[k] as string)
+          }
+        }
+        if (Array.isArray(o['children'])) walk(o['children'] as unknown[])
+      }
+    }
+    for (const raw of backgrounds) {
+      if (!isRecord(raw)) continue
+      const bg = raw as Record<string, unknown>
+      if (typeof bg['script'] === 'string') bg['script'] = rewrite(bg['script'] as string)
+      if (Array.isArray(bg['objects'])) walk(bg['objects'] as unknown[])
+    }
+    for (const raw of pages) {
+      if (!isRecord(raw)) continue
+      const page = raw as Record<string, unknown>
+      if (typeof page['script'] === 'string') page['script'] = rewrite(page['script'] as string)
+      if (Array.isArray(page['objects'])) walk(page['objects'] as unknown[])
+    }
+  }
+
+  return { book, notes }
 }
 
 let idCounter = 0

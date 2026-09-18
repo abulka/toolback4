@@ -1,5 +1,5 @@
 import type { Book, ControlKind, FitHintMode, FitHintOptions, Rect } from '@toolback/format'
-import { normalizeFitHints } from '@toolback/format'
+import { normalizeFitHints, resolveStartPageIndex } from '@toolback/format'
 import {
   createStore,
   getObjectRects,
@@ -9,7 +9,7 @@ import {
   renderDynamicText,
 } from './index'
 import { createDesignController, type DesignOutMessage, type HandleDir } from './design'
-import { popupEscape, runBook, stopRun } from './player'
+import { popupEscape, runBook, stopRun, isRunActive } from './player'
 import { startAuthorMode, stopAuthor, syncAuthorScripts } from './author'
 import { loadShelfManifest, setLibMap } from './libs'
 import type { ObjectRects } from './index'
@@ -37,6 +37,7 @@ export type EditorToCanvasMessage =
   | { type: 'toolback:esc' }
   | { type: 'toolback:authorStart'; book: Book; pageIndex: number }
   | { type: 'toolback:authorStop' }
+  | { type: 'toolback:smoke'; id: number; book: Book }
 
 export type CanvasToEditorMessage =
   | { type: 'toolback:ready' }
@@ -62,6 +63,7 @@ export type CanvasToEditorMessage =
   | { type: 'toolback:copy' }
   | { type: 'toolback:cut' }
   | { type: 'toolback:paste' }
+  | { type: 'toolback:smokeResult'; id: number; errors: string[] }
 
 /** reply leg of the author bridge (editor → canvas) */
 export type AuthorReplyMessage = {
@@ -272,6 +274,39 @@ export function listenForEditor(
     send({ type: 'toolback:viewport', width: size.width, height: size.height })
   }
 
+  /**
+   * Run a book off-screen for a short window and report its script errors.
+   * Used to smoke-test AI-generated books before they touch the real project.
+   * Skipped while a design run is active so it can't disturb the user.
+   */
+  function runSmoke(book: Book, id: number): void {
+    if (isRunActive()) {
+      send({ type: 'toolback:smokeResult', id, errors: [] })
+      return
+    }
+    const doc = root.ownerDocument
+    const errors: string[] = []
+    const hidden = doc.createElement('div')
+    hidden.style.cssText =
+      'position:absolute;left:-10000px;top:0;width:800px;height:600px;overflow:hidden'
+    root.appendChild(hidden)
+    let handle: ReturnType<typeof runBook> | null = null
+    try {
+      handle = runBook(book, hidden, (message) => errors.push(message), resolveStartPageIndex(book))
+    } catch (err) {
+      errors.push(String(err))
+    }
+    setTimeout(() => {
+      try {
+        handle?.stop()
+      } catch {
+        /* already stopped */
+      }
+      hidden.remove()
+      send({ type: 'toolback:smokeResult', id, errors })
+    }, 400)
+  }
+
   /** a fluid page fills the viewport, so its wrapper spans the full width; a
    *  fixed page keeps the wrapper at the page size so it can centre */
   function syncCanvasWidth(): void {
@@ -392,6 +427,10 @@ export function listenForEditor(
     }
     if (data.type === 'toolback:authorStop') {
       stopAuthor()
+      return
+    }
+    if (data.type === 'toolback:smoke') {
+      runSmoke(data.book, data.id)
       return
     }
     // the bridge reply path (typed loosely — it's a distinct message kind)

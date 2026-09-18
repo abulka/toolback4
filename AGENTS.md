@@ -20,7 +20,7 @@ packages/controls/  @toolback/controls — plain-DOM renderers per control, zero
 packages/runtime/   @toolback/runtime  — the player (no Vue) + design controller + editorLink protocol
 packages/libs/      @toolback/libs     — the npm "library shelf" (its dependencies are the shelf)
 examples/           ready-made .toolbook.json books; a test runs every page of every book
-docs/               scripting-guide.md, runtime-internals.md, screenshots/
+docs/               scripting-guide.md, runtime-internals.md, llm-authoring.md, screenshots/
 plans/              internal design notes + PLAN.md (milestone/progress log)
 ```
 
@@ -47,6 +47,31 @@ the usual suspect.
   anything an author can call, `docs/runtime-internals.md` for architecture /
   internals. When a plan ships, fold its durable bits (backlog → `plans/PLAN.md`,
   architecture → internals) and delete the plan file.
+- **Added or changed a control, property or script API member? Update the
+  capability manifest in `@toolback/format` and bump `CAPABILITY_VERSION`** — see
+  *AI authoring surface* below. The AI prompt and its drift tests read from it.
+
+## AI authoring surface — keep it in sync
+
+The editor's **AI panel** generates books from a model. Its factual tables are
+built at request time from the **capability manifest** in
+`packages/format/src/index.ts`:
+
+- `CONTROL_PROPS: Record<ControlKind, PropSpec[]>` — every control kind and the
+  props it accepts (type, enum, default, `scriptable`, doc).
+- `SCRIPT_API` — the runtime script API (`store`, `page`, `controls`, `event`,
+  `target`, `self`, `forward`, `author`).
+- `CAPABILITY_VERSION` — stamped into the prompt; bump it when either changes.
+
+`apps/editor/src/ai.ts` (`manifestText`/`styleGuide`) and
+`apps/editor/src/aiPrompt.ts` build the model prompt from this; `validateBook`
+uses `CONTROL_PROPS` to flag unknown props; `capabilities.test.ts` guards drift.
+
+**When you add or change a control, a property or a script API member, edit the
+manifest in the same change.** Also update `docs/llm-authoring.md` if the book
+JSON shape, geometry, or examples change, and `docs/scripting-guide.md` for
+authors. New script variables must also follow
+[`docs/runtime-internals.md` §10.3](docs/runtime-internals.md).
 
 ## Conventions
 
@@ -98,6 +123,9 @@ ones most easily broken:
 
 - `docs/scripting-guide.md` — author-facing, rendered in-app (`?raw` import); the
   single source to edit for API docs.
+- `docs/llm-authoring.md` — model-facing book authoring spec (canonical format,
+  geometry, examples); the AI panel appends a control/API table generated from
+  the `CONTROL_PROPS`/`SCRIPT_API` manifest in `@toolback/format`.
 - `docs/runtime-internals.md` — deep architecture, protocol tables, invariants.
 - `docs/screenshots/` — committed images that docs/README reference.
 - `plans/` — internal plans. Each carries a `Status:`. Implemented plans are
