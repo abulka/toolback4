@@ -10,9 +10,11 @@ import {
 import { useBookStore } from '../stores/book'
 import { collectStoreKeys } from '../storeKeys'
 import {
+  APPEARANCE_KINDS,
+  BOX_KINDS,
   IMAGE_PROVIDERS,
   randomImageUrl,
-  TEXT_STYLE_KINDS,
+  styleKindsForProp,
   type ImageProvider,
 } from '@toolback/format'
 import { copyText, objectsToJson } from '../copyJson'
@@ -21,6 +23,7 @@ import HelpButton from './HelpButton.vue'
 import DynamicTextEditor from './DynamicTextEditor.vue'
 import ContentEditor from './ContentEditor.vue'
 import TextStyleFields from './TextStyleFields.vue'
+import BoxStyleFields from './BoxStyleFields.vue'
 
 const store = useBookStore()
 // store keys plus the built-in self binding — {{self.name}} makes every copy
@@ -110,83 +113,102 @@ const textFields = computed<TextField[]>(() => {
   }
 })
 
-// ---- text style (bold/italic/align/colour/fill) ----
-// Applied through the selection: a group's props flow to its text members, and
-// a multi-selection patches every text-capable object. Surfaces (borders,
-// radii) are still per-object via drill-in.
-type TextCaps = {
+// ---- style (text / fill / box) ----
+// Applied through the selection: a group's style flows to its text members, and
+// a multi-selection patches every capable object. Box decoration stays
+// per-object (a group has no box of its own), so box targets do not recurse.
+type StyleCaps = {
+  font: boolean
   bold: boolean
   italic: boolean
   textAlign: boolean
   vAlign: boolean
   textColor: boolean
   background: boolean
+  trackColor: boolean
+  border: boolean
+  radius: boolean
+  opacity: boolean
 }
-const CAPS: Record<string, TextCaps> = {
-  button: { bold: true, italic: true, textAlign: true, vAlign: true, textColor: true, background: true },
-  label: { bold: true, italic: true, textAlign: true, vAlign: true, textColor: true, background: true },
-  input: { bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true },
-  switch: { bold: true, italic: true, textAlign: false, vAlign: false, textColor: true, background: false },
-  card: { bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true },
-  markdown: { bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true },
-  html: { bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true },
+const NO_CAPS: StyleCaps = {
+  font: false, bold: false, italic: false, textAlign: false, vAlign: false,
+  textColor: false, background: false, trackColor: false,
+  border: false, radius: false, opacity: false,
 }
-const NO_CAPS: TextCaps = { bold: false, italic: false, textAlign: false, vAlign: false, textColor: false, background: false }
-const TEXT_KINDS = new Set<string>(TEXT_STYLE_KINDS)
+const CAPS: Record<string, StyleCaps> = {
+  button: { font: true, bold: true, italic: true, textAlign: true, vAlign: true, textColor: true, background: true, trackColor: false, border: true, radius: true, opacity: true },
+  label: { font: true, bold: true, italic: true, textAlign: true, vAlign: true, textColor: true, background: true, trackColor: false, border: true, radius: true, opacity: true },
+  input: { font: true, bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true, trackColor: false, border: true, radius: true, opacity: true },
+  switch: { font: true, bold: true, italic: true, textAlign: false, vAlign: false, textColor: true, background: false, trackColor: true, border: false, radius: false, opacity: false },
+  card: { font: true, bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true, trackColor: false, border: true, radius: true, opacity: true },
+  container: { font: false, bold: false, italic: false, textAlign: false, vAlign: false, textColor: false, background: true, trackColor: false, border: true, radius: true, opacity: true },
+  markdown: { font: true, bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true, trackColor: false, border: true, radius: true, opacity: true },
+  html: { font: true, bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true, trackColor: false, border: true, radius: true, opacity: true },
+  image: { font: false, bold: false, italic: false, textAlign: false, vAlign: false, textColor: false, background: false, trackColor: false, border: true, radius: true, opacity: true },
+}
+const APPEARANCE = new Set<string>(APPEARANCE_KINDS)
+const BOX = new Set<string>(BOX_KINDS)
+const BOX_PROPS = new Set(['borderWidth', 'borderStyle', 'borderColor', 'radius', 'opacity'])
+const STYLE_KEYS = ['fontSize', 'fontFamily', 'bold', 'italic', 'textAlign', 'vAlign', 'textColor', 'background', 'trackColor', 'borderWidth', 'borderStyle', 'borderColor', 'radius', 'opacity']
 
-function supportsText(o: PageObject | null | undefined): o is PageObject {
-  return !!o && TEXT_KINDS.has(o.control)
+function rootsFor(): PageObject[] {
+  return multi.value ? store.selectedObjects : sel.value ? [sel.value] : []
 }
 
-/** the objects a text-style edit will touch: the selection, expanding any
- *  selected group down to its text-capable members */
-const textTargets = computed<PageObject[]>(() => {
-  const roots = multi.value ? store.selectedObjects : sel.value ? [sel.value] : []
+/** the objects a text/fill edit touches: the selection, expanding groups */
+const styleTargets = computed<PageObject[]>(() => {
   const out: PageObject[] = []
   const add = (o: PageObject): void => {
-    if (supportsText(o)) out.push(o)
+    if (APPEARANCE.has(o.control)) out.push(o)
     for (const child of o.children ?? []) add(child)
   }
-  roots.forEach(add)
+  rootsFor().forEach(add)
   return out
 })
 
-const textCaps = computed<TextCaps>(() => {
+/** box decoration stays per-object — groups do not recurse here */
+const boxTargets = computed<PageObject[]>(() => rootsFor().filter((o) => BOX.has(o.control)))
+
+const styleCaps = computed<StyleCaps>(() => {
   const caps = { ...NO_CAPS }
-  for (const o of textTargets.value) {
+  for (const o of [...styleTargets.value, ...boxTargets.value]) {
     const c = CAPS[o.control]
     if (!c) continue
-    caps.bold = caps.bold || c.bold
-    caps.italic = caps.italic || c.italic
-    caps.textAlign = caps.textAlign || c.textAlign
-    caps.vAlign = caps.vAlign || c.vAlign
-    caps.textColor = caps.textColor || c.textColor
-    caps.background = caps.background || c.background
+    for (const key of Object.keys(caps) as Array<keyof StyleCaps>) caps[key] = caps[key] || c[key]
   }
   return caps
 })
 
-const showText = computed(() => textTargets.value.length > 0)
+const showStyle = computed(() => styleTargets.value.length > 0 || boxTargets.value.length > 0)
 
-/** common prop across the text targets; undefined when absent or mixed */
-function textProp(key: string): unknown {
-  const objs = textTargets.value
+function targetsFor(key: string): PageObject[] {
+  return BOX_PROPS.has(key) ? boxTargets.value : styleTargets.value
+}
+
+/** common prop across the relevant targets; undefined when absent or mixed */
+function styleProp(key: string): unknown {
+  const objs = targetsFor(key)
   if (!objs.length) return undefined
   const first = objs[0]!.props[key]
   return objs.every((o) => o.props[key] === first) ? first : undefined
 }
-function textStr(key: string): string {
-  const v = textProp(key)
+function styleStr(key: string): string {
+  const v = styleProp(key)
   return typeof v === 'string' ? v : ''
 }
-function textBool(key: string): boolean {
-  return textProp(key) === true
+function styleBool(key: string): boolean {
+  return styleProp(key) === true
 }
-const textMixed = computed<Record<string, boolean>>(() => {
-  const objs = textTargets.value
-  const keys = ['fontSize', 'fontFamily', 'bold', 'italic', 'textAlign', 'vAlign', 'textColor', 'background']
+function styleNum(key: string): string {
+  const v = styleProp(key)
+  if (typeof v === 'number' && Number.isFinite(v)) return String(v)
+  if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) return String(Number(v))
+  return ''
+}
+const styleMixed = computed<Record<string, boolean>>(() => {
   const out: Record<string, boolean> = {}
-  for (const key of keys) {
+  for (const key of STYLE_KEYS) {
+    const objs = targetsFor(key)
     if (objs.length < 2) {
       out[key] = false
       continue
@@ -196,26 +218,28 @@ const textMixed = computed<Record<string, boolean>>(() => {
   }
   return out
 })
-function textFontSize(): string {
-  const v = textProp('fontSize')
+function styleFontSize(): string {
+  const v = styleProp('fontSize')
   if (typeof v === 'number' && Number.isFinite(v)) return String(v)
   if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) {
     return String(Math.round(Number(v)))
   }
   // a lone object with no stored size shows the CSS baseline (15px)
-  return textTargets.value.length === 1 && !multi.value ? '15' : ''
+  return styleTargets.value.length === 1 && !multi.value ? '15' : ''
 }
-function textSwatch(key: 'textColor' | 'background'): string {
-  const v = textProp(key)
+function styleSwatch(key: 'textColor' | 'background' | 'trackColor' | 'borderColor'): string {
+  const v = styleProp(key)
   if (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) return v
-  const control = textTargets.value[0]?.control ?? ''
+  const control = [...styleTargets.value, ...boxTargets.value][0]?.control ?? ''
   if (key === 'textColor') return control === 'button' ? '#ffffff' : '#111827'
+  if (key === 'trackColor') return '#4f46e5'
+  if (key === 'borderColor') return '#d1d5db'
   if (control === 'button') return '#4f46e5'
   if (control === 'container') return '#f9fafb'
   return '#ffffff'
 }
-function setTextProp(key: string, value: unknown): void {
-  store.updateSelectedProps({ [key]: value }, TEXT_STYLE_KINDS)
+function setStyleProp(key: string, value: unknown): void {
+  store.updateSelectedProps({ [key]: value }, styleKindsForProp(key))
 }
 
 function propValue(key: string): string {
@@ -393,23 +417,36 @@ function onPaste(): void {
     <p v-if="store.selectionIds.length >= 2 && !store.groupEligible" class="hint warn">
       Grouping needs all selected objects under the same parent.
     </p>
-    <template v-if="showText">
-      <h2>Text style</h2>
+    <template v-if="showStyle">
+      <h2>Style</h2>
       <div class="fields">
         <TextStyleFields
-          :caps="textCaps"
-          :font-size="textFontSize()"
-          :font-family="textStr('fontFamily')"
-          :bold="textBool('bold')"
-          :italic="textBool('italic')"
-          :text-align="textStr('textAlign')"
-          :v-align="textStr('vAlign')"
-          :text-color="textStr('textColor')"
-          :text-color-swatch="textSwatch('textColor')"
-          :background="textStr('background')"
-          :background-swatch="textSwatch('background')"
-          :mixed="textMixed"
-          @set="setTextProp"
+          :caps="styleCaps"
+          :font-size="styleFontSize()"
+          :font-family="styleStr('fontFamily')"
+          :bold="styleBool('bold')"
+          :italic="styleBool('italic')"
+          :text-align="styleStr('textAlign')"
+          :v-align="styleStr('vAlign')"
+          :text-color="styleStr('textColor')"
+          :text-color-swatch="styleSwatch('textColor')"
+          :track-color="styleStr('trackColor')"
+          :track-color-swatch="styleSwatch('trackColor')"
+          :background="styleStr('background')"
+          :background-swatch="styleSwatch('background')"
+          :mixed="styleMixed"
+          @set="setStyleProp"
+        />
+        <BoxStyleFields
+          :caps="styleCaps"
+          :border-width="styleNum('borderWidth')"
+          :border-style="styleStr('borderStyle')"
+          :border-color="styleStr('borderColor')"
+          :border-color-swatch="styleSwatch('borderColor')"
+          :radius="styleNum('radius')"
+          :opacity="styleNum('opacity')"
+          :mixed="styleMixed"
+          @set="setStyleProp"
         />
       </div>
     </template>
@@ -516,21 +553,40 @@ function onPaste(): void {
           >🎲</button>
           </div>
     </div>
+    </div>
+    <p v-if="textFields.length === 0 && !isGroupSel()" class="hint">No content properties.</p>
+    <template v-if="showStyle">
+    <h2>Style</h2>
+    <div class="fields">
     <TextStyleFields
-      v-if="showText"
-      :caps="textCaps"
-      :font-size="textFontSize()"
-      :font-family="textStr('fontFamily')"
-      :bold="textBool('bold')"
-      :italic="textBool('italic')"
-      :text-align="textStr('textAlign')"
-      :v-align="textStr('vAlign')"
-      :text-color="textStr('textColor')"
-      :text-color-swatch="textSwatch('textColor')"
-      :background="textStr('background')"
-      :background-swatch="textSwatch('background')"
-      :mixed="textMixed"
-      @set="setTextProp"
+      v-if="styleTargets.length"
+      :caps="styleCaps"
+      :font-size="styleFontSize()"
+      :font-family="styleStr('fontFamily')"
+      :bold="styleBool('bold')"
+      :italic="styleBool('italic')"
+      :text-align="styleStr('textAlign')"
+      :v-align="styleStr('vAlign')"
+      :text-color="styleStr('textColor')"
+      :text-color-swatch="styleSwatch('textColor')"
+      :track-color="styleStr('trackColor')"
+      :track-color-swatch="styleSwatch('trackColor')"
+      :background="styleStr('background')"
+      :background-swatch="styleSwatch('background')"
+      :mixed="styleMixed"
+      @set="setStyleProp"
+    />
+    <BoxStyleFields
+      v-if="boxTargets.length"
+      :caps="styleCaps"
+      :border-width="styleNum('borderWidth')"
+      :border-style="styleStr('borderStyle')"
+      :border-color="styleStr('borderColor')"
+      :border-color-swatch="styleSwatch('borderColor')"
+      :radius="styleNum('radius')"
+      :opacity="styleNum('opacity')"
+      :mixed="styleMixed"
+      @set="setStyleProp"
     />
     <div v-if="sel!.control === 'switch'" class="field">
       <label>Checked</label>
@@ -542,11 +598,11 @@ function onPaste(): void {
       />
     </div>
     </div>
+    </template>
     <p v-if="isGroupSel()" class="hint">
-      Groups have no content of their own — edit members for content. The Text
-      style above applies to the group's text members.
+      Groups have no content of their own — edit members for content. The Style
+      section above applies to the group's text members; borders are per-object.
     </p>
-    <p v-else-if="textFields.length === 0" class="hint">No content properties.</p>
     </div>
 
     <div v-show="subTab === 'script'">

@@ -18,7 +18,7 @@
           "name": "navBar",
           "control": "container",
           "rect": { "x": 0, "y": 0, "w": 1280, "h": 64 },
-          "props": { "color": "#1e293b" },
+          "props": { "background": "#1e293b" },
           "fit": { "x": "fill", "y": "top" }
         },
         {
@@ -26,7 +26,7 @@
           "name": "brand",
           "control": "label",
           "rect": { "x": 32, "y": 16, "w": 320, "h": 32 },
-          "props": { "text": "Toolback HUD", "fontSize": 18, "color": "#e2e8f0" }
+          "props": { "text": "Toolback HUD", "fontSize": 18, "textColor": "#e2e8f0" }
         },
         {
           "id": "obj_menu",
@@ -51,7 +51,7 @@
           "name": "title",
           "control": "label",
           "rect": { "x": 96, "y": 96, "w": 800, "h": 44 },
-          "props": { "text": "A layout that adapts", "fontSize": 26, "color": "#f1f5f9" },
+          "props": { "text": "A layout that adapts", "fontSize": 26, "textColor": "#f1f5f9" },
           "fit": { "x": "left", "y": "top" }
         },
         {
@@ -79,7 +79,7 @@
           "name": "hits",
           "control": "label",
           "rect": { "x": 288, "y": 718, "w": 220, "h": 32 },
-          "props": { "text": "Hits: {{hits}}", "fontSize": 16, "color": "#cbd5e1" },
+          "props": { "text": "Hits: {{hits}}", "fontSize": 16, "textColor": "#cbd5e1" },
           "fit": { "x": "left", "y": "pin-bottom" }
         }
       ]

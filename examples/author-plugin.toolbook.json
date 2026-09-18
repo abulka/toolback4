@@ -156,7 +156,7 @@
      },
      "props": {
       "title": "A",
-      "color": "teal"
+      "background": "teal"
      },
      "on": {}
     },
@@ -174,7 +174,7 @@
      },
      "props": {
       "title": "B",
-      "color": "gold"
+      "background": "gold"
      },
      "on": {}
     },
@@ -192,7 +192,7 @@
      },
      "props": {
       "title": "C",
-      "color": "indigo"
+      "background": "indigo"
      },
      "on": {}
     },

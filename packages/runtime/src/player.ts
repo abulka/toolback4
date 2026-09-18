@@ -1,6 +1,6 @@
 import type { Background, Book, CanvasSize, PageObject, Rect } from '@toolback/format'
-import { backgroundFor, DEFAULT_DIALOG_SIZE, flattenObjects, FONT_STACKS, rectForObject, resolveColor, scaleSubtreeEdges, writeRectPart } from '@toolback/format'
-import { applyContent, applyTextStyleToTree, contentKeyFor } from '@toolback/controls'
+import { backgroundFor, DEFAULT_DIALOG_SIZE, flattenObjects, FONT_STACKS, rectForObject, scaleSubtreeEdges, styleKindsForProp, writeRectPart } from '@toolback/format'
+import { applyContent, applyStyleToTree, contentKeyFor } from '@toolback/controls'
 import { applyEdgeStyles, measureViewport, pageBoxFor, parentBoxMap, renderBookPage } from './index'
 import { rewriteLibImports, toolbackImport } from './libs'
 
@@ -60,6 +60,18 @@ export interface ControlApi {
   textColor: string
   /** explicit background/fill colour (overrides `color` on surface controls) */
   background: string
+  /** switch toggle-track colour */
+  trackColor: string
+  /** border thickness in px (0 = none; unset = the control's default) */
+  borderWidth: number
+  /** 'solid' | 'dashed' */
+  borderStyle: string
+  /** border colour */
+  borderColor: string
+  /** corner radius in px */
+  radius: number
+  /** 0–1 opacity */
+  opacity: number
   on(event: string, fn: (e: Event) => void): void
 }
 
@@ -132,6 +144,43 @@ export function makeControlApi(
     wrapper.dataset.tbEdgeX = obj.x.mode
     wrapper.dataset.tbEdgeY = obj.y.mode
     applyEdgeStyles(wrapper, obj)
+  }
+
+  /** every descendant object of a group, depth-first */
+  const descendantsOf = (): PageObject[] => {
+    const out: PageObject[] = []
+    const walk = (node: PageObject): void => {
+      out.push(node)
+      for (const child of node.children ?? []) walk(child)
+    }
+    for (const child of obj.children ?? []) walk(child)
+    return out
+  }
+  /** a descendant's rendered element (the wrapper's first child) */
+  const memberEl = (node: PageObject): HTMLElement | null => {
+    const w = el.querySelector<HTMLElement>(`[data-tb-id="${CSS.escape(node.id)}"]`)
+    return (w?.firstElementChild as HTMLElement | null) ?? null
+  }
+  /**
+   * Write one style prop and paint it. A plain object styles itself; a group
+   * has no box of its own, so the prop flows to its members that support it
+   * (text/fill/box per `styleKindsForProp`) and is also kept on the group for
+   * getter readback. Member props are mutated, so the styling survives page
+   * re-renders.
+   */
+  const setStyleProp = (key: string, value: unknown): void => {
+    obj.props = { ...obj.props, [key]: value }
+    if (!isGroup) {
+      applyStyleToTree(el, obj)
+      return
+    }
+    const kinds = styleKindsForProp(key)
+    for (const member of descendantsOf()) {
+      if (!kinds.includes(member.control)) continue
+      member.props = { ...member.props, [key]: value }
+      const child = memberEl(member)
+      if (child) applyStyleToTree(child, member)
+    }
   }
 
   return {
@@ -211,65 +260,86 @@ export function makeControlApi(
       return typeof obj.props['color'] === 'string' ? (obj.props['color'] as string) : ''
     },
     set color(v: string) {
-      obj.props = { ...obj.props, color: v }
-      // switches paint their toggle track with `color`; the text span is
-      // untouched (use textColor for that)
-      if (checkbox) {
-        const resolved = resolveColor(v)
-        if (resolved) el.style.setProperty('--tb-switch-on', resolved)
-        return
-      }
-      applyTextStyleToTree(el, obj)
+      setStyleProp('color', v)
     },
     get fontFamily() {
       return typeof obj.props['fontFamily'] === 'string' ? (obj.props['fontFamily'] as string) : ''
     },
     set fontFamily(v: string) {
       if (!(v in FONT_STACKS)) return
-      obj.props = { ...obj.props, fontFamily: v }
-      applyTextStyleToTree(el, obj)
+      setStyleProp('fontFamily', v)
     },
     get bold() {
       return obj.props['bold'] === true
     },
     set bold(v: boolean) {
-      obj.props = { ...obj.props, bold: v === true }
-      applyTextStyleToTree(el, obj)
+      setStyleProp('bold', v === true)
     },
     get italic() {
       return obj.props['italic'] === true
     },
     set italic(v: boolean) {
-      obj.props = { ...obj.props, italic: v === true }
-      applyTextStyleToTree(el, obj)
+      setStyleProp('italic', v === true)
     },
     get textAlign() {
       return typeof obj.props['textAlign'] === 'string' ? (obj.props['textAlign'] as string) : ''
     },
     set textAlign(v: string) {
-      obj.props = { ...obj.props, textAlign: v }
-      applyTextStyleToTree(el, obj)
+      setStyleProp('textAlign', v)
     },
     get vAlign() {
       return typeof obj.props['vAlign'] === 'string' ? (obj.props['vAlign'] as string) : ''
     },
     set vAlign(v: string) {
-      obj.props = { ...obj.props, vAlign: v }
-      applyTextStyleToTree(el, obj)
+      setStyleProp('vAlign', v)
     },
     get textColor() {
       return typeof obj.props['textColor'] === 'string' ? (obj.props['textColor'] as string) : ''
     },
     set textColor(v: string) {
-      obj.props = { ...obj.props, textColor: v }
-      applyTextStyleToTree(el, obj)
+      setStyleProp('textColor', v)
     },
     get background() {
       return typeof obj.props['background'] === 'string' ? (obj.props['background'] as string) : ''
     },
     set background(v: string) {
-      obj.props = { ...obj.props, background: v }
-      applyTextStyleToTree(el, obj)
+      setStyleProp('background', v)
+    },
+    get trackColor() {
+      return typeof obj.props['trackColor'] === 'string' ? (obj.props['trackColor'] as string) : ''
+    },
+    set trackColor(v: string) {
+      setStyleProp('trackColor', v)
+    },
+    get borderWidth() {
+      return typeof obj.props['borderWidth'] === 'number' ? (obj.props['borderWidth'] as number) : 0
+    },
+    set borderWidth(v: number) {
+      setStyleProp('borderWidth', v)
+    },
+    get borderStyle() {
+      return typeof obj.props['borderStyle'] === 'string' ? (obj.props['borderStyle'] as string) : ''
+    },
+    set borderStyle(v: string) {
+      setStyleProp('borderStyle', v)
+    },
+    get borderColor() {
+      return typeof obj.props['borderColor'] === 'string' ? (obj.props['borderColor'] as string) : ''
+    },
+    set borderColor(v: string) {
+      setStyleProp('borderColor', v)
+    },
+    get radius() {
+      return typeof obj.props['radius'] === 'number' ? (obj.props['radius'] as number) : 0
+    },
+    set radius(v: number) {
+      setStyleProp('radius', v)
+    },
+    get opacity() {
+      return typeof obj.props['opacity'] === 'number' ? (obj.props['opacity'] as number) : 1
+    },
+    set opacity(v: number) {
+      setStyleProp('opacity', v)
     },
     on(event: string, fn: (e: Event) => void) {
       el.addEventListener(event, fn)

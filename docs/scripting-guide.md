@@ -215,13 +215,21 @@ Get/set properties:
 - `background` — explicit fill colour; wins over `color` on surface controls
   (buttons, cards, containers) and adds a background to text controls
   (labels, viewers, inputs)
+- `trackColor` — a **switch**'s toggle colour (overrides `color` for the track)
+- `borderWidth` — border thickness in px (`0` removes it; unset keeps the
+  control's default), with `borderStyle` (`'solid' | 'dashed'`) and
+  `borderColor`
+- `radius` — corner radius in px; `0` squares the corners off
+- `opacity` — `0`–`1`, fades the whole object
 
 `''` clears any of the colour/alignment props back to the control's default.
 
-The same fields appear in the Selection panel as **Text style** (font size,
-font, B/I, alignment, text colour, background). With several objects selected —
-or with a **group** selected — an edit applies to every text control in the
-selection (a group's edit flows to its text members).
+The same fields appear in the Selection panel's **Style** section (font size,
+font, B/I, alignment, text colour, background, toggle colour, and a **Box** row
+for border, corner radius and opacity). With several objects selected — or with
+a **group** selected — an edit applies to every capable object in the selection
+(a group's text/fill edit flows to its members; borders stay per-object). On a
+group in a script, the same style setters write through to the members.
 
 Geometry changes apply immediately, and they stick for the whole run — even
 across `page.go` navigations. A geometry write moves the control now while
@@ -257,7 +265,7 @@ controls.inc.on('click', () => store.set('score', (store.get('score') ?? 0) + 1)
 ```
 
 Scripting them: `viewer.text` reads/writes the source (`'# New heading'`) and
-re-renders immediately. Both viewers honour the **Text style** section (font,
+re-renders immediately. Both viewers honour the **Style** section (font,
 size, bold/italic, alignment, text colour, background) in the Selection panel.
 
 **Sizing and editing.** A viewer is a fixed box the size you give it; content
@@ -521,12 +529,15 @@ I am {{self.name}}
 
 This is how object state becomes visible text.
 
-**Text style**: labels, buttons, switches, inputs and viewers have a **Text
-style** section in the Selection panel — font size, font, **B**/**I**,
-horizontal/vertical alignment, text colour and background fill. Long text wraps
-inside the object's box and clips if it doesn't fit — give a paragraph label a
-smaller size (14) and a taller box, or use a card for long body text. The same
-fields apply across a multi-selection, or to a group's text members in one go.
+**Style**: the Selection panel's **Style** section shows only what applies to
+what you picked — font size and font, **B**/**I**, horizontal/vertical
+alignment, text colour and background fill, a switch's toggle colour, and a
+**Box** row (border width/style/colour, corner radius, opacity) for anything
+with a box. Containers show a **Background** fill; images show just the box
+options. Long text wraps inside the object's box and clips if it doesn't fit —
+give a paragraph label a smaller size (14) and a taller box, or use a card for
+long body text. The same fields apply across a multi-selection, or to a group's
+members in one go (borders stay per-object).
 
 ## Events reference
 

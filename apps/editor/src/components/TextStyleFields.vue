@@ -7,12 +7,17 @@ import {
 
 defineProps<{
   caps: {
+    font: boolean
     bold: boolean
     italic: boolean
     textAlign: boolean
     vAlign: boolean
     textColor: boolean
     background: boolean
+    trackColor: boolean
+    border: boolean
+    radius: boolean
+    opacity: boolean
   }
   fontSize: string
   fontFamily: string
@@ -22,6 +27,8 @@ defineProps<{
   vAlign: string
   textColor: string
   textColorSwatch: string
+  trackColor: string
+  trackColorSwatch: string
   background: string
   backgroundSwatch: string
   mixed: Record<string, boolean>
@@ -58,7 +65,7 @@ function toggleAlign(key: 'textAlign' | 'vAlign', value: string, current: string
 </script>
 
 <template>
-  <div class="field">
+  <div v-if="caps.font" class="field">
     <label>Font size · Font</label>
     <div class="pair-row">
       <input type="number" min="8" placeholder="size" :value="fontSize" @input="onFontSize" />
@@ -134,6 +141,19 @@ function toggleAlign(key: 'textAlign' | 'vAlign', value: string, current: string
         @input="onInput('background', $event)"
       />
       <input type="color" class="color-swatch" :value="backgroundSwatch" @input="onInput('background', $event)" />
+    </div>
+  </div>
+
+  <div v-if="caps.trackColor" class="field">
+    <label>Toggle colour</label>
+    <div class="color-row">
+      <input
+        class="color-input"
+        :value="trackColor"
+        placeholder="red, #3b82f6…"
+        @input="onInput('trackColor', $event)"
+      />
+      <input type="color" class="color-swatch" :value="trackColorSwatch" @input="onInput('trackColor', $event)" />
     </div>
   </div>
 </template>

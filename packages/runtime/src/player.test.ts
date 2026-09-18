@@ -214,6 +214,34 @@ describe('groups', () => {
     root.remove()
   })
 
+  it('scripted group style flows to supporting members and skips the rest', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const label = createObject('label', 'kidLabel', { x: 0, y: 0, w: 40, h: 20 }, { text: 'L' })
+    const image = createObject('image', 'kidImage', { x: 0, y: 30, w: 40, h: 20 })
+    const group = createGroup('styGroup', { x: 40, y: 40, w: 120, h: 80 }, [label, image])
+    const book: Book = {
+      id: 'bg',
+      title: 'Groups',
+      backgrounds: [BG],
+      pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [group] }],
+    }
+    const handle = runBook(book, root)
+    const api = handle.controls['styGroup']!
+    api.bold = true
+    api.background = 'light'
+    const labelEl = root.querySelector('[data-tb-name="kidLabel"] .tb-label') as HTMLElement
+    expect(labelEl.style.fontWeight).toBe('600')
+    expect(labelEl.style.background).toBe('#f3f4f6')
+    // member props are mutated, so a re-render would keep the style
+    const [kidLabel, kidImage] = group.children!
+    expect(kidLabel!.props['bold']).toBe(true)
+    expect(kidImage!.props['bold']).toBeUndefined()
+    expect(kidImage!.props['background']).toBeUndefined()
+    stopRun()
+    root.remove()
+  })
+
   it('a member handler without forward() stops the message at the member', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
@@ -653,6 +681,35 @@ describe('player', () => {
     expect(errors).toEqual([])
     expect(cardEl.style.background).toBe('#22c55e')
     expect(cardEl.style.fontFamily).toContain('monospace')
+    handle.stop()
+    root.remove()
+  })
+
+  it('box decoration and track colour are scriptable', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const book = makeBook({
+      objects: [
+        { name: 'chip', control: 'card', props: { title: 'chip' }, on: {} },
+        { name: 'sw', control: 'switch', props: { text: 'S' }, on: {} },
+      ],
+    })
+    const handle = runBook(book, root)
+    const cardEl = root.querySelector('[data-tb-name="chip"] .tb-card') as HTMLElement
+    const swEl = root.querySelector('[data-tb-name="sw"] .tb-switch') as HTMLElement
+    const chip = handle.controls['chip']!
+    chip.borderWidth = 2
+    chip.borderStyle = 'dashed'
+    chip.borderColor = 'red'
+    chip.radius = 8
+    chip.opacity = 0.5
+    handle.controls['sw']!.trackColor = 'teal'
+    expect(cardEl.style.borderWidth).toBe('2px')
+    expect(cardEl.style.borderStyle).toBe('dashed')
+    expect(cardEl.style.borderColor).toBe('#ef4444')
+    expect(cardEl.style.borderRadius).toBe('8px')
+    expect(cardEl.style.opacity).toBe('0.5')
+    expect(swEl.style.getPropertyValue('--tb-switch-on')).toBe('#0d9488')
     handle.stop()
     root.remove()
   })

@@ -463,6 +463,23 @@ export const FONT_STACKS: Record<FontFamily, string> = {
 /** controls whose text (and, for surfaces, fill) the text-style props apply to */
 export const TEXT_STYLE_KINDS = ['button', 'label', 'input', 'switch', 'card', 'markdown', 'html'] as const
 
+/** controls that can paint a surface/text colour (text kinds plus containers) */
+export const APPEARANCE_KINDS = [...TEXT_STYLE_KINDS, 'container'] as const
+
+/** controls with a rendered box that border/radius/opacity apply to */
+export const BOX_KINDS = ['button', 'label', 'input', 'card', 'container', 'image', 'markdown', 'html'] as const
+
+/** which control kinds each style prop writes to — the shared table the editor
+ *  selection patch and the runtime group propagation both read */
+export function styleKindsForProp(prop: string): readonly string[] {
+  if (prop === 'trackColor') return ['switch']
+  if (prop === 'borderWidth' || prop === 'borderStyle' || prop === 'borderColor' || prop === 'radius' || prop === 'opacity') {
+    return BOX_KINDS
+  }
+  if (prop === 'background' || prop === 'color') return APPEARANCE_KINDS
+  return TEXT_STYLE_KINDS
+}
+
 /** horizontal text alignment choices (the `textAlign` prop) */
 export const TEXT_ALIGNS = ['left', 'center', 'right'] as const
 export type TextAlign = (typeof TEXT_ALIGNS)[number]
@@ -481,6 +498,14 @@ export function resolveVerticalAlign(value: unknown): VerticalAlign | null {
   return typeof value === 'string' && (VERTICAL_ALIGNS as readonly string[]).includes(value)
     ? (value as VerticalAlign)
     : null
+}
+
+/** border line styles (the `borderStyle` prop); solid when unset */
+export const BORDER_STYLES = ['solid', 'dashed'] as const
+export type BorderStyle = (typeof BORDER_STYLES)[number]
+
+export function resolveBorderStyle(value: unknown): BorderStyle {
+  return value === 'dashed' ? 'dashed' : 'solid'
 }
 
 export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {

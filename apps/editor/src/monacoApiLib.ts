@@ -29,6 +29,30 @@ interface TBControl {
   color: string
   /** Font family: 'system' | 'sans' | 'serif' | 'mono' | 'rounded' */
   fontFamily: string
+  /** Bold text */
+  bold: boolean
+  /** Italic text */
+  italic: boolean
+  /** Horizontal text alignment: 'left' | 'center' | 'right' */
+  textAlign: string
+  /** Vertical text alignment: 'top' | 'middle' | 'bottom' */
+  vAlign: string
+  /** Explicit text colour (overrides color on text controls); '' = default */
+  textColor: string
+  /** Explicit background/fill colour; '' = default */
+  background: string
+  /** Switch toggle-track colour */
+  trackColor: string
+  /** Border width in px (0 = none) */
+  borderWidth: number
+  /** Border style: 'solid' | 'dashed' */
+  borderStyle: string
+  /** Border colour */
+  borderColor: string
+  /** Corner radius in px */
+  radius: number
+  /** Opacity, 0–1 */
+  opacity: number
   /** Attach an extra event handler, e.g. on('click', (e) => { ... }) */
   on(event: string, fn: TBListener): void
 }

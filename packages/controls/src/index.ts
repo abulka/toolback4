@@ -1,7 +1,9 @@
 import { marked } from 'marked'
 import type { ControlKind, PageObject, TextAlign, VerticalAlign } from '@toolback/format'
 import {
+  BOX_KINDS,
   FONT_STACKS,
+  resolveBorderStyle,
   resolveColor,
   resolveTextAlign,
   resolveVerticalAlign,
@@ -102,13 +104,34 @@ export function applyVerticalAlign(el: HTMLElement, obj: PageObject): void {
   el.style.justifyContent = v ? VERTICAL_JUSTIFY[v] : ''
 }
 
+/** border / corner radius / opacity; absent props fall back to the CSS default */
+export function applyBoxStyle(el: HTMLElement, obj: PageObject): void {
+  const w = numProp(obj, 'borderWidth')
+  if (w !== null) {
+    el.style.borderWidth = `${Math.max(0, w)}px`
+    el.style.borderStyle = resolveBorderStyle(obj.props['borderStyle'])
+    el.style.borderColor = resolveColor(obj.props['borderColor']) ?? 'currentColor'
+  } else {
+    el.style.borderWidth = ''
+    el.style.borderStyle = ''
+    el.style.borderColor = ''
+  }
+  const radius = numProp(obj, 'radius')
+  el.style.borderRadius = radius !== null ? `${Math.max(0, radius)}px` : ''
+  const opacity = numProp(obj, 'opacity')
+  el.style.opacity = opacity !== null ? String(Math.min(1, Math.max(0, opacity))) : ''
+}
+
+const BOX_KIND_SET = new Set<string>(BOX_KINDS)
+
 /**
- * Apply every text-style prop to a rendered control's element tree — the single
+ * Apply every style prop to a rendered control's element tree — the single
  * place that knows which node each kind paints. Renderers call it on a fresh
  * element; the runtime calls it again after a live prop write, so the two stay
  * in lockstep.
  */
-export function applyTextStyleToTree(root: HTMLElement, obj: PageObject): void {
+export function applyStyleToTree(root: HTMLElement, obj: PageObject): void {
+  if (BOX_KIND_SET.has(obj.control)) applyBoxStyle(root, obj)
   switch (obj.control) {
     case 'button':
       applyFontProps(root, obj)
@@ -135,6 +158,9 @@ export function applyTextStyleToTree(root: HTMLElement, obj: PageObject): void {
       applyTextAlign(root, obj)
       return
     case 'switch': {
+      const track = resolveColor(obj.props['trackColor']) ?? resolveColor(obj.props['color'])
+      if (track) root.style.setProperty('--tb-switch-on', track)
+      else root.style.removeProperty('--tb-switch-on')
       const txt = root.querySelector<HTMLElement>('.tb-switch-text')
       if (!txt) return
       applyFontProps(txt, obj)
@@ -252,7 +278,7 @@ export function renderButton(obj: PageObject): HTMLElement {
   el.type = 'button'
   el.className = 'tb-button'
   el.textContent = textProp(obj, 'text', 'Button')
-  applyTextStyleToTree(el, obj)
+  applyStyleToTree(el, obj)
   return el
 }
 
@@ -260,7 +286,7 @@ export function renderLabel(obj: PageObject): HTMLElement {
   const el = document.createElement('div')
   el.className = 'tb-label'
   el.textContent = textProp(obj, 'text', 'Label')
-  applyTextStyleToTree(el, obj)
+  applyStyleToTree(el, obj)
   return el
 }
 
@@ -281,11 +307,9 @@ export function renderSwitch(obj: PageObject): HTMLElement {
   applyContent(el, 'switch', textProp(obj, 'text'))
   el.classList.toggle('tb-switch-on', obj.props['checked'] === true)
   box.checked = obj.props['checked'] === true
-  const color = resolveColor(obj.props['color'])
-  if (color) el.style.setProperty('--tb-switch-on', color)
   // text styling goes ON the text span — its own `font` shorthand would
   // otherwise override anything inherited from the switch element
-  applyTextStyleToTree(el, obj)
+  applyStyleToTree(el, obj)
   return el
 }
 
@@ -294,7 +318,7 @@ export function renderInput(obj: PageObject): HTMLElement {
   el.type = 'text'
   el.className = 'tb-input'
   el.placeholder = textProp(obj, 'placeholder', 'Type here')
-  applyTextStyleToTree(el, obj)
+  applyStyleToTree(el, obj)
   return el
 }
 
@@ -305,12 +329,14 @@ export function renderImage(obj: PageObject): HTMLElement {
     el.className = 'tb-image-empty'
     el.textContent = '🖼'
     el.title = textProp(obj, 'alt', 'No image URL set')
+    applyStyleToTree(el, obj)
     return el
   }
   const el = document.createElement('img')
   el.className = 'tb-image'
   el.src = src
   el.alt = textProp(obj, 'alt')
+  applyStyleToTree(el, obj)
   return el
 }
 
@@ -325,7 +351,7 @@ export function renderCard(obj: PageObject): HTMLElement {
   el.appendChild(title)
   el.appendChild(body)
   applyContent(el, 'card', textProp(obj, 'text'))
-  applyTextStyleToTree(el, obj)
+  applyStyleToTree(el, obj)
   return el
 }
 
@@ -333,7 +359,7 @@ export function renderCard(obj: PageObject): HTMLElement {
 export function renderMarkdown(obj: PageObject): HTMLElement {
   const el = document.createElement('div')
   el.className = 'tb-markdown'
-  applyTextStyleToTree(el, obj)
+  applyStyleToTree(el, obj)
   applyContent(el, 'markdown', textProp(obj, 'text'))
   return el
 }
@@ -342,7 +368,7 @@ export function renderMarkdown(obj: PageObject): HTMLElement {
 export function renderHtml(obj: PageObject): HTMLElement {
   const el = document.createElement('div')
   el.className = 'tb-html'
-  applyTextStyleToTree(el, obj)
+  applyStyleToTree(el, obj)
   applyContent(el, 'html', textProp(obj, 'html'))
   return el
 }
@@ -350,7 +376,7 @@ export function renderHtml(obj: PageObject): HTMLElement {
 export function renderContainer(obj: PageObject): HTMLElement {
   const el = document.createElement('div')
   el.className = 'tb-container'
-  applyTextStyleToTree(el, obj)
+  applyStyleToTree(el, obj)
   return el
 }
 

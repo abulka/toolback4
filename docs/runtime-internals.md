@@ -79,18 +79,26 @@ YEdge = { mode:'top'; top; height }
   box is its own `x`/`y` and hugs its members. A group handle resize (or a typed
   W/H / scripted size) scales the members with it (see §5).
 - Style props are all optional keys on `props`; renderers apply them through
-  `applyTextStyleToTree` (`packages/controls`), the single place that knows
-  which node each kind paints. `color` (colour names via `resolveColor` — a
-  curated map plus any CSS colour string — or raw CSS) keeps its role meaning:
-  surface fill for buttons/cards/containers, text for labels/viewers, toggle
-  track for switches. `textColor` and `background` are explicit overrides that
-  win over `color` per role. `fontFamily` (one of five stacks in `FONT_STACKS`),
-  `fontSize`, `bold`, `italic`, `textAlign`, `vAlign` round out the set.
-  Labels and buttons are flex **columns** (horizontal alignment is `text-align`
-  on a stretched text item; vertical is `justify-content`), so alignment maps
-  cleanly on both axes. Every prop is also a live `ControlApi` accessor that
-  writes the prop AND re-applies the inline styles. Switches apply text styling
-  to their text span and `color` to the toggle track (`--tb-switch-on`).
+  `applyStyleToTree` (`packages/controls`), the single place that knows which
+  node each kind paints. `color` (colour names via `resolveColor` — a curated
+  map plus any CSS colour string — or raw CSS) keeps its role meaning: surface
+  fill for buttons/cards/containers, text for labels/viewers, toggle track for
+  switches. `textColor`, `background` and `trackColor` are explicit overrides
+  that win over `color` per role. `fontFamily` (one of five stacks in
+  `FONT_STACKS`), `fontSize`, `bold`, `italic`, `textAlign`, `vAlign` round out
+  the text set; `borderWidth`/`borderStyle`/`borderColor`, `radius` and
+  `opacity` are box decoration (`applyBoxStyle`, applied for `BOX_KINDS`).
+  `styleKindsForProp` (`format`) is the shared prop→kinds table the editor
+  selection patch and the runtime group propagation both read. Labels and
+  buttons are flex **columns** (horizontal alignment is `text-align` on a
+  stretched text item; vertical is `justify-content`), so alignment maps cleanly
+  on both axes. Every prop is also a live `ControlApi` accessor that writes the
+  prop AND re-applies the inline styles. Switches apply text styling to their
+  text span and `trackColor`/`color` to the toggle track (`--tb-switch-on`).
+- A **group** has no box of its own, so its style setters flow the prop to the
+  members that support it (`styleKindsForProp`), mutating member `props` so the
+  styling survives a re-render, and keep the value on the group for getter
+  readback. `text`/`value` stay inert on groups.
 - Pinia reactive proxies are **not structured-cloneable** — the book always
   crosses the iframe boundary as `JSON.parse(JSON.stringify(book))`.
 

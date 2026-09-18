@@ -28,6 +28,7 @@ import {
   scaleEdges,
   scaleRect,
   scaleSubtreeEdges,
+  styleKindsForProp,
   treeRows,
   unionRects,
   unrebaseRect,
@@ -747,6 +748,32 @@ describe('randomImageUrl', () => {
 
   it('exposes the providers the UI offers', () => {
     expect(IMAGE_PROVIDERS).toEqual(['picsum', 'dummyimage'])
+  })
+})
+
+describe('style prop → control kinds', () => {
+  it('routes text props to text kinds', () => {
+    expect(styleKindsForProp('bold')).toContain('label')
+    expect(styleKindsForProp('bold')).not.toContain('container')
+    expect(styleKindsForProp('bold')).not.toContain('image')
+    expect(styleKindsForProp('fontSize')).toEqual(styleKindsForProp('fontFamily'))
+  })
+
+  it('routes background/color to appearance kinds (containers included)', () => {
+    expect(styleKindsForProp('background')).toContain('container')
+    expect(styleKindsForProp('background')).toContain('label')
+    expect(styleKindsForProp('color')).toEqual(styleKindsForProp('background'))
+    expect(styleKindsForProp('background')).not.toContain('image')
+  })
+
+  it('routes box props to box kinds and trackColor to switches only', () => {
+    for (const prop of ['borderWidth', 'borderStyle', 'borderColor', 'radius', 'opacity']) {
+      expect(styleKindsForProp(prop)).toContain('container')
+      expect(styleKindsForProp(prop)).toContain('image')
+      expect(styleKindsForProp(prop)).not.toContain('switch')
+      expect(styleKindsForProp(prop)).not.toContain('group')
+    }
+    expect(styleKindsForProp('trackColor')).toEqual(['switch'])
   })
 })
 

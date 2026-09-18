@@ -150,6 +150,32 @@ describe('controls', () => {
     expect(html.style.color).toBe('#0d9488')
   })
 
+  it('paints a container fill and box decoration', () => {
+    const el = renderContainer(createObject('container', 'c1', { x: 0, y: 0, w: 100, h: 100 }, {
+      background: 'navy', borderWidth: 2, borderStyle: 'dashed', borderColor: 'red', radius: 12, opacity: 0.5,
+    }))
+    expect(el.style.background).toBe('#1e3a8a')
+    expect(el.style.borderWidth).toBe('2px')
+    expect(el.style.borderStyle).toBe('dashed')
+    expect(el.style.borderColor).toBe('#ef4444')
+    expect(el.style.borderRadius).toBe('12px')
+    expect(el.style.opacity).toBe('0.5')
+  })
+
+  it('clears box decoration when the props are absent', () => {
+    const el = renderButton(createObject('button', 'b1', { x: 0, y: 0, w: 100, h: 40 }, { text: 'B' }))
+    expect(el.style.borderWidth).toBe('')
+    expect(el.style.borderStyle).toBe('')
+    expect(el.style.borderColor).toBe('')
+    expect(el.style.borderRadius).toBe('')
+    expect(el.style.opacity).toBe('')
+  })
+
+  it('paints a switch toggle track from trackColor', () => {
+    const el = renderSwitch(createObject('switch', 's1', { x: 0, y: 0, w: 160, h: 40 }, { text: 'M', trackColor: 'teal' }))
+    expect(el.style.getPropertyValue('--tb-switch-on')).toBe('#0d9488')
+  })
+
   it('registry covers every control kind', () => {
     for (const kind of [
       'button',

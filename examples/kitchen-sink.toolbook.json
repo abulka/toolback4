@@ -248,7 +248,7 @@
           "name": "modeSwitch",
           "control": "switch",
           "rects": { "desktop": { "x": 480, "y": 368, "w": 260, "h": 48 } },
-          "props": { "text": "Dark mode", "checked": true, "color": "purple", "fontFamily": "mono", "fontSize": 18 },
+          "props": { "text": "Dark mode", "checked": true, "trackColor": "purple", "fontFamily": "mono", "fontSize": 18 },
           "on": {
             "change": "store.set('dark', self.value)"
           }
@@ -261,7 +261,7 @@
           "rects": { "desktop": { "x": 480, "y": 264, "w": 240, "h": 48 } },
           "props": { "text": "I turn green" },
           "on": {
-            "click": "self.color = 'green'"
+            "click": "self.background = 'green'"
           }
         }
 ,
@@ -270,7 +270,7 @@
           "name": "stColorTip",
           "control": "label",
           "rects": { "desktop": { "x": 480, "y": 200, "w": 600, "h": 64 } },
-          "props": { "text": "Colours & fonts: set the Colour / Font fields in the Selection panel — 'red', 'navy', '#3b82f6', rgb(…) — or from scripts: try the green button (its click script runs self.color = 'green').", "fontSize": 14 },
+          "props": { "text": "Colours & fonts: set the Background / Text colour / Font fields in the Selection panel — 'red', 'navy', '#3b82f6', rgb(…) — or from scripts: try the green button (its click script runs self.background = 'green').", "fontSize": 14 },
           "on": {}
         }
 ,
@@ -953,7 +953,7 @@
           "name": "npPlay",
           "control": "button",
           "rects": {"desktop":{"x":412,"y":216,"w":240,"h":52}},
-          "props": {"text":"Play","color":"teal"},
+          "props": {"text":"Play","background":"teal"},
           "on": {
             "click": "playDemo()"
           }
@@ -964,7 +964,7 @@
           "name": "npDownload",
           "control": "button",
           "rects": {"desktop":{"x":668,"y":216,"w":240,"h":52}},
-          "props": {"text":"Download .mid","color":"navy"},
+          "props": {"text":"Download .mid","background":"navy"},
           "on": {
             "click": "downloadDemo()"
           }
