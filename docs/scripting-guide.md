@@ -287,11 +287,12 @@ editing affordances scripts have:
 Things to know:
 
 - **Empty sources show a placeholder** instead of an empty box.
-- **Their box is outlined while you design.** A viewer has no border or
-  background of its own, so at design time a markdown/HTML control that isn't
-  selected shows a faint dashed outline tracing its box (just like an unselected
-  group). Selecting it shows the usual selection box instead; the outline never
-  appears at run time or in the published book.
+- **Borderless controls are outlined while you design.** A label or a
+  markdown/HTML viewer has no border or background of its own, so at design time
+  one that isn't selected shows a faint dashed outline tracing its box (just like
+  an unselected group) — which is also where its edge springs anchor. Selecting
+  it shows the usual selection box instead; the outline never appears at run time
+  or in the published book.
 - **The canvas is a same-origin sandbox where authored scripts already run, so
   viewer content is trusted.** HTML is injected with **no sanitizer**, and
   Markdown passes raw HTML through — only open books you trust.

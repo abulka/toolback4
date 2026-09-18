@@ -380,10 +380,12 @@ and communicates with the editor only through messages (`toolback:selection`,
   `groupMembers`/`nonDefaultOnly` filters hide springs, not the box). A group
   can be both drilled and in-view, or selected: a selected group is
   always excluded — its `.tb-sel` box is the loud one — and `fitHints.mode:'off'`
-  leaves only the drilled ancestors. **Markdown/HTML viewers** join the set too
-  (detected by their `.tb-markdown`/`.tb-html` element): they have no chrome of
-  their own, so their box is traced whenever they're not selected, independent
-  of the spring mode — otherwise an empty viewer is invisible at design time.
+  leaves only the drilled ancestors. **Borderless controls** — labels and
+  markdown/HTML viewers — join the set too (detected by their `.tb-label`,
+  `.tb-markdown`/`.tb-html` element): they have no chrome of their own, so their
+  box is traced whenever they're not selected, independent of the spring mode —
+  otherwise an unselected label or empty viewer is invisible at design time, and
+  the edge springs pointing at it land on nothing.
   Built by `redrawGroupOutlines` (the group part is the pure `groupOutlineIds`),
   positioned from the `rects`/`bgRects` maps like the selection boxes, painted
   under `.tb-sel`, and refreshed whenever the selection, drill path or hint mode

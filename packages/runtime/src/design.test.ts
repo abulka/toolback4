@@ -2164,6 +2164,41 @@ describe('group outlines', () => {
     }
   })
 
+  it('traces borderless labels even with the hints off', () => {
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const cleanup = listenForEditor(root, () => {})
+    try {
+      const label = createObject('label', 'score', { x: 60, y: 80, w: 200, h: 40 })
+      const btn = createObject('button', 'go', { x: 300, y: 80, w: 120, h: 40 })
+      const book: Book = {
+        id: 'bl',
+        title: 'L',
+        backgrounds: [BG],
+        pages: [{ id: 'p', name: 'P', script: '', backgroundId: 'bg1', objects: [label, btn] }],
+      }
+      loadBook(root, book, { fitHints: 'off' })
+      // only the label is borderless; a button has its own chrome
+      expect(outlineIds(root)).toEqual([label.id])
+      const box = root.querySelector<HTMLElement>(
+        `.tb-group-outline[data-tb-group-outline-id="${label.id}"]`,
+      )!
+      expect(box.style.left).toBe('60px')
+      expect(box.style.top).toBe('80px')
+      expect(box.style.width).toBe('200px')
+      expect(box.style.height).toBe('40px')
+
+      // selecting the label drops its outline (the loud .tb-sel box takes over)
+      pointer(root, 'pointerdown', 100, 100)
+      pointer(root, 'pointerup', 100, 100)
+      expect(outlineIds(root)).toEqual([])
+    } finally {
+      unpatchRects()
+      cleanup()
+      root.remove()
+    }
+  })
+
   it('drops the outline for a selected group, and shows none when hints are off', () => {
     const root = document.createElement('div')
     document.body.appendChild(root)
