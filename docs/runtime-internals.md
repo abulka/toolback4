@@ -785,8 +785,15 @@ AGENTS.md).
 **Load modes** — `loadGeneratedBook(raw, mode, { keepExisting })`, each one undo
 step:
 
-- `append` — `mergeGeneratedBook`: incoming backgrounds/pages are re-idded and
-  page names de-duplicated (references rewritten).
+- `append` — `mergeGeneratedBook`: an incoming background whose name matches an
+  existing one is **reused** (the new pages join it and the existing shared
+  objects/script win; any objects the model put on it are dropped and counted),
+  while genuinely new backgrounds are re-idded and appended. Page names are
+  de-duplicated (references rewritten). A page joining a reused background has
+  colliding object names renamed, with `controls.<name>` references rewritten
+  (the page and its background share one runtime namespace). The append prompt in
+  `AiPanel.vue` carries the existing background/page names so the model reuses
+  the current background instead of inventing a duplicate.
 - `modify` — `applyModifiedPage`: replaces the current page's objects/script,
   keeping its id, name and background; names colliding with the background are
   renamed. With `keepExisting` (strict add-only) the existing objects are kept

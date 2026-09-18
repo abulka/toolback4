@@ -12,7 +12,7 @@ function incomingWithPage(name: string, goTarget?: string) {
 }
 
 describe('mergeGeneratedBook', () => {
-  it('appends pages and backgrounds with fresh ids', () => {
+  it('appends pages with fresh ids, reusing a same-named background', () => {
     const current = createBook('Current')
     current.pages[0]!.name = 'Main'
     const incoming = incomingWithPage('Game')
@@ -22,9 +22,61 @@ describe('mergeGeneratedBook', () => {
     expect(book.pages[1]!.name).toBe('Game')
     expect(book.pages[1]!.id).not.toBe(incoming.pages[0]!.id)
     expect(book.pages[1]!.objects[0]!.id).not.toBe(incoming.pages[0]!.objects[0]!.id)
-    expect(book.backgrounds.length).toBe(current.backgrounds.length + incoming.backgrounds.length)
-    expect(report).toEqual({ pagesAdded: 1, backgroundsAdded: 1, renamedPages: [] })
+    expect(book.backgrounds).toHaveLength(current.backgrounds.length)
+    expect(book.pages[1]!.backgroundId).toBe(current.backgrounds[0]!.id)
+    expect(report.backgroundsAdded).toBe(0)
+    expect(report.reusedBackgrounds).toEqual(['Background 1'])
+    expect(report.renamedPages).toEqual([])
     expect(current.pages).toHaveLength(1)
+  })
+
+  it('appends a genuinely new background when the name differs', () => {
+    const current = createBook('Current')
+    const incoming = incomingWithPage('Game')
+    incoming.backgrounds[0]!.name = 'Board'
+    const { book, report } = mergeGeneratedBook(current, incoming)
+
+    expect(book.backgrounds).toHaveLength(2)
+    const added = book.backgrounds[1]!
+    expect(added.name).toBe('Board')
+    expect(added.id).not.toBe(incoming.backgrounds[0]!.id)
+    expect(book.pages[1]!.backgroundId).toBe(added.id)
+    expect(report.backgroundsAdded).toBe(1)
+    expect(report.reusedBackgrounds).toEqual([])
+  })
+
+  it('renames page objects that collide with the reused background', () => {
+    const current = createBook('Current')
+    current.backgrounds[0]!.objects.push(
+      createObject('label', 'nav', { x: 0, y: 0, w: 10, h: 10 }, { text: 'nav' }),
+    )
+    const incoming = incomingWithPage('Game')
+    const page = incoming.pages[0]!
+    page.script = "controls.nav.text = 'x'"
+    const colliding = createObject('button', 'nav', { x: 0, y: 0, w: 10, h: 10 }, { text: 'Go' })
+    colliding.on = { click: "controls.nav.text = 'y'" }
+    page.objects.push(colliding)
+    const { book, report } = mergeGeneratedBook(current, incoming)
+
+    const added = book.pages[1]!
+    expect(added.backgroundId).toBe(current.backgrounds[0]!.id)
+    expect(added.script).toContain('controls.nav2')
+    const renamed = added.objects.find((o) => o.name === 'nav2')!
+    expect(renamed).toBeTruthy()
+    expect(renamed.on['click']).toContain('controls.nav2')
+    expect(report.renamedObjects).toEqual(['nav → nav2'])
+  })
+
+  it('drops objects the model put on a reused background', () => {
+    const current = createBook('Current')
+    const incoming = incomingWithPage('Game')
+    incoming.backgrounds[0]!.objects.push(
+      createObject('label', 'shared', { x: 0, y: 0, w: 10, h: 10 }, { text: 's' }),
+    )
+    const { book, report } = mergeGeneratedBook(current, incoming)
+    expect(book.backgrounds).toHaveLength(1)
+    expect(book.backgrounds[0]!.objects).toHaveLength(0)
+    expect(report.droppedBackgroundObjects).toBe(1)
   })
 
   it('de-duplicates page names and rewrites references to them', () => {

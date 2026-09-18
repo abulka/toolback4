@@ -247,9 +247,41 @@ function seedStyleFromBook(): void {
   if (bg) setStyle({ background: bg.color })
 }
 
+/** The background governing the current edit target (page or background view). */
+function currentBackground() {
+  return store.editing.kind === 'background'
+    ? store.activeBackground
+    : backgroundFor(store.book, store.activePage)
+}
+
+/**
+ * Context for an append request: the existing backgrounds/pages so the model can
+ * join a new page to an existing background (by reusing its exact name) rather
+ * than inventing a duplicate, and can wire navigation to existing pages.
+ */
+function appendContext(): string {
+  const bg = currentBackground()
+  const backgrounds = store.book.backgrounds
+    .map((b) => `- ${b.name} (colour: ${b.color})`)
+    .join('\n')
+  const pages = store.book.pages.map((p) => p.name).join(', ') || '(none)'
+  return (
+    `The current project already has these backgrounds:\n${backgrounds}\n` +
+    `Existing pages: ${pages}\n` +
+    (bg ? `The background in view right now is "${bg.name}".\n` : '') +
+    'Add the new page(s) to this project. For an ordinary new page, put it on the ' +
+    'current background: reuse that background by giving your background exactly the ' +
+    `same name ("${bg?.name ?? ''}") and leave its objects empty — the app keeps the ` +
+    'existing shared objects and script. Only invent a new background name when the ' +
+    'request needs a distinct surface (for example a popup, whose size comes from its ' +
+    `background). page.go('Name') can navigate to any existing page by name.`
+  )
+}
+
 function buildPrompt(): string {
   const text = request.value.trim()
   const tokens = styleGuide(style.value)
+  if (mode.value === 'append') return `${tokens}\n\n${appendContext()}\n\nRequest: ${text}`
   if (mode.value !== 'modify') return `${tokens}\n\nRequest: ${text}`
   const keep = keepExisting.value
     ? 'This is an ADD-ONLY change: reproduce every existing object exactly as given ' +
@@ -326,6 +358,7 @@ function applyBook(book: Book, loadMode: LoadMode): LoadGeneratedResult {
     push(`Modified “${store.activePage.name}” · ${bits.join(' · ')}`)
   } else {
     const bits = [`${report.pagesAdded} page(s)`, `${report.backgroundsAdded} background(s)`]
+    if (report.reusedBackgrounds?.length) bits.push(`joined ${report.reusedBackgrounds.join(', ')}`)
     if (report.renamedPages?.length) bits.push(`renamed pages ${report.renamedPages.join(', ')}`)
     push(`Loaded (${loadMode}): ${bits.join(' · ')}`)
   }

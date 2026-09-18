@@ -39,8 +39,17 @@ export function diffBooks(
     const existingNames = new Set(pageNames(current))
     const incoming = pageNames(generated).filter((n) => !existingNames.has(n))
     lines.push(`Add ${report.pagesAdded} page(s)${incoming.length ? `: ${incoming.join(', ')}` : ''}`)
-    lines.push(`Add ${report.backgroundsAdded} background(s)`)
+    if (report.backgroundsAdded) lines.push(`Add ${report.backgroundsAdded} background(s)`)
+    if (report.reusedBackgrounds.length) {
+      lines.push(`Join existing background(s): ${report.reusedBackgrounds.join(', ')}`)
+    }
+    if (report.droppedBackgroundObjects) {
+      lines.push(
+        `Note: ${report.droppedBackgroundObjects} generated object(s) on reused backgrounds were dropped`,
+      )
+    }
     for (const rename of report.renamedPages) lines.push(`Rename page ${rename}`)
+    for (const rename of report.renamedObjects) lines.push(`Rename object ${rename}`)
     return lines
   }
 

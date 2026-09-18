@@ -18,6 +18,8 @@ describe('diffBooks', () => {
     const lines = diffBooks(current, generated, 'append', 0)
     expect(lines.some((l) => l.includes('Add 1 page'))).toBe(true)
     expect(lines.some((l) => l.includes('Rename page'))).toBe(true)
+    expect(lines.some((l) => l.includes('Join existing background'))).toBe(true)
+    expect(lines.some((l) => l.includes('Add 1 background'))).toBe(false)
   })
 
   it('summarises a modify by added/removed objects and script', () => {

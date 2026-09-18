@@ -144,6 +144,12 @@ was given** — identical `id`, `name`, `control`, `x`, `y`, `props`, `on` and
   "tidy up" or re-theme the page.
 - Preserve page names, backgrounds and every other page.
 - Keep existing `props` key order and values exactly.
+- When adding a page to an existing app, put it on an existing background by
+  giving your background **exactly the same `name`** as that background (usually
+  the current one) and leaving the background's `objects` empty — the app keeps
+  the existing shared objects and script. Only invent a new background name when
+  the request needs a distinct surface (for example a popup, whose size comes from
+  its background). `page.go('Name')` can navigate to any existing page by name.
 
 The app keeps existing objects verbatim for add-only requests and only accepts
 new objects, so any edits you make to existing objects will simply be ignored.

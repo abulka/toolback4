@@ -73,6 +73,8 @@ export interface LoadGeneratedResult {
   error?: string
   pagesAdded?: number
   backgroundsAdded?: number
+  reusedBackgrounds?: string[]
+  droppedBackgroundObjects?: number
   renamedPages?: string[]
   renamedObjects?: string[]
   keptObjects?: number

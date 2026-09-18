@@ -3,7 +3,12 @@ import { flattenObjects, newId, type Background, type Book, type Page, type Page
 export interface MergeReport {
   pagesAdded: number
   backgroundsAdded: number
+  /** names of existing backgrounds the generated pages were joined to */
+  reusedBackgrounds: string[]
+  /** generated background objects dropped because the background was reused */
+  droppedBackgroundObjects: number
   renamedPages: string[]
+  renamedObjects: string[]
 }
 
 export interface ModifyReport {
@@ -129,13 +134,22 @@ export function applyModifiedPage(
 }
 
 
+const normalizeBgName = (name: string): string => name.trim().toLowerCase()
+
 /**
- * Append an AI-generated book to the current one. Backgrounds are appended as
- * fresh backgrounds (new ids) and each incoming page is re-pointed at its new
- * background, so generated names can never collide with objects already on an
- * existing background. Only page names need de-duplicating (page.go resolves by
- * name); when one is renamed, references to it inside the incoming book are
- * rewritten so the generated app keeps working.
+ * Append an AI-generated book to the current one.
+ *
+ * A generated background whose name matches an existing background is **reused**
+ * — the new pages join that background (so a "create a page" request does not
+ * spawn a duplicate "Main") and its shared objects/script are kept. Genuinely
+ * new backgrounds are appended as before (fresh ids). Page names are
+ * de-duplicated because `page.go` resolves by name; when one is renamed,
+ * references to it inside the incoming book are rewritten.
+ *
+ * When a page joins an existing background, its object names are checked against
+ * that background's objects (they share one namespace at run time); collisions
+ * are renamed and references to them rewritten, and any objects the model put on
+ * the reused background are dropped (the existing shared shell wins).
  */
 export function mergeGeneratedBook(
   current: Book,
@@ -175,30 +189,87 @@ export function mergeGeneratedBook(
       children: o.children ? reid(o.children) : undefined,
     }))
 
-  const backgrounds: Background[] = incoming.backgrounds.map((bg) => ({
-    ...bg,
-    id: newId('bg'),
-    script: rewrite(bg.script),
-    objects: reid(bg.objects),
-  }))
-  const bgIdMap = new Map<string, string>()
-  incoming.backgrounds.forEach((bg, i) => bgIdMap.set(bg.id, backgrounds[i]!.id))
-  const fallbackBgId = backgrounds[0]?.id ?? book.backgrounds[0]!.id
+  const byName = new Map<string, Background>()
+  for (const bg of book.backgrounds) {
+    const key = normalizeBgName(bg.name)
+    if (!byName.has(key)) byName.set(key, bg)
+  }
 
+  const bgIdMap = new Map<string, string>()
+  const reservedByBg = new Map<string, Set<string>>()
+  const newBackgrounds: Background[] = []
+  const reusedBackgrounds: string[] = []
+  let droppedBackgroundObjects = 0
+  for (const bg of incoming.backgrounds) {
+    const key = normalizeBgName(bg.name)
+    const existing = byName.get(key)
+    if (existing) {
+      bgIdMap.set(bg.id, existing.id)
+      if (!reusedBackgrounds.includes(existing.name)) reusedBackgrounds.push(existing.name)
+      reservedByBg.set(
+        existing.id,
+        new Set(flattenObjects(existing.objects).map((o) => o.name)),
+      )
+      droppedBackgroundObjects += flattenObjects(bg.objects).length
+      continue
+    }
+    const fresh: Background = {
+      ...bg,
+      id: newId('bg'),
+      script: rewrite(bg.script),
+      objects: reid(bg.objects),
+    }
+    byName.set(key, fresh)
+    bgIdMap.set(bg.id, fresh.id)
+    newBackgrounds.push(fresh)
+  }
+  const fallbackBgId = newBackgrounds[0]?.id ?? book.backgrounds[0]!.id
+
+  const renamedObjects: string[] = []
   for (const page of incoming.pages) {
+    const backgroundId = bgIdMap.get(page.backgroundId) ?? fallbackBgId
+    const reserved = reservedByBg.get(backgroundId)
+    let objects: PageObject[]
+    let script = rewrite(page.script)
+    if (reserved && reserved.size) {
+      const taken = new Set(reserved)
+      const objMap = new Map<string, string>()
+      const build = (objs: PageObject[]): PageObject[] =>
+        objs.map((o) => {
+          const next = uniqueName(o.name, taken)
+          if (next !== o.name) {
+            objMap.set(o.name, next)
+            renamedObjects.push(`${o.name} → ${next}`)
+          }
+          return { ...o, id: newId('obj'), name: next, children: o.children ? build(o.children) : undefined }
+        })
+      objects = build(page.objects)
+      const objRewrite = makeRewrite(objMap)
+      rewriteHandlers(objects, objRewrite)
+      script = objRewrite(script)
+    } else {
+      objects = reid(page.objects)
+    }
     book.pages.push({
       ...page,
       id: newId('page'),
       name: pageNameMap.get(page.name) ?? page.name,
-      backgroundId: bgIdMap.get(page.backgroundId) ?? fallbackBgId,
-      script: rewrite(page.script),
-      objects: reid(page.objects),
+      backgroundId,
+      script,
+      objects,
     })
   }
-  book.backgrounds.push(...backgrounds)
+  book.backgrounds.push(...newBackgrounds)
 
   return {
     book,
-    report: { pagesAdded: incoming.pages.length, backgroundsAdded: backgrounds.length, renamedPages },
+    report: {
+      pagesAdded: incoming.pages.length,
+      backgroundsAdded: newBackgrounds.length,
+      reusedBackgrounds,
+      droppedBackgroundObjects,
+      renamedPages,
+      renamedObjects,
+    },
   }
 }
