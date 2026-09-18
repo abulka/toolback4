@@ -150,6 +150,10 @@ was given** — identical `id`, `name`, `control`, `x`, `y`, `props`, `on` and
   the existing shared objects and script. Only invent a new background name when
   the request needs a distinct surface (for example a popup, whose size comes from
   its background). `page.go('Name')` can navigate to any existing page by name.
+- Call the shared background functions by name to reuse them, and **do not
+  define a page function with the same name** as one of them — the page version
+  silently shadows the shared one. The current background's function names are
+  listed in the request context.
 
 The app keeps existing objects verbatim for add-only requests and only accepts
 new objects, so any edits you make to existing objects will simply be ignored.

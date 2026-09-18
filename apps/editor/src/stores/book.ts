@@ -77,6 +77,7 @@ export interface LoadGeneratedResult {
   droppedBackgroundObjects?: number
   renamedPages?: string[]
   renamedObjects?: string[]
+  warnings?: string[]
   keptObjects?: number
   addedObjects?: number
 }

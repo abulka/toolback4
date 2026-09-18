@@ -50,6 +50,7 @@ export function diffBooks(
     }
     for (const rename of report.renamedPages) lines.push(`Rename page ${rename}`)
     for (const rename of report.renamedObjects) lines.push(`Rename object ${rename}`)
+    for (const warning of report.warnings) lines.push(`Warning: ${warning}`)
     return lines
   }
 

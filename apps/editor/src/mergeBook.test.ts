@@ -79,6 +79,32 @@ describe('mergeGeneratedBook', () => {
     expect(report.droppedBackgroundObjects).toBe(1)
   })
 
+  it('warns when a generated page function shadows a reused background function', () => {
+    const current = createBook('Current')
+    current.backgrounds[0]!.script = 'function goHome() { store.set("home", true) }'
+    const incoming = incomingWithPage('Game')
+    incoming.pages[0]!.script = 'function goHome() { store.set("home", false) }'
+    const { report } = mergeGeneratedBook(current, incoming)
+    expect(report.warnings.some((w) => w.includes('goHome') && w.includes('shadows'))).toBe(true)
+  })
+
+  it('does not warn when generated page functions are distinct', () => {
+    const current = createBook('Current')
+    current.backgrounds[0]!.script = 'function goHome() {}'
+    const incoming = incomingWithPage('Game')
+    incoming.pages[0]!.script = 'function goSettings() {}'
+    const { report } = mergeGeneratedBook(current, incoming)
+    expect(report.warnings).toEqual([])
+  })
+
+  it('warns when a reused background discards generated helper functions', () => {
+    const current = createBook('Current')
+    const incoming = incomingWithPage('Game')
+    incoming.backgrounds[0]!.script = 'function sharedHelper() {}'
+    const { report } = mergeGeneratedBook(current, incoming)
+    expect(report.warnings.some((w) => w.includes('sharedHelper') && w.includes('discarded'))).toBe(true)
+  })
+
   it('de-duplicates page names and rewrites references to them', () => {
     const current = createBook('Current')
     current.pages[0]!.name = 'Main'

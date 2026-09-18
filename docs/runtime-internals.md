@@ -778,7 +778,9 @@ AGENTS.md).
    `controls.<x>` / `page.go` / `popupOpen` targets, `{{key}}` seeds, unknown
    props as warnings, deprecated shapes).
 5. `smokeBook` runs the parsed book off-screen in the canvas
-   (`toolback:smoke`) and returns any script errors.
+   (`toolback:smoke`) and returns any script errors. Each smoke is independent:
+   `runSmoke` finishes with `stopRun()`, which clears the player's module `active`
+   so the next smoke is not skipped by its own `isRunActive()` guard.
 6. Failures are fed back for a bounded number of repair turns; `notes` and
    issues surface in the panel log.
 
@@ -792,8 +794,14 @@ step:
   de-duplicated (references rewritten). A page joining a reused background has
   colliding object names renamed, with `controls.<name>` references rewritten
   (the page and its background share one runtime namespace). The append prompt in
-  `AiPanel.vue` carries the existing background/page names so the model reuses
-  the current background instead of inventing a duplicate.
+  `AiPanel.vue` carries the existing background/page names and the current
+  background's function names, so the model reuses the current background instead
+  of inventing a duplicate and avoids redefining its helpers. The merge returns
+  non-blocking `warnings` for a page function that shadows a function of the same
+  name on the reused background and for helpers discarded with a reused
+  background's script; `AiPanel` also smoke-runs the merged book (start page moved
+  to the first appended page) before applying, so merge-induced runtime errors
+  surface in the result card/log.
 - `modify` — `applyModifiedPage`: replaces the current page's objects/script,
   keeping its id, name and background; names colliding with the background are
   renamed. With `keepExisting` (strict add-only) the existing objects are kept

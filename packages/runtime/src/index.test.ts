@@ -537,4 +537,29 @@ describe('smoke run', () => {
       root.remove()
     }
   })
+
+  it('runs a second smoke after the first (no stale active run)', async () => {
+    const sent: Array<{ type: string; id?: number; errors?: string[] }> = []
+    const send = (msg: { type: string }) => sent.push(msg as { type: string })
+    const root = document.createElement('div')
+    document.body.appendChild(root)
+    const cleanup = listenForEditor(root, send)
+    try {
+      stopRun()
+      const book = createBook('Smoke')
+      book.pages[0]!.script = "function pageEnter() { throw new Error('boom again') }"
+      for (const id of [11, 12]) {
+        window.dispatchEvent(
+          new MessageEvent('message', { data: { type: 'toolback:smoke', id, book } }),
+        )
+        await new Promise((r) => setTimeout(r, 600))
+      }
+      const results = sent.filter((m) => m.type === 'toolback:smokeResult')
+      expect(results.map((m) => m.id)).toEqual([11, 12])
+      for (const r of results) expect(r.errors?.join(' ')).toContain('boom again')
+    } finally {
+      cleanup()
+      root.remove()
+    }
+  })
 })

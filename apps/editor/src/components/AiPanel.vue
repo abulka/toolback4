@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { FONT_FAMILIES, backgroundFor, type Book } from '@toolback/format'
+import { extractFunctionNames } from '@toolback/runtime'
 import { useBookStore, type LoadGeneratedResult } from '../stores/book'
 import { fetchModels, generateBook, styleGuide, type AiSettings, type ChatMessage } from '../ai'
 import { diffBooks, type LoadMode } from '../aiDiff'
+import { mergeGeneratedBook } from '../mergeBook'
 import { detectIntent } from '../aiIntent'
 import { smokeBook } from '../canvasClient'
 import { SYSTEM_PROMPT } from '../aiPrompt'
@@ -265,10 +267,17 @@ function appendContext(): string {
     .map((b) => `- ${b.name} (colour: ${b.color})`)
     .join('\n')
   const pages = store.book.pages.map((p) => p.name).join(', ') || '(none)'
+  const bgFns = bg ? [...new Set(extractFunctionNames(bg.script))] : []
+  const fnLine = bgFns.length
+    ? `The current background's script defines these functions: ${bgFns.join(', ')} — call ` +
+      'them to reuse shared behaviour, and do not define page functions with those names ' +
+      '(a page function would silently shadow the shared one).\n'
+    : ''
   return (
     `The current project already has these backgrounds:\n${backgrounds}\n` +
     `Existing pages: ${pages}\n` +
     (bg ? `The background in view right now is "${bg.name}".\n` : '') +
+    fnLine +
     'Add the new page(s) to this project. For an ordinary new page, put it on the ' +
     'current background: reuse that background by giving your background exactly the ' +
     `same name ("${bg?.name ?? ''}") and leave its objects empty — the app keeps the ` +
@@ -361,6 +370,7 @@ function applyBook(book: Book, loadMode: LoadMode): LoadGeneratedResult {
     if (report.reusedBackgrounds?.length) bits.push(`joined ${report.reusedBackgrounds.join(', ')}`)
     if (report.renamedPages?.length) bits.push(`renamed pages ${report.renamedPages.join(', ')}`)
     push(`Loaded (${loadMode}): ${bits.join(' · ')}`)
+    for (const warning of report.warnings ?? []) push(`  warning: ${warning}`)
   }
   return report
 }
@@ -411,6 +421,18 @@ async function run(): Promise<void> {
         mode.value === 'modify'
           ? []
           : diffBooks(store.book, result.book, mode.value, store.currentPageIndex)
+      if (mode.value === 'append') {
+        // smoke the merged book (start on the first appended page) so errors the
+        // merge introduces — e.g. a call to a helper dropped with a reused
+        // background — surface before it touches the project
+        const merged = mergeGeneratedBook(store.book, result.book).book
+        const firstNew = merged.pages[store.book.pages.length]
+        if (firstNew) merged.startPageId = firstNew.id
+        for (const err of await smokeBook(merged)) {
+          push(`  merged smoke: ${err}`)
+          diff.push(`Warning (merged): ${err}`)
+        }
+      }
       const report = applyBook(result.book, mode.value)
       if (report.ok) {
         if (mode.value === 'modify') {

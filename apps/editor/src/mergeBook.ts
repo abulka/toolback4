@@ -1,4 +1,5 @@
 import { flattenObjects, newId, type Background, type Book, type Page, type PageObject } from '@toolback/format'
+import { extractFunctionNames } from '@toolback/runtime'
 
 export interface MergeReport {
   pagesAdded: number
@@ -9,6 +10,8 @@ export interface MergeReport {
   droppedBackgroundObjects: number
   renamedPages: string[]
   renamedObjects: string[]
+  /** non-blocking hazards introduced by the merge (function clashes, dropped helpers) */
+  warnings: string[]
 }
 
 export interface ModifyReport {
@@ -150,6 +153,11 @@ const normalizeBgName = (name: string): string => name.trim().toLowerCase()
  * that background's objects (they share one namespace at run time); collisions
  * are renamed and references to them rewritten, and any objects the model put on
  * the reused background are dropped (the existing shared shell wins).
+ *
+ * The merge also reports non-blocking `warnings`: page functions that shadow a
+ * function of the same name on the reused background, and helper functions
+ * discarded with a reused background's script. Neither is fatal (the page
+ * function silently wins at run time) but both are easy to miss by hand.
  */
 export function mergeGeneratedBook(
   current: Book,
@@ -197,8 +205,11 @@ export function mergeGeneratedBook(
 
   const bgIdMap = new Map<string, string>()
   const reservedByBg = new Map<string, Set<string>>()
+  const bgFnByBg = new Map<string, Set<string>>()
+  const reusedNameByBg = new Map<string, string>()
   const newBackgrounds: Background[] = []
   const reusedBackgrounds: string[] = []
+  const warnings: string[] = []
   let droppedBackgroundObjects = 0
   for (const bg of incoming.backgrounds) {
     const key = normalizeBgName(bg.name)
@@ -210,7 +221,16 @@ export function mergeGeneratedBook(
         existing.id,
         new Set(flattenObjects(existing.objects).map((o) => o.name)),
       )
+      bgFnByBg.set(existing.id, new Set(extractFunctionNames(existing.script)))
+      reusedNameByBg.set(existing.id, existing.name)
       droppedBackgroundObjects += flattenObjects(bg.objects).length
+      const droppedFns = [...new Set(extractFunctionNames(bg.script))]
+      if (droppedFns.length) {
+        warnings.push(
+          `generated background "${existing.name}" defined function(s) ${droppedFns.join(', ')}, ` +
+            `which were discarded — pages that call them will fail`,
+        )
+      }
       continue
     }
     const fresh: Background = {
@@ -229,6 +249,16 @@ export function mergeGeneratedBook(
   for (const page of incoming.pages) {
     const backgroundId = bgIdMap.get(page.backgroundId) ?? fallbackBgId
     const reserved = reservedByBg.get(backgroundId)
+    const bgFns = bgFnByBg.get(backgroundId)
+    if (bgFns?.size) {
+      const clashes = [...new Set(extractFunctionNames(page.script))].filter((n) => bgFns.has(n))
+      if (clashes.length) {
+        warnings.push(
+          `page "${page.name}" defines function(s) ${clashes.join(', ')}, also on reused ` +
+            `background "${reusedNameByBg.get(backgroundId)}" — the page version shadows the shared one`,
+        )
+      }
+    }
     let objects: PageObject[]
     let script = rewrite(page.script)
     if (reserved && reserved.size) {
@@ -270,6 +300,7 @@ export function mergeGeneratedBook(
       droppedBackgroundObjects,
       renamedPages,
       renamedObjects,
+      warnings,
     },
   }
 }

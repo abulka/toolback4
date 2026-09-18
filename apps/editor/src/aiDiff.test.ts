@@ -22,6 +22,15 @@ describe('diffBooks', () => {
     expect(lines.some((l) => l.includes('Add 1 background'))).toBe(false)
   })
 
+  it('shows function-clash warnings in an append summary', () => {
+    const current = createBook('Current')
+    current.backgrounds[0]!.script = 'function goHome() {}'
+    const generated = createBook('Generated')
+    generated.pages[0]!.script = 'function goHome() {}'
+    const lines = diffBooks(current, generated, 'append', 0)
+    expect(lines.some((l) => l.startsWith('Warning:') && l.includes('goHome'))).toBe(true)
+  })
+
   it('summarises a modify by added/removed objects and script', () => {
     const current = createBook('Current')
     const page = current.pages[0]!

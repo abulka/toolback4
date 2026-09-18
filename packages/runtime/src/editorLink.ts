@@ -290,15 +290,16 @@ export function listenForEditor(
     hidden.style.cssText =
       'position:absolute;left:-10000px;top:0;width:800px;height:600px;overflow:hidden'
     root.appendChild(hidden)
-    let handle: ReturnType<typeof runBook> | null = null
     try {
-      handle = runBook(book, hidden, (message) => errors.push(message), resolveStartPageIndex(book))
+      runBook(book, hidden, (message) => errors.push(message), resolveStartPageIndex(book))
     } catch (err) {
       errors.push(String(err))
     }
     setTimeout(() => {
       try {
-        handle?.stop()
+        // stopRun (not handle.stop) also clears the module `active`, so the
+        // isRunActive() guard above does not skip every later smoke run
+        stopRun()
       } catch {
         /* already stopped */
       }
