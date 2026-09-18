@@ -16,7 +16,6 @@ import ImportHelper from './components/ImportHelper.vue'
 import PagesPanel from './components/PagesPanel.vue'
 import StoreBrowser from './components/StoreBrowser.vue'
 import AiPanel from './components/AiPanel.vue'
-import BackgroundDialog from './components/BackgroundDialog.vue'
 import OpenDialog from './components/OpenDialog.vue'
 
 const store = useBookStore()
@@ -372,6 +371,23 @@ async function copyPageJson(): Promise<void> {
   pageJsonCopied.value = ok
   clearTimeout(pageJsonTimer)
   pageJsonTimer = setTimeout(() => (pageJsonCopied.value = false), 1500)
+}
+
+/** delete the background being edited (with a pages confirm when in use) */
+function onDeleteBackground(): void {
+  if (store.editing.kind !== 'background') return
+  const id = store.editing.id
+  if (store.book.backgrounds.length <= 1) return
+  const name = store.activeBackground?.name ?? 'This background'
+  const used = store.book.pages.filter((p) => p.backgroundId === id).length
+  if (used > 0) {
+    const ok = window.confirm(
+      `"${name}" is used by ${used} page${used === 1 ? '' : 's'}.\n\n` +
+        'OK deletes the background AND those pages.',
+    )
+    if (!ok) return
+  }
+  store.removeBackground(id, used > 0)
 }
 
 function selectInList(obj: PageObject): void {
@@ -981,9 +997,9 @@ function startPaletteSplitDrag(e: PointerEvent): void {
               </select>
               <button
                 class="bg-props"
-                title="Background properties"
-                @click="store.backgroundDialogId = pageBackgroundId"
-              >Properties…</button>
+                title="Edit this background — name, colour, delete and script"
+                @click="store.editBackground(pageBackgroundId)"
+              >Edit background</button>
             </div>
           </div>
 
@@ -1073,9 +1089,15 @@ function startPaletteSplitDrag(e: PointerEvent): void {
         </template>
 
         <template v-else>
+          <button class="back-to-page" title="Return to editing a page" @click="store.selectPage(store.currentPageIndex)">
+            ← Back to page
+          </button>
           <p class="hint bg-banner">
             Editing background <strong>"{{ store.activeBackground?.name }}"</strong> — its objects
             appear on all {{ store.backgroundPageCount }} page(s) that use it.
+            <span class="bg-banner-sub">
+              Pages here fill the window — set a page to Fixed size in the Page tab for a dialog or popup.
+            </span>
           </p>
           <div class="field">
             <label>Background name</label>
@@ -1085,19 +1107,22 @@ function startPaletteSplitDrag(e: PointerEvent): void {
             />
           </div>
           <div class="field">
-            <label>Colour</label>
-            <input
-              type="color"
-              class="bg-color"
-              :value="store.activeBackground?.color"
-              @input="store.setBackgroundProp(store.editing.id, { color: ($event.target as HTMLInputElement).value })"
-            />
+            <label>Colour (fills every page on this background)</label>
+            <div class="bg-color-row">
+              <input
+                type="color"
+                class="bg-color"
+                :value="store.activeBackground?.color"
+                @input="store.setBackgroundProp(store.editing.id, { color: ($event.target as HTMLInputElement).value })"
+              />
+              <input
+                class="bg-hex"
+                :value="store.activeBackground?.color"
+                spellcheck="false"
+                @change="store.setBackgroundProp(store.editing.id, { color: ($event.target as HTMLInputElement).value })"
+              />
+            </div>
           </div>
-          <button
-            class="bg-props full"
-            title="Background name, colour and delete"
-            @click="store.backgroundDialogId = store.editing.id"
-          >Background properties…</button>
 
           <div class="row">
             <h2 class="tab-head">Background script</h2>
@@ -1116,9 +1141,12 @@ function startPaletteSplitDrag(e: PointerEvent): void {
             @update:model-value="store.setBackgroundScript"
           />
 
-          <p class="hint">
-            Pages always play at run time — Run shows the first page on this background.
-          </p>
+          <button
+            class="delete-bg"
+            :disabled="store.book.backgrounds.length <= 1"
+            :title="store.book.backgrounds.length <= 1 ? 'A book always keeps one background' : 'Delete this background'"
+            @click="onDeleteBackground"
+          >Delete background…</button>
         </template>
       </div>
 
@@ -1160,7 +1188,6 @@ function startPaletteSplitDrag(e: PointerEvent): void {
       </div>
     </aside>
 
-    <BackgroundDialog v-if="store.backgroundDialogId" />
     <OpenDialog v-if="openDialogOpen" @close="openDialogOpen = false" @import="onImport" />
 
     <footer class="status">
@@ -1878,14 +1905,8 @@ body.tb-palette-dragging * {
   color: #fff;
 }
 
-.bg-props.full {
-  width: 100%;
-  padding: 9px 10px;
-  margin: 4px 0 8px;
-}
-
-.bg-banner {
-  margin: 4px 2px 12px;
+.hint.bg-banner {
+  margin: 4px 2px 20px;
   padding: 9px 11px;
   border: 1px solid var(--ed-accent);
   border-radius: 8px;
@@ -1914,6 +1935,60 @@ body.tb-palette-dragging * {
   border: 1px solid var(--ed-border);
   border-radius: 6px;
   cursor: pointer;
+}
+
+.bg-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bg-hex {
+  width: 110px;
+  font: 12px ui-monospace, 'SF Mono', Menlo, monospace;
+  color: var(--ed-text);
+}
+
+.bg-banner-sub {
+  display: block;
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: var(--ed-text-dim);
+}
+
+.back-to-page {
+  font: 500 11px/1 system-ui, sans-serif;
+  color: var(--ed-text-dim);
+  background: transparent;
+  border: none;
+  margin: 0 0 6px 2px;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.back-to-page:hover {
+  color: var(--ed-accent);
+}
+
+.delete-bg {
+  margin-top: 12px;
+  width: 100%;
+  font: 600 12px/1 system-ui, sans-serif;
+  color: #fca5a5;
+  background: rgba(220, 38, 38, 0.12);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  border-radius: 8px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.delete-bg:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.22);
+}
+
+.delete-bg:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .status .note {

@@ -910,8 +910,10 @@ pages nested underneath:
   A single click on the background does nothing — this is deliberate, so a stray
   click can't drop you onto an empty background. A click on any page always
   returns the canvas to that page.
-- **⚙** opens the background properties: name, colour and **Delete…**
-  (backgrounds with pages take them along — confirmed first)
+- In background mode the **Background** panel (Page tab) holds its name, colour,
+  script and **Delete background…** (backgrounds with pages take them along —
+  confirmed first). **← Back to page** returns to the page you were editing; the
+  same panel opens from a page via the Page tab's **Edit background** button.
 - **✎** renames it; ⧉ duplicates
 - **drag pages** to rearrange them, or drop them on another background to move
   them there

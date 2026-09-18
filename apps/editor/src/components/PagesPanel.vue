@@ -204,9 +204,8 @@ function bgDropClass(id: string): Record<string, boolean> {
             <span class="bg-name">{{ g.bg.name }}</span>
           </span>
           <span class="page-actions">
-            <button title="Edit this background's own objects (or double-click the row)" @click.stop="store.editBackground(g.bg.id)" @dblclick.stop>👁</button>
+            <button title="Edit this background — objects, name, colour, delete and script (or double-click the row)" @click.stop="store.editBackground(g.bg.id)" @dblclick.stop>👁</button>
             <button title="Rename background" @click.stop="startBgRename(g.bg)" @dblclick.stop>✎</button>
-            <button title="Background properties (name, colour, delete)" @click.stop="store.backgroundDialogId = g.bg.id" @dblclick.stop>⚙</button>
             <button title="Duplicate background" @click.stop="store.duplicateBackground(g.bg.id)" @dblclick.stop>⧉</button>
           </span>
         </span>

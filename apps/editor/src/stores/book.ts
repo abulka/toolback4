@@ -106,7 +106,6 @@ export const useBookStore = defineStore('book', () => {
    * or undo clears it.
    */
   const compareBook = ref<Book | null>(null)
-  const backgroundDialogId = ref<string | null>(null)
   /** author-mode plugin: null, or the running plugin page's name */
   const authorActive = ref<null | string>(null)
   const recents = ref<RecentEntry[]>([])
@@ -1666,7 +1665,6 @@ export const useBookStore = defineStore('book', () => {
     popupsOpen,
     currentPageIndex,
     editing,
-    backgroundDialogId,
     authorActive,
     recents,
     autosaveAt,
