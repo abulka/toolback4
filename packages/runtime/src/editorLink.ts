@@ -333,6 +333,7 @@ export function listenForEditor(
         return i === -1 ? 0 : i
       }
       if (data.design) {
+        root.classList.add('tb-design')
         stopStoreStream()
         stopRun()
         if (view.kind === 'background') {
@@ -363,6 +364,7 @@ export function listenForEditor(
         // a running author plugin hot-reloads when its page's scripts changed
         syncAuthorScripts(data.book)
       } else {
+        root.classList.remove('tb-design')
         design.setEnabled(false)
         const handle = runBook(
           data.book,

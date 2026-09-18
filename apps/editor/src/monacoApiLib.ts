@@ -53,6 +53,14 @@ interface TBControl {
   radius: number
   /** Opacity, 0–1 */
   opacity: number
+  /** Canvas objects only: the raw <canvas> element */
+  readonly canvas?: HTMLCanvasElement
+  /** Canvas objects only: the 2D drawing context (use inside the draw script) */
+  readonly ctx?: CanvasRenderingContext2D | null
+  /** Canvas objects only: clear and re-run the draw script */
+  redraw?(): void
+  /** Canvas objects only: start (default) or stop a per-frame repaint loop */
+  animate?(on?: boolean): void
   /** Attach an extra event handler, e.g. on('click', (e) => { ... }) */
   on(event: string, fn: TBListener): void
 }
@@ -126,7 +134,7 @@ declare const author: {
   /** deep JSON of the selected objects (Copy JSON equivalent) */
   selectionJson(): Promise<any[]>
   /** add a control to the page being edited; returns its live handle */
-  insertControl(kind: 'button' | 'label' | 'input' | 'image' | 'card' | 'container' | 'switch' | 'group' | 'markdown' | 'html' | 'shape', options?: { x?: number; y?: number; w?: number; h?: number; props?: Record<string, any> }): Promise<TBAuthorObject>
+  insertControl(kind: 'button' | 'label' | 'input' | 'image' | 'card' | 'container' | 'switch' | 'group' | 'markdown' | 'html' | 'shape' | 'canvas', options?: { x?: number; y?: number; w?: number; h?: number; props?: Record<string, any> }): Promise<TBAuthorObject>
   /**
    * Patch any object: props (text, color, title, …) AND geometry (x/y/width/
    * height resolved editor-side, group-aware). Omit the id (null) to patch

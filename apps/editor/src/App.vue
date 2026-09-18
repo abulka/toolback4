@@ -394,7 +394,7 @@ function selectInList(obj: PageObject): void {
   store.setSelection([obj.id])
 }
 
-const palette: ControlKind[] = ['button', 'label', 'input', 'image', 'card', 'container', 'switch', 'markdown', 'html', 'shape']
+const palette: ControlKind[] = ['button', 'label', 'input', 'image', 'card', 'container', 'switch', 'markdown', 'html', 'shape', 'canvas']
 
 function onPaletteDown(kind: ControlKind, e: PointerEvent): void {
   if (iframe.value && !store.isRunning) startPaletteDrag(e, kind, iframe.value)

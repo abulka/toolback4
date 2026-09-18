@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { AlignMode, MatchDim, PageObject, Rect } from '@toolback/format'
 import {
   describeFit,
@@ -57,12 +57,26 @@ function onFitV(e: Event): void {
 }
 
 const EVENTS = ['click', 'dblclick', 'change', 'input', 'mouseenter', 'mouseleave'] as const
-const currentEvent = ref<(typeof EVENTS)[number]>('click')
+// `draw` is a canvas lifecycle hook (invoked by the runtime), not a DOM event
+const CANVAS_EVENT = 'draw'
+const currentEvent = ref<string>('click')
+const eventNames = computed<string[]>(() =>
+  sel.value?.control === 'canvas' ? [CANVAS_EVENT, ...EVENTS] : [...EVENTS],
+)
 const eventScript = computed(() => sel.value?.on[currentEvent.value] ?? '')
 
-function hasScript(e: (typeof EVENTS)[number]): boolean {
+function hasScript(e: string): boolean {
   return Boolean(sel.value?.on[e]?.trim())
 }
+
+watch(
+  () => sel.value?.id,
+  () => {
+    if (!eventNames.value.includes(currentEvent.value)) {
+      currentEvent.value = sel.value?.control === 'canvas' ? CANVAS_EVENT : 'click'
+    }
+  },
+)
 
 // ---- Selection sub-tabs ----
 const subTab = ref<'general' | 'script'>('general')
@@ -149,6 +163,7 @@ const CAPS: Record<string, StyleCaps> = {
   html: { font: true, bold: true, italic: true, textAlign: true, vAlign: false, textColor: true, background: true, trackColor: false, border: true, radius: true, opacity: true },
   image: { font: false, bold: false, italic: false, textAlign: false, vAlign: false, textColor: false, background: false, trackColor: false, border: true, radius: true, opacity: true },
   shape: { font: false, bold: false, italic: false, textAlign: false, vAlign: false, textColor: false, background: true, trackColor: false, border: true, radius: false, opacity: true },
+  canvas: { font: false, bold: false, italic: false, textAlign: false, vAlign: false, textColor: false, background: true, trackColor: false, border: true, radius: true, opacity: true },
 }
 const APPEARANCE = new Set<string>(APPEARANCE_KINDS)
 const BOX = new Set<string>(BOX_KINDS)
@@ -607,7 +622,11 @@ function onPaste(): void {
       @set="onShapeProp"
     />
     </div>
-    <p v-if="textFields.length === 0 && !isGroupSel() && sel?.control !== 'shape'" class="hint">No content properties.</p>
+    <p v-if="textFields.length === 0 && !isGroupSel() && sel?.control !== 'shape' && sel?.control !== 'canvas'" class="hint">No content properties.</p>
+    <p v-if="sel?.control === 'canvas'" class="hint">
+      Painted by the <strong>draw</strong> event script in the Script tab — use
+      <code>self.ctx</code> and call <code>self.animate()</code> for animation.
+    </p>
     <template v-if="showStyle">
     <h2>Style</h2>
     <div class="fields">
@@ -666,7 +685,7 @@ function onPaste(): void {
     <div class="event-row">
       <label>Event</label>
       <select v-model="currentEvent">
-        <option v-for="e in EVENTS" :key="e" :value="e" :class="{ scripted: hasScript(e) }">{{ hasScript(e) ? e + ' •' : e }}</option>
+        <option v-for="e in eventNames" :key="e" :value="e" :class="{ scripted: hasScript(e) }">{{ hasScript(e) ? e + ' •' : e }}</option>
       </select>
     </div>
     <div class="script-fill">

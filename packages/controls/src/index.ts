@@ -362,6 +362,9 @@ export function applyStyleToTree(root: HTMLElement, obj: PageObject): void {
       applyFontProps(root, obj)
       applyBackground(root, obj, { colorAsSurface: true })
       return
+    case 'canvas':
+      applyBackground(root, obj, { colorAsSurface: true })
+      return
     default:
       return
   }
@@ -548,6 +551,19 @@ export function renderContainer(obj: PageObject): HTMLElement {
   return el
 }
 
+/**
+ * canvas: a real `<canvas>` the runtime sizes to the object box (hi-DPI) and
+ * paints by running the object's `draw` script. At design time it shows a grid
+ * placeholder (`body.tb-design .tb-canvas`); the renderer itself only creates
+ * the element — the runtime owns the backing store and drawing.
+ */
+export function renderCanvas(obj: PageObject): HTMLElement {
+  const el = document.createElement('canvas')
+  el.className = 'tb-canvas'
+  applyStyleToTree(el, obj)
+  return el
+}
+
 /** shape: an inline SVG geometry sized to the object box (viewBox 0–100) */
 export function renderShape(obj: PageObject): HTMLElement {
   const type = resolveShapeType(obj.props['shape'])
@@ -590,4 +606,5 @@ export function registerControls(): void {
   registerControl('markdown', renderMarkdown)
   registerControl('html', renderHtml)
   registerControl('shape', renderShape)
+  registerControl('canvas', renderCanvas)
 }

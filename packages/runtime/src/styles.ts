@@ -184,6 +184,23 @@ body > .tb-page {
   stroke-width: 2;
 }
 
+/* canvas: real 2D surface; the runtime sizes the backing store and runs the
+   object's draw script. Design mode shows a grid placeholder instead. */
+.tb-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #ffffff;
+}
+
+.tb-design .tb-canvas {
+  background-color: #f8fafc;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.28) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.28) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
 /* markdown / HTML viewers: read-only rich content, scrollable inside the object */
 .tb-markdown,
 .tb-html {

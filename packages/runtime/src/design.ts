@@ -1030,7 +1030,8 @@ export function createDesignController(send: (msg: DesignOutMessage) => void): D
       (cls.contains('tb-label') ||
         cls.contains('tb-markdown') ||
         cls.contains('tb-html') ||
-        cls.contains('tb-shape'))
+        cls.contains('tb-shape') ||
+        cls.contains('tb-canvas'))
     )
   }
 

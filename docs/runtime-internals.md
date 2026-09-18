@@ -41,7 +41,7 @@ Background {
 Page    { id, name, script, backgroundId, author?, size?: {w,h}, objects: PageObject[] }
 PageObject {
   id, name,                       // name = unique per page/background; the `controls[name]` handle
-  control: 'button'|'label'|'input'|'image'|'card'|'container'|'switch'|'group'|'shape',
+  control: 'button'|'label'|'input'|'image'|'card'|'container'|'switch'|'group'|'shape'|'canvas',
   x: XEdge,                       // horizontal edge constraint (see §4.1)
   y: YEdge,                       // vertical edge constraint
   props: Record<string, unknown>, // control-specific, e.g. { text }
@@ -100,7 +100,12 @@ YEdge = { mode:'top'; top; height }
   paint (`applyShapeStyle`): `background`/`color` become `fill`, the border
   props become `stroke`/`stroke-width`/`stroke-dasharray`, `radius` rounds a
   rectangle, and `shape`/`sides`/`points`/`innerRatio`/`path` select the
-  geometry.
+  geometry. A **canvas** is a real `<canvas>`; the player sizes its backing
+  store to the object box at the device pixel ratio and paints it by running
+  the object's reserved `draw` handler, exposing `self.canvas`/`self.ctx`/
+  `self.redraw()`/`self.animate()` per canvas in `runPage`.
+  `background`/`color` are the CSS surface behind the drawing; border/radius/
+  opacity are box decoration.
   `styleKindsForProp` (`format`) is the shared prop→kinds table the editor
   selection patch and the runtime group propagation both read. Labels and
   buttons are flex **columns** (horizontal alignment is `text-align` on a
@@ -248,6 +253,14 @@ Semantics (ToolBook-faithful):
    ones do.
 7. `control.on(event, fn)` (the API method) attaches a *direct* listener on the
    object's element — outside the chain, no forward.
+
+The reserved **`draw`** event is compiled like any other handler but is **not**
+attached as a DOM listener (`types.delete('draw')`); after the dispatchers are
+wired, `runPage` finds every canvas object, injects `canvas`/`ctx`/`redraw`/
+`animate` onto its ControlApi, and calls its compiled `draw` handler on render,
+on resize, on each `store.subscribe` tick, and per frame while `animate(true)`.
+Every canvas loop and store subscription is added to `scope.listeners`, so
+`pageLeave`/`stop()` tears them down with the rest.
 
 `pageLeave`/`stop()` remove every dispatcher and store subscription.
 

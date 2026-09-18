@@ -74,6 +74,19 @@ export const SNIPPETS: SnippetSpec[] = [
     body: "console.log('you clicked', target.name)$0",
   },
   {
+    label: 'canvas-draw',
+    detail: 'canvas draw script: paint with self.ctx',
+    body:
+      "const ctx = self.ctx\nconst w = self.width, h = self.height\nctx.fillStyle = '${1:#3b82f6}'\nctx.fillRect(0, 0, w, h)$0",
+    kinds: ['object'],
+  },
+  {
+    label: 'canvas-animate',
+    detail: 'canvas: start a per-frame repaint loop',
+    body: 'self.animate(true)$0',
+    kinds: ['object'],
+  },
+  {
     label: 'input-to-store',
     detail: 'remember an input value (input/change script)',
     body: "store.set('${1:key}', event.target.value)$0",
@@ -121,6 +134,21 @@ const CONTROL_MEMBERS: Array<{
   { label: 'radius', detail: 'corner radius in px', body: 'radius', kind: 'prop' },
   { label: 'opacity', detail: 'opacity, 0–1', body: 'opacity', kind: 'prop' },
   { label: 'name', detail: "this object's name", body: 'name', kind: 'prop' },
+  { label: 'canvas', detail: 'canvas object: the raw <canvas> element', body: 'canvas', kind: 'prop' },
+  { label: 'ctx', detail: 'canvas object: the 2D drawing context', body: 'ctx', kind: 'prop' },
+  {
+    label: 'redraw',
+    detail: 'canvas object: clear and re-run the draw script',
+    body: 'redraw()',
+    kind: 'method',
+  },
+  {
+    label: 'animate',
+    detail: 'canvas object: start/stop a per-frame repaint loop',
+    body: 'animate(${1:true})',
+    kind: 'method',
+    snippet: true,
+  },
   {
     label: 'on',
     detail: "attach a handler, e.g. on('click', (e) => { … })",

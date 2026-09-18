@@ -92,11 +92,11 @@ of truth). Only use a control kind and property names that appear there.
 Unknown properties are ignored and reported as warnings.
 
 Most text controls also accept a set of styling props, and box controls
-(button, label, input, card, container, image, markdown, html, shape) accept
-`borderWidth`, `borderStyle` (`'solid' | 'dashed'`), `borderColor`, `radius` and
-`opacity` (0–1); a switch accepts `trackColor`. On a shape these are SVG paint:
-`background`/`color` fill it and the border props stroke its outline. Use these
-to give an app a consistent look instead of inventing CSS.
+(button, label, input, card, container, image, markdown, html, shape, canvas)
+accept `borderWidth`, `borderStyle` (`'solid' | 'dashed'`), `borderColor`,
+`radius` and `opacity` (0–1); a switch accepts `trackColor`. On a shape these
+are SVG paint: `background`/`color` fill it and the border props stroke its
+outline. Use these to give an app a consistent look instead of inventing CSS.
 
 ---
 
@@ -108,6 +108,8 @@ Scripts are plain modern JavaScript (no TypeScript annotations). Two homes:
   plus `pageEnter()` (runs when the page opens) and `pageLeave()`.
 - **Object scripts** (`object.on.<event>`): the handler body for one event.
   Events: `click`, `dblclick`, `change`, `input`, `mouseenter`, `mouseleave`.
+  A **canvas** object additionally has `draw`, which repaints it; use
+  `self.ctx` inside it and call `self.animate()` for a per-frame animation.
 
 The API table (appended from the manifest) lists `store`, `controls`, `page`,
 `event`, `target`, `self`, `forward()` and the plugin-only `author` bridge.

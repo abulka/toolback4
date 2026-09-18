@@ -330,6 +330,67 @@ controls.toggle.on('click', () => {
 })
 ```
 
+### Canvas — drawing with code
+
+The **canvas** control is a real 2D drawing surface you paint from JavaScript.
+Its **Script** tab has a special **draw** event: the code you write there runs
+whenever the canvas needs repainting. Inside it, `self.ctx` is the standard
+[Canvas 2D context](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D)
+and `self.canvas` is the element. The visible box is given in CSS pixels — the
+runtime handles the device-pixel-ratio backing store for crisp lines.
+
+```js
+// draw event — a filled circle in the middle
+const ctx = self.ctx
+const w = self.width, h = self.height
+ctx.beginPath()
+ctx.arc(w / 2, h / 2, Math.min(w, h) / 3, 0, Math.PI * 2)
+ctx.fillStyle = '#3b82f6'
+ctx.fill()
+```
+
+The `draw` script re-runs automatically when:
+
+- the page renders (and after every `page.go`),
+- the canvas is resized (including editor preview widths / window resize),
+- **any** `store.set` happens — so binding a drawing to store state is reactive,
+
+and you can ask for a repaint yourself with `self.redraw()`.
+
+**Animation.** Call `self.animate()` to start a per-frame loop that repaints the
+canvas ~60×/second; call `self.animate(false)` to stop it. You can also start it
+from `pageEnter()` so it runs for as long as the page is open. The loop is torn
+down automatically on `page.go`, Stop and Run — you never leak a frame loop.
+
+```js
+function pageEnter() {
+  controls.spinner.animate()
+}
+```
+
+```js
+// spinner draw event — a constantly rotating arc
+const ctx = self.ctx
+const t = performance.now() / 1000
+const w = self.width, h = self.height
+const r = Math.min(w, h) / 3
+ctx.lineWidth = 6
+ctx.strokeStyle = '#f59e0b'
+ctx.beginPath()
+ctx.arc(w / 2, h / 2, r, t, t + Math.PI * 1.5)
+ctx.stroke()
+```
+
+Notes:
+
+- `self.ctx` is `null` only if there is no 2D context (very rare); guard if you
+  want to be safe: `if (!self.ctx) return`.
+- The canvas' **Background** style is the surface colour behind your drawing;
+  `clearRect` (which every repaint starts with) reveals it. Borders, corner
+  radius and opacity from the Box row apply to the element.
+- Canvas drawing is author-trusted code, exactly like the `html` control and
+  every other script.
+
 ### Responsive edges
 
 Every object can carry a **Responsive** setting — a horizontal and a vertical
@@ -588,6 +649,7 @@ The event dropdown offers:
 | `input` | an input's value changes, every keystroke |
 | `mouseenter` | the pointer enters the object |
 | `mouseleave` | the pointer leaves the object |
+| `draw` | **canvas only** — (re)paint the canvas; runs on render, resize, every `store.set`, and each frame while `self.animate()` is on |
 
 ## Recipes
 

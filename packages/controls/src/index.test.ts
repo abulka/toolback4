@@ -5,6 +5,7 @@ import {
   contentKeyFor,
   registerControls,
   renderButton,
+  renderCanvas,
   renderCard,
   renderContainer,
   renderHtml,
@@ -96,6 +97,18 @@ describe('controls', () => {
     expect(arrowGeom.tagName.toLowerCase()).toBe('line')
     expect(arrowGeom.getAttribute('marker-end')).toMatch(/^url\(#tb-arrow-/)
     expect(arrowGeom.style.stroke).toBe('#3b82f6')
+  })
+
+  it('renders a canvas element and applies its background fill', () => {
+    const el = renderCanvas(createObject('canvas', 'cv1', { x: 0, y: 0, w: 320, h: 200 }, {
+      background: 'navy', borderWidth: 1, borderColor: 'red', radius: 8, opacity: 0.8,
+    }))
+    expect(el.tagName).toBe('CANVAS')
+    expect(el.className).toBe('tb-canvas')
+    expect(el.style.background).toBe('#1e3a8a')
+    expect(el.style.borderWidth).toBe('1px')
+    expect(el.style.borderRadius).toBe('8px')
+    expect(el.style.opacity).toBe('0.8')
   })
 
   it('renders a switch with a checkbox, label text and checked state', () => {
@@ -258,6 +271,7 @@ describe('controls', () => {
       'markdown',
       'html',
       'shape',
+      'canvas',
     ] as const) {
       const obj = createObject(kind, 'x', { x: 0, y: 0, w: 100, h: 100 })
       expect(() => renderObject(obj)).not.toThrow()

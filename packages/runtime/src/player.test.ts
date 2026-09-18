@@ -486,7 +486,7 @@ describe('groups', () => {
 
 function makeBook(opts: {
   pageScript?: string
-  objects?: Array<{ name: string; control: 'button' | 'label' | 'switch' | 'card' | 'markdown' | 'html'; text?: string; props?: Record<string, unknown>; on?: Record<string, string> }>
+  objects?: Array<{ name: string; control: 'button' | 'label' | 'switch' | 'card' | 'markdown' | 'html' | 'canvas'; text?: string; props?: Record<string, unknown>; on?: Record<string, string> }>
 }): Book {
   return {
     id: 'book1',
@@ -1105,5 +1105,52 @@ describe('player', () => {
       expect(book.pages[0]!.objects[0]!.x).toMatchObject({ left: 99 })
       handle.stop()
     })
+  })
+})
+
+describe('canvas controls', () => {
+  it('sizes the backing store and runs draw on render, store change and redraw()', () => {
+    const calls: string[] = []
+    const fakeCtx = {
+      setTransform: (): void => void calls.push('transform'),
+      clearRect: (): void => void calls.push('clear'),
+      fillRect: (): void => void calls.push('fill'),
+    }
+    const origGet = HTMLCanvasElement.prototype.getContext
+    const origRect = HTMLCanvasElement.prototype.getBoundingClientRect
+    HTMLCanvasElement.prototype.getContext = function (): unknown {
+      return fakeCtx
+    } as typeof HTMLCanvasElement.prototype.getContext
+    HTMLCanvasElement.prototype.getBoundingClientRect = function (): DOMRect {
+      return { width: 320, height: 200, left: 0, top: 0, right: 320, bottom: 200, x: 0, y: 0, toJSON: () => ({}) } as DOMRect
+    }
+    try {
+      const root = document.createElement('div')
+      document.body.appendChild(root)
+      const book = makeBook({
+        objects: [
+          { name: 'cv', control: 'canvas', on: { draw: 'self.ctx.fillRect(0, 0, 10, 10)' } },
+          { name: 'btn', control: 'button', text: 'redraw', on: { click: 'cv.redraw()' } },
+        ],
+      })
+      const handle = runBook(book, root)
+      const canvas = root.querySelector('canvas.tb-canvas') as HTMLCanvasElement
+      expect(canvas.width).toBe(320)
+      expect(canvas.height).toBe(200)
+      const fills = (): number => calls.filter((c) => c === 'fill').length
+      expect(fills()).toBe(1)
+
+      handle.store.set('tick', 1)
+      expect(fills()).toBe(2)
+
+      root.querySelector('button.tb-button')!.dispatchEvent(new MouseEvent('click'))
+      expect(fills()).toBe(3)
+      expect(handle.controls['cv']!.canvas).toBe(canvas)
+      handle.stop()
+      root.remove()
+    } finally {
+      HTMLCanvasElement.prototype.getContext = origGet
+      HTMLCanvasElement.prototype.getBoundingClientRect = origRect
+    }
   })
 })

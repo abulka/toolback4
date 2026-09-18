@@ -12,6 +12,7 @@ export const CONTROL_KINDS = [
   'markdown',
   'html',
   'shape',
+  'canvas',
 ] as const
 export type ControlKind = (typeof CONTROL_KINDS)[number]
 
@@ -285,6 +286,7 @@ export const DEFAULT_SIZES: Record<ControlKind, { w: number; h: number }> = {
   markdown: { w: 420, h: 260 },
   html: { w: 420, h: 260 },
   shape: { w: 120, h: 120 },
+  canvas: { w: 360, h: 240 },
 }
 
 /** simplified web-safe font families offered in the editor */
@@ -309,10 +311,10 @@ export const FONT_STACKS: Record<FontFamily, string> = {
 export const TEXT_STYLE_KINDS = ['button', 'label', 'input', 'switch', 'card', 'markdown', 'html'] as const
 
 /** controls that can paint a surface/text colour (text kinds plus surfaces) */
-export const APPEARANCE_KINDS = [...TEXT_STYLE_KINDS, 'container', 'shape'] as const
+export const APPEARANCE_KINDS = [...TEXT_STYLE_KINDS, 'container', 'shape', 'canvas'] as const
 
 /** controls with a rendered box that border/radius/opacity apply to */
-export const BOX_KINDS = ['button', 'label', 'input', 'card', 'container', 'image', 'markdown', 'html', 'shape'] as const
+export const BOX_KINDS = ['button', 'label', 'input', 'card', 'container', 'image', 'markdown', 'html', 'shape', 'canvas'] as const
 
 /** which control kinds each style prop writes to — the shared table the editor
  *  selection patch and the runtime group propagation both read */
@@ -398,6 +400,7 @@ export const BORDER_DEFAULTS: Record<ControlKind, BorderDefault> = {
   markdown: { width: 0, style: 'solid', color: '#d1d5db' },
   html: { width: 0, style: 'solid', color: '#d1d5db' },
   shape: { width: 0, style: 'solid', color: '#6b7280' },
+  canvas: { width: 0, style: 'solid', color: '#d1d5db' },
 }
 
 export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
@@ -412,6 +415,7 @@ export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
   markdown: { text: '# Heading\n\nBody…', fontSize: 15 },
   html: { html: '<p>Hello</p>' },
   shape: { shape: 'ellipse', background: '#e5e7eb' },
+  canvas: {},
 }
 
 /**
@@ -604,6 +608,7 @@ export const CONTROL_PROPS: Record<ControlKind, PropSpec[]> = {
   markdown: [P_TEXT, ...TEXT_STYLE_PROPS, ...BOX_PROPS],
   html: [P_HTML, ...TEXT_STYLE_PROPS, ...BOX_PROPS],
   shape: [P_SHAPE, P_SIDES, P_POINTS, P_INNER_RATIO, P_PATH, P_BACKGROUND, P_COLOR, ...BOX_PROPS],
+  canvas: [P_COLOR, P_BACKGROUND, ...BOX_PROPS],
 }
 
 export interface ScriptApiMember {
@@ -668,7 +673,11 @@ export const SCRIPT_API: ScriptApiNamespace[] = [
   {
     name: 'self',
     detail: 'The object whose script is running (`this` is an alias)',
-    members: [],
+    members: [
+      { name: 'self.canvas / self.ctx', detail: "a canvas object's element and 2D drawing context" },
+      { name: 'self.redraw()', detail: "clear a canvas and re-run its `draw` script" },
+      { name: 'self.animate(on?)', detail: 'start/stop a per-frame repaint loop (canvas animation)' },
+    ],
   },
   {
     name: 'forward',
@@ -688,7 +697,7 @@ export const SCRIPT_API: ScriptApiNamespace[] = [
 ]
 
 /** Bump when the manifest changes so a stale AI conversation is detectable. */
-export const CAPABILITY_VERSION = 3
+export const CAPABILITY_VERSION = 4
 
 /**
  * Free, key-less image hosts behind the image control's "generate" button. All

@@ -73,6 +73,71 @@ export interface ControlApi {
   /** 0–1 opacity */
   opacity: number
   on(event: string, fn: (e: Event) => void): void
+  /** canvas objects only: the raw `<canvas>` element */
+  readonly canvas?: HTMLCanvasElement
+  /** canvas objects only: the 2D drawing context (null before layout / off-DOM) */
+  readonly ctx?: CanvasRenderingContext2D | null
+  /** canvas objects only: clear and re-run the `draw` script */
+  redraw?(): void
+  /** canvas objects only: start (default) or stop a per-frame repaint loop */
+  animate?(on?: boolean): void
+}
+
+interface CanvasSurface {
+  redraw(): void
+  animate(on?: boolean): void
+  stop(): void
+}
+
+/**
+ * Owns a canvas control's backing store: size it to its CSS box at the device
+ * pixel ratio, clear, then run the object's compiled `draw` script. Off-DOM or
+ * without a 2D context (e.g. tests) it quietly no-ops, so no draw code runs.
+ */
+function createCanvasSurface(canvas: HTMLCanvasElement, draw: (() => void) | null): CanvasSurface {
+  let rafId = 0
+  let running = false
+  const size = (): CanvasRenderingContext2D | null => {
+    const rect = canvas.getBoundingClientRect()
+    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1
+    const w = Math.max(1, Math.round((rect.width || 1) * dpr))
+    const h = Math.max(1, Math.round((rect.height || 1) * dpr))
+    if (canvas.width !== w) canvas.width = w
+    if (canvas.height !== h) canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    return ctx
+  }
+  const redraw = (): void => {
+    const ctx = size()
+    if (!ctx) return
+    const rect = canvas.getBoundingClientRect()
+    ctx.clearRect(0, 0, rect.width || canvas.width, rect.height || canvas.height)
+    draw?.()
+  }
+  const loop = (): void => {
+    if (!running) return
+    redraw()
+    rafId = requestAnimationFrame(loop)
+  }
+  const stop = (): void => {
+    running = false
+    if (rafId && typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(rafId)
+    rafId = 0
+  }
+  return {
+    redraw,
+    animate(on = true): void {
+      if (on && !running && typeof requestAnimationFrame !== 'undefined') {
+        running = true
+        rafId = requestAnimationFrame(loop)
+      } else if (!on) {
+        stop()
+      }
+    },
+    stop,
+  }
 }
 
 export function extractFunctionNames(source: string): string[] {
@@ -734,6 +799,9 @@ function runPage(st: RunState, scope: Scope, idx: number): void {
       const chain = chainOf(obj)
       const types = new Set<string>()
       for (const o of chain) for (const t of Object.keys(o.on)) types.add(t)
+      // `draw` is a canvas lifecycle hook, not a DOM event — it is invoked by
+      // the canvas surface (see below), never attached as a listener
+      types.delete('draw')
       for (const eventName of types) {
         const dispatch = (e: Event): void => {
           let i = 0
@@ -747,6 +815,47 @@ function runPage(st: RunState, scope: Scope, idx: number): void {
         }
         ctl.el.addEventListener(eventName, dispatch)
         scope.listeners.push(() => ctl.el.removeEventListener(eventName, dispatch))
+      }
+    }
+
+    // ---- canvas controls: own the backing store, run each `draw` script ----
+    const canvasRedraws: Array<() => void> = []
+    const canvasStops: Array<() => void> = []
+    for (const obj of flat) {
+      if (obj.control !== 'canvas') continue
+      const ctl = scope.controls[obj.name]
+      const canvas = ctl?.el as HTMLCanvasElement | undefined
+      if (!ctl || !canvas || canvas.tagName !== 'CANVAS') continue
+      const drawFn = compiled.get(obj.name)?.get('draw')
+      const invoke = drawFn ? (): void => drawFn({ type: 'draw' } as unknown as Event, ctl, () => {}) : null
+      const surface = createCanvasSurface(canvas, invoke)
+      Object.defineProperties(ctl, {
+        canvas: { get: () => canvas, configurable: true },
+        ctx: { get: () => canvas.getContext('2d'), configurable: true },
+        redraw: { value: surface.redraw, configurable: true },
+        animate: { value: surface.animate, configurable: true },
+      })
+      canvasStops.push(surface.stop)
+      // re-fit the backing store and repaint whenever the CSS box changes
+      // (window resize, editor preview widths, group/page reflow)
+      if (typeof ResizeObserver !== 'undefined') {
+        const ro = new ResizeObserver(() => surface.redraw())
+        ro.observe(canvas)
+        canvasStops.push(() => ro.disconnect())
+      }
+      // a surface with no `draw` script is painted imperatively by the author;
+      // do not clear it on store changes (only repaint declarative ones)
+      if (invoke) canvasRedraws.push(surface.redraw)
+      surface.redraw()
+    }
+    if (canvasStops.length) {
+      scope.listeners.push(() => {
+        for (const s of canvasStops) s()
+      })
+      if (canvasRedraws.length) {
+        scope.listeners.push(st.store.subscribe(() => {
+          for (const r of canvasRedraws) r()
+        }))
       }
     }
 
