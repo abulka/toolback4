@@ -45,18 +45,26 @@ function twoObjectBook(): Book {
   return parseBook({
     id: 'b1',
     title: 'T',
-    design: { width: 800, height: 600 },
+    backgrounds: [{ id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', objects: [] }],
     pages: [
       {
         id: 'p1',
         name: 'P',
+        backgroundId: 'bg1',
         objects: [
-          { id: 'a', name: 'labelA', control: 'label', rect: { x: 0, y: 0, w: 100, h: 50 } },
+          {
+            id: 'a',
+            name: 'labelA',
+            control: 'label',
+            x: { mode: 'left', left: 0, width: 100 },
+            y: { mode: 'top', top: 0, height: 50 },
+          },
           {
             id: 'b',
             name: 'labelB',
             control: 'label',
-            rect: { x: 120, y: 40, w: 80, h: 60 },
+            x: { mode: 'left', left: 120, width: 80 },
+            y: { mode: 'top', top: 40, height: 60 },
           },
         ],
       },

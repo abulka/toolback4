@@ -1,483 +1,974 @@
 {
+  "formatVersion": 1,
   "id": "book_kitchen_sink",
   "title": "Kitchen Sink",
-  "canvas": {
-    "desktop": { "width": 1280, "height": 800 },
-    "tablet": { "width": 768, "height": 1024 },
-    "mobile": { "width": 390, "height": 844 }
-  },
+  "backgrounds": [
+    {
+      "id": "bg_8927af1d3",
+      "name": "Background 1",
+      "color": "#f6f7fb",
+      "script": "",
+      "objects": []
+    },
+    {
+      "id": "bg_10c0b2b54",
+      "name": "Background 2",
+      "color": "#f1f5f9",
+      "script": "",
+      "objects": []
+    }
+  ],
   "pages": [
     {
       "id": "page_ks_home",
       "name": "Home",
       "script": "function pageEnter() {\n  store.set('where', page.name)\n  store.set('pages', page.names.join(', '))\n}\n",
-      "background": "#f6f7fb",
+      "backgroundId": "bg_8927af1d3",
       "objects": [
         {
           "id": "obj_ks_mnTitle",
           "name": "mnTitle",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 32, "w": 980, "h": 48 } },
-          "props": { "text": "Kitchen sink — a guided tour of every toolback feature", "fontSize": 22 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 980
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "Kitchen sink — a guided tour of every toolback feature",
+            "fontSize": 22
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_mnHint",
           "name": "mnHint",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 96, "w": 1000, "h": 64 } },
-          "props": { "text": "Each page demonstrates one feature: what it does, where its scripts live, and tips for trying it. The menu below IS the pages & navigation demo — every button is one line of script: page.go('…'). Press Run (F3 or ⌥3) and click.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1000
+          },
+          "y": {
+            "mode": "top",
+            "top": 96,
+            "height": 64
+          },
+          "props": {
+            "text": "Each page demonstrates one feature: what it does, where its scripts live, and tips for trying it. The menu below IS the pages & navigation demo — every button is one line of script: page.go('…'). Press Run (F3 or ⌥3) and click.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_mnGo1",
           "name": "mnGo1",
           "control": "button",
-          "rects": { "desktop": { "x": 96, "y": 200, "w": 380, "h": 52 } },
-          "props": { "text": "Store & dynamic labels" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 380
+          },
+          "y": {
+            "mode": "top",
+            "top": 200,
+            "height": 52
+          },
+          "props": {
+            "text": "Store & dynamic labels"
+          },
           "on": {
             "click": "page.go('Store')"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_mnGo2",
           "name": "mnGo2",
           "control": "button",
-          "rects": { "desktop": { "x": 96, "y": 268, "w": 380, "h": 52 } },
-          "props": { "text": "self — the script owner" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 380
+          },
+          "y": {
+            "mode": "top",
+            "top": 268,
+            "height": 52
+          },
+          "props": {
+            "text": "self — the script owner"
+          },
           "on": {
             "click": "page.go('Self')"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_mnGo3",
           "name": "mnGo3",
           "control": "button",
-          "rects": { "desktop": { "x": 96, "y": 336, "w": 380, "h": 52 } },
-          "props": { "text": "Groups & forward" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 380
+          },
+          "y": {
+            "mode": "top",
+            "top": 336,
+            "height": 52
+          },
+          "props": {
+            "text": "Groups & forward"
+          },
           "on": {
             "click": "page.go('Groups')"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_mnGo4",
           "name": "mnGo4",
           "control": "button",
-          "rects": { "desktop": { "x": 96, "y": 404, "w": 380, "h": 52 } },
-          "props": { "text": "Scripted motion" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 380
+          },
+          "y": {
+            "mode": "top",
+            "top": 404,
+            "height": 52
+          },
+          "props": {
+            "text": "Scripted motion"
+          },
           "on": {
             "click": "page.go('Motion')"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_mnGo5",
           "name": "mnGo5",
           "control": "button",
-          "rects": { "desktop": { "x": 96, "y": 472, "w": 380, "h": 52 } },
-          "props": { "text": "Events" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 380
+          },
+          "y": {
+            "mode": "top",
+            "top": 472,
+            "height": 52
+          },
+          "props": {
+            "text": "Events"
+          },
           "on": {
             "click": "page.go('Events')"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_mnGo6",
           "name": "mnGo6",
           "control": "button",
-          "rects": { "desktop": { "x": 96, "y": 540, "w": 380, "h": 52 } },
-          "props": { "text": "Editor tricks" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 380
+          },
+          "y": {
+            "mode": "top",
+            "top": 540,
+            "height": 52
+          },
+          "props": {
+            "text": "Editor tricks"
+          },
           "on": {
             "click": "page.go('Editor')"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_mnGo7",
           "name": "mnGo7",
           "control": "button",
-          "rects": {"desktop":{"x":96,"y":608,"w":380,"h":52}},
-          "props": {"text":"npm libraries"},
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 380
+          },
+          "y": {
+            "mode": "top",
+            "top": 608,
+            "height": 52
+          },
+          "props": {
+            "text": "npm libraries"
+          },
           "on": {
             "click": "page.go('Npm')"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_mnGo8",
           "name": "mnGo8",
           "control": "button",
-          "rects": {"desktop":{"x":96,"y":676,"w":380,"h":52}},
-          "props": {"text":"Markdown & HTML viewers"},
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 380
+          },
+          "y": {
+            "mode": "top",
+            "top": 676,
+            "height": 52
+          },
+          "props": {
+            "text": "Markdown & HTML viewers"
+          },
           "on": {
             "click": "page.go('Viewers')"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_mnCard",
           "name": "mnCard",
           "control": "card",
-          "rects": { "desktop": { "x": 560, "y": 200, "w": 420, "h": 392 } },
-          "props": { "title": "The tour", "text": "Everything here is one ordinary .toolbook.json book built from the same palette controls. Open any object's Script panel while designing — scripted events are marked with a • in the event dropdown. While a run is active, the Store tab on the right shows every store.set live." },
+          "x": {
+            "mode": "left",
+            "left": 560,
+            "width": 420
+          },
+          "y": {
+            "mode": "top",
+            "top": 200,
+            "height": 392
+          },
+          "props": {
+            "title": "The tour",
+            "text": "Everything here is one ordinary .toolbook.json book built from the same palette controls. Open any object's Script panel while designing — scripted events are marked with a • in the event dropdown. While a run is active, the Store tab on the right shows every store.set live."
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_mnPages",
           "name": "mnPages",
           "control": "label",
-          "rects": { "desktop": { "x": 560, "y": 608, "w": 420, "h": 36 } },
-          "props": { "text": "Pages: {{pages}}", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 560,
+            "width": 420
+          },
+          "y": {
+            "mode": "top",
+            "top": 608,
+            "height": 36
+          },
+          "props": {
+            "text": "Pages: {{pages}}",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_mnWhere",
           "name": "mnWhere",
           "control": "label",
-          "rects": { "desktop": { "x": 560, "y": 652, "w": 420, "h": 36 } },
-          "props": { "text": "You are on: {{where}}", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 560,
+            "width": 420
+          },
+          "y": {
+            "mode": "top",
+            "top": 652,
+            "height": 36
+          },
+          "props": {
+            "text": "You are on: {{where}}",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_mnTip",
           "name": "mnTip",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 672, "w": 460, "h": 80 } },
-          "props": { "text": "Tip: the ↶ ↷ buttons (or ⌘Z) undo any design edit — even grouping or deleting. Try it as you explore.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 520,
+            "width": 460
+          },
+          "y": {
+            "mode": "top",
+            "top": 704,
+            "height": 40
+          },
+          "props": {
+            "text": "Tip: the ↶ ↷ buttons (or ⌘Z) undo any design edit — even grouping or deleting. Try it as you explore.",
+            "fontSize": 14
+          },
           "on": {}
         }
-
-      ]
+      ],
+      "padding": 8
     },
     {
       "id": "page_ks_store",
       "name": "Store",
       "script": "function pageEnter() {\n  store.set('where', page.name)\n  if (store.get('clicks') === undefined) store.set('clicks', 0)\n  if (store.get('who') === undefined) store.set('who', 'stranger')\n  if (store.get('dark') === undefined) store.set('dark', true)\n}\n",
-      "background": "#f6f7fb",
+      "backgroundId": "bg_8927af1d3",
       "objects": [
         {
           "id": "obj_ks_stTitle",
           "name": "stTitle",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 32, "w": 980, "h": 48 } },
-          "props": { "text": "Store & dynamic labels — {{key}} makes state visible", "fontSize": 22 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 980
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "Store & dynamic labels — {{key}} makes state visible",
+            "fontSize": 22
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_stHint",
           "name": "stHint",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 96, "w": 1150, "h": 64 } },
-          "props": { "text": "store.set(key, value) stores a value; {{key}} in any Text property displays it and re-renders on every store.set. Press Run, type below, and watch the labels — plus the Store tab on the right.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1150
+          },
+          "y": {
+            "mode": "top",
+            "top": 96,
+            "height": 64
+          },
+          "props": {
+            "text": "store.set(key, value) stores a value; {{key}} in any Text property displays it and re-renders on every store.set. Press Run, type below, and watch the labels — plus the Store tab on the right.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_nameInput",
           "name": "nameInput",
           "control": "input",
-          "rects": { "desktop": { "x": 96, "y": 200, "w": 360, "h": 48 } },
-          "props": { "placeholder": "Your name…" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 360
+          },
+          "y": {
+            "mode": "top",
+            "top": 200,
+            "height": 48
+          },
+          "props": {
+            "placeholder": "Your name…"
+          },
           "on": {
             "input": "store.set('who', event.target.value)",
             "change": "store.set('committed', event.target.value)"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_echoLabel",
           "name": "echoLabel",
           "control": "label",
-          "rects": { "desktop": { "x": 96, "y": 264, "w": 360, "h": 36 } },
-          "props": { "text": "Hi {{who}}", "fontSize": 16 },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 360
+          },
+          "y": {
+            "mode": "top",
+            "top": 264,
+            "height": 36
+          },
+          "props": {
+            "text": "Hi {{who}}",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_committedLabel",
           "name": "committedLabel",
           "control": "label",
-          "rects": { "desktop": { "x": 96, "y": 308, "w": 360, "h": 36 } },
-          "props": { "text": "Committed: {{committed}}", "fontSize": 16 },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 360
+          },
+          "y": {
+            "mode": "top",
+            "top": 308,
+            "height": 36
+          },
+          "props": {
+            "text": "Committed: {{committed}}",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_clickButton",
           "name": "clickButton",
           "control": "button",
-          "rects": { "desktop": { "x": 96, "y": 368, "w": 200, "h": 48 } },
-          "props": { "text": "Click me" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 200
+          },
+          "y": {
+            "mode": "top",
+            "top": 368,
+            "height": 48
+          },
+          "props": {
+            "text": "Click me"
+          },
           "on": {
             "click": "store.set('clicks', (store.get('clicks') ?? 0) + 1)",
             "dblclick": "store.set('clicks', 0)"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_lockButton",
           "name": "lockButton",
           "control": "button",
-          "rects": { "desktop": { "x": 312, "y": 368, "w": 144, "h": 48 } },
-          "props": { "text": "Lock click" },
+          "x": {
+            "mode": "left",
+            "left": 312,
+            "width": 144
+          },
+          "y": {
+            "mode": "top",
+            "top": 368,
+            "height": 48
+          },
+          "props": {
+            "text": "Lock click"
+          },
           "on": {
             "click": "clickButton.enabled = !clickButton.enabled"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_clicksLabel",
           "name": "clicksLabel",
           "control": "label",
-          "rects": { "desktop": { "x": 96, "y": 432, "w": 360, "h": 36 } },
-          "props": { "text": "Clicks: {{clicks}}", "fontSize": 16 },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 360
+          },
+          "y": {
+            "mode": "top",
+            "top": 432,
+            "height": 36
+          },
+          "props": {
+            "text": "Clicks: {{clicks}}",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_modeSwitch",
           "name": "modeSwitch",
           "control": "switch",
-          "rects": { "desktop": { "x": 480, "y": 368, "w": 260, "h": 48 } },
-          "props": { "text": "Dark mode", "checked": true, "trackColor": "purple", "fontFamily": "mono", "fontSize": 18 },
+          "x": {
+            "mode": "left",
+            "left": 480,
+            "width": 260
+          },
+          "y": {
+            "mode": "top",
+            "top": 368,
+            "height": 48
+          },
+          "props": {
+            "text": "Dark mode",
+            "checked": true,
+            "trackColor": "purple",
+            "fontFamily": "mono",
+            "fontSize": 18
+          },
           "on": {
             "change": "store.set('dark', self.value)"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_stColorBtn",
           "name": "stColorBtn",
           "control": "button",
-          "rects": { "desktop": { "x": 480, "y": 264, "w": 240, "h": 48 } },
-          "props": { "text": "I turn green" },
+          "x": {
+            "mode": "left",
+            "left": 480,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 264,
+            "height": 48
+          },
+          "props": {
+            "text": "I turn green"
+          },
           "on": {
             "click": "self.background = 'green'"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_stColorTip",
           "name": "stColorTip",
           "control": "label",
-          "rects": { "desktop": { "x": 480, "y": 200, "w": 600, "h": 64 } },
-          "props": { "text": "Colours & fonts: set the Background / Text colour / Font fields in the Selection panel — 'red', 'navy', '#3b82f6', rgb(…) — or from scripts: try the green button (its click script runs self.background = 'green').", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 480,
+            "width": 600
+          },
+          "y": {
+            "mode": "top",
+            "top": 200,
+            "height": 64
+          },
+          "props": {
+            "text": "Colours & fonts: set the Background / Text colour / Font fields in the Selection panel — 'red', 'navy', '#3b82f6', rgb(…) — or from scripts: try the green button (its click script runs self.background = 'green').",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_stDark",
           "name": "stDark",
           "control": "label",
-          "rects": { "desktop": { "x": 480, "y": 432, "w": 260, "h": 36 } },
-          "props": { "text": "Dark mode is: {{dark}}", "fontSize": 16 },
+          "x": {
+            "mode": "left",
+            "left": 480,
+            "width": 260
+          },
+          "y": {
+            "mode": "top",
+            "top": 432,
+            "height": 36
+          },
+          "props": {
+            "text": "Dark mode is: {{dark}}",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_stTip1",
           "name": "stTip1",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 512, "w": 1150, "h": 72 } },
-          "props": { "text": "Where the scripts live: nameInput's Script panel has two handlers (input + change) reading event.target.value. clickButton has click + dblclick — a double-click fires click twice, then dblclick resets the count. Lock click writes clickButton.enabled.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1150
+          },
+          "y": {
+            "mode": "top",
+            "top": 512,
+            "height": 72
+          },
+          "props": {
+            "text": "Where the scripts live: nameInput's Script panel has two handlers (input + change) reading event.target.value. clickButton has click + dblclick — a double-click fires click twice, then dblclick resets the count. Lock click writes clickButton.enabled.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_stTip2",
           "name": "stTip2",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 600, "w": 1150, "h": 72 } },
-          "props": { "text": "The labels are NOT scripted: their Text property is just Hi {{who}} / Clicks: {{clicks}}. Unset keys render empty. Script-side, read values with store.get — typing {{ in a script offers exactly that.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1150
+          },
+          "y": {
+            "mode": "top",
+            "top": 600,
+            "height": 72
+          },
+          "props": {
+            "text": "The labels are NOT scripted: their Text property is just Hi {{who}} / Clicks: {{clicks}}. Unset keys render empty. Script-side, read values with store.get — typing {{ in a script offers exactly that.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_mnBack1",
           "name": "mnBack1",
           "control": "button",
-          "rects": { "desktop": { "x": 1080, "y": 32, "w": 152, "h": 48 } },
-          "props": { "text": "← Menu" },
+          "x": {
+            "mode": "left",
+            "left": 1080,
+            "width": 152
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "← Menu"
+          },
           "on": {
             "click": "page.go('Home')"
           }
         }
-
       ]
     },
     {
       "id": "page_ks_self",
       "name": "Self",
       "script": "function pageEnter() {\n  store.set('where', page.name)\n  if (store.get('lastSelf') === undefined) store.set('lastSelf', '—')\n}\n",
-      "background": "#f6f7fb",
+      "backgroundId": "bg_8927af1d3",
       "objects": [
         {
           "id": "obj_ks_sfTitle",
           "name": "sfTitle",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 32, "w": 1050, "h": 48 } },
-          "props": { "text": "self — the object that owns the script", "fontSize": 22 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1050
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "self — the object that owns the script",
+            "fontSize": 22
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_sfHint1",
           "name": "sfHint1",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 96, "w": 1180, "h": 64 } },
-          "props": { "text": "self is a system property: the object the currently executing script belongs to. In a button's own script self is that button; in a group's script self is the GROUP (while target is the member that was clicked); in the page script self is the page. Like ToolBook's self, it cannot be set. this is an alias for self.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 96,
+            "height": 64
+          },
+          "props": {
+            "text": "self is a system property: the object the currently executing script belongs to. In a button's own script self is that button; in a group's script self is the GROUP (while target is the member that was clicked); in the page script self is the page. Like ToolBook's self, it cannot be set. this is an alias for self.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_sfHint2",
           "name": "sfHint2",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 176, "w": 1180, "h": 48 } },
-          "props": { "text": "The three buttons below share the same Text binding — I am {{self.name}} — and no script touches their text:", "fontSize": 16 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 176,
+            "height": 48
+          },
+          "props": {
+            "text": "The three buttons below share the same Text binding — I am {{self.name}} — and no script touches their text:",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_selfBtn1",
           "name": "selfBtn1",
           "control": "button",
-          "rects": { "desktop": { "x": 96, "y": 248, "w": 344, "h": 56 } },
-          "props": { "text": "I am {{self.name}}" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 344
+          },
+          "y": {
+            "mode": "top",
+            "top": 248,
+            "height": 56
+          },
+          "props": {
+            "text": "I am {{self.name}}"
+          },
           "on": {
             "click": "store.set('lastSelf', self.name)"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_selfBtn2",
           "name": "selfBtn2",
           "control": "button",
-          "rects": { "desktop": { "x": 476, "y": 248, "w": 344, "h": 56 } },
-          "props": { "text": "I am {{self.name}}" },
+          "x": {
+            "mode": "left",
+            "left": 476,
+            "width": 344
+          },
+          "y": {
+            "mode": "top",
+            "top": 248,
+            "height": 56
+          },
+          "props": {
+            "text": "I am {{self.name}}"
+          },
           "on": {
             "click": "store.set('lastSelf', self.name)"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_selfBtn3",
           "name": "selfBtn3",
           "control": "button",
-          "rects": { "desktop": { "x": 856, "y": 248, "w": 344, "h": 56 } },
-          "props": { "text": "I am {{self.name}}" },
+          "x": {
+            "mode": "left",
+            "left": 856,
+            "width": 344
+          },
+          "y": {
+            "mode": "top",
+            "top": 248,
+            "height": 56
+          },
+          "props": {
+            "text": "I am {{self.name}}"
+          },
           "on": {
             "click": "store.set('lastSelf', self.name)"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_sfLast",
           "name": "sfLast",
           "control": "label",
-          "rects": { "desktop": { "x": 96, "y": 328, "w": 640, "h": 36 } },
-          "props": { "text": "Last clicked: {{lastSelf}}", "fontSize": 16 },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 640
+          },
+          "y": {
+            "mode": "top",
+            "top": 328,
+            "height": 36
+          },
+          "props": {
+            "text": "Last clicked: {{lastSelf}}",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_sfTip1",
           "name": "sfTip1",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 400, "w": 1180, "h": 48 } },
-          "props": { "text": "Try it: select a button and press ⧉ (or ⌥D) — the duplicate lands +24px down-right and already shows its own name. The binding does the work; nothing to edit. Undo with ⌘Z.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 400,
+            "height": 48
+          },
+          "props": {
+            "text": "Try it: select a button and press ⧉ (or ⌥D) — the duplicate lands +24px down-right and already shows its own name. The binding does the work; nothing to edit. Undo with ⌘Z.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_sfTip2",
           "name": "sfTip2",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 464, "w": 1180, "h": 48 } },
-          "props": { "text": "Where the scripts live: each button's click script is one line — store.set('lastSelf', self.name). The name display is the Text property I am {{self.name}}, a binding rather than a script. {{this.name}} works too.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 464,
+            "height": 48
+          },
+          "props": {
+            "text": "Where the scripts live: each button's click script is one line — store.set('lastSelf', self.name). The name display is the Text property I am {{self.name}}, a binding rather than a script. {{this.name}} works too.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_sfTip3",
           "name": "sfTip3",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 528, "w": 1180, "h": 48 } },
-          "props": { "text": "self vs target (ToolBook heritage): in a group script, self is the group itself and target is the member that was clicked — the Groups page shows the pair in action. In the page script, self.name is the page name.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 528,
+            "height": 48
+          },
+          "props": {
+            "text": "self vs target (ToolBook heritage): in a group script, self is the group itself and target is the member that was clicked — the Groups page shows the pair in action. In the page script, self.name is the page name.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_mnBack2",
           "name": "mnBack2",
           "control": "button",
-          "rects": { "desktop": { "x": 1080, "y": 32, "w": 152, "h": 48 } },
-          "props": { "text": "← Menu" },
+          "x": {
+            "mode": "left",
+            "left": 1080,
+            "width": 152
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "← Menu"
+          },
           "on": {
             "click": "page.go('Home')"
           }
         }
-
       ]
     },
     {
       "id": "page_ks_groups",
       "name": "Groups",
       "script": "function pageEnter() {\n  store.set('where', page.name)\n  if (store.get('memberRan') === undefined) store.set('memberRan', '—')\n  if (store.get('groupRan') === undefined) store.set('groupRan', '—')\n}\n",
-      "background": "#f6f7fb",
+      "backgroundId": "bg_8927af1d3",
       "objects": [
         {
           "id": "obj_ks_gpTitle",
           "name": "gpTitle",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 32, "w": 1050, "h": 48 } },
-          "props": { "text": "Groups & forward — the ToolBook event rule", "fontSize": 22 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1050
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "Groups & forward — the ToolBook event rule",
+            "fontSize": 22
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_gpHint1",
           "name": "gpHint1",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 96, "w": 1180, "h": 64 } },
-          "props": { "text": "Rule: the innermost script for an event runs and STOPS there unless it calls forward(). An object with no script for that event lets the event pass to its parent group automatically. In a group's script, target is the member that was clicked and self is the group itself.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 96,
+            "height": 64
+          },
+          "props": {
+            "text": "Rule: the innermost script for an event runs and STOPS there unless it calls forward(). An object with no script for that event lets the event pass to its parent group automatically. In a group's script, target is the member that was clicked and self is the group itself.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_gpHint2",
           "name": "gpHint2",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 176, "w": 1180, "h": 48 } },
-          "props": { "text": "groupA below holds two buttons AND another group (groupInner) holding a third — nested groups. Press Run and click each button:", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 176,
+            "height": 48
+          },
+          "props": {
+            "text": "groupA below holds two buttons AND another group (groupInner) holding a third — nested groups. Press Run and click each button:",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_mnBack3",
           "name": "mnBack3",
           "control": "button",
-          "rects": { "desktop": { "x": 1080, "y": 32, "w": 152, "h": 48 } },
-          "props": { "text": "← Menu" },
+          "x": {
+            "mode": "left",
+            "left": 1080,
+            "width": 152
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "← Menu"
+          },
           "on": {
             "click": "page.go('Home')"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_groupA",
           "name": "groupA",
           "control": "group",
-          "rects": { "desktop": { "x": 96, "y": 240, "w": 520, "h": 224 } },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 520
+          },
+          "y": {
+            "mode": "top",
+            "top": 240,
+            "height": 224
+          },
           "props": {},
           "on": {
             "click": "store.set('groupRan', self.name + ' saw ' + target.name)"
@@ -487,27 +978,56 @@
               "id": "obj_ks_btnFwd",
               "name": "btnFwd",
               "control": "button",
-              "rects": { "desktop": { "x": 16, "y": 16, "w": 232, "h": 56 } },
-              "props": { "text": "I have a script + forward()" },
+              "x": {
+                "mode": "left",
+                "left": 16,
+                "width": 232
+              },
+              "y": {
+                "mode": "top",
+                "top": 16,
+                "height": 56
+              },
+              "props": {
+                "text": "I have a script + forward()"
+              },
               "on": {
                 "click": "store.set('memberRan', self.name)\nforward()"
               }
-            }
-,
+            },
             {
               "id": "obj_ks_btnQuiet",
               "name": "btnQuiet",
               "control": "button",
-              "rects": { "desktop": { "x": 264, "y": 16, "w": 232, "h": 56 } },
-              "props": { "text": "I have no script" },
+              "x": {
+                "mode": "left",
+                "left": 264,
+                "width": 232
+              },
+              "y": {
+                "mode": "top",
+                "top": 16,
+                "height": 56
+              },
+              "props": {
+                "text": "I have no script"
+              },
               "on": {}
-            }
-,
+            },
             {
               "id": "obj_ks_groupInner",
               "name": "groupInner",
               "control": "group",
-              "rects": { "desktop": { "x": 16, "y": 88, "w": 488, "h": 72 } },
+              "x": {
+                "mode": "left",
+                "left": 16,
+                "width": 488
+              },
+              "y": {
+                "mode": "top",
+                "top": 88,
+                "height": 72
+              },
               "props": {},
               "on": {},
               "children": [
@@ -515,349 +1035,697 @@
                   "id": "obj_ks_btnDeep",
                   "name": "btnDeep",
                   "control": "button",
-                  "rects": { "desktop": { "x": 16, "y": 8, "w": 456, "h": 56 } },
-                  "props": { "text": "Deep in a nested group" },
+                  "x": {
+                    "mode": "left",
+                    "left": 16,
+                    "width": 456
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 8,
+                    "height": 56
+                  },
+                  "props": {
+                    "text": "Deep in a nested group"
+                  },
                   "on": {}
                 }
-
               ]
             }
-
           ]
-        }
-,
+        },
         {
           "id": "obj_ks_gpMember",
           "name": "gpMember",
           "control": "label",
-          "rects": { "desktop": { "x": 648, "y": 240, "w": 560, "h": 36 } },
-          "props": { "text": "Member script ran on: {{memberRan}}", "fontSize": 16 },
+          "x": {
+            "mode": "left",
+            "left": 648,
+            "width": 560
+          },
+          "y": {
+            "mode": "top",
+            "top": 240,
+            "height": 36
+          },
+          "props": {
+            "text": "Member script ran on: {{memberRan}}",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_gpGroup",
           "name": "gpGroup",
           "control": "label",
-          "rects": { "desktop": { "x": 648, "y": 284, "w": 560, "h": 36 } },
-          "props": { "text": "Group handler: {{groupRan}}", "fontSize": 16 },
+          "x": {
+            "mode": "left",
+            "left": 648,
+            "width": 560
+          },
+          "y": {
+            "mode": "top",
+            "top": 284,
+            "height": 36
+          },
+          "props": {
+            "text": "Group handler: {{groupRan}}",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_gpTip1",
           "name": "gpTip1",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 496, "w": 1180, "h": 76 } },
-          "props": { "text": "Try it: click \"I have a script + forward()\" — its own script runs, then forward() continues up to groupA (groupRan reads self = groupA, target = btnFwd). Click \"I have no script\" or the nested button — no member script exists, so the event walks btnDeep → groupInner → groupA and the group handler catches it with target = the button you clicked.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 496,
+            "height": 76
+          },
+          "props": {
+            "text": "Try it: click \"I have a script + forward()\" — its own script runs, then forward() continues up to groupA (groupRan reads self = groupA, target = btnFwd). Click \"I have no script\" or the nested button — no member script exists, so the event walks btnDeep → groupInner → groupA and the group handler catches it with target = the button you clicked.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_gpTip2",
           "name": "gpTip2",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 584, "w": 1180, "h": 76 } },
-          "props": { "text": "Where the scripts live: exactly two. groupA's click handler (click the group once to select it — double-click drills in, Esc steps out) is store.set('groupRan', self.name + ' saw ' + target.name). btnFwd's click is store.set('memberRan', self.name) followed by forward(). groupInner and the other buttons have NO scripts — which is precisely why the message passes through them.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 584,
+            "height": 76
+          },
+          "props": {
+            "text": "Where the scripts live: exactly two. groupA's click handler (click the group once to select it — double-click drills in, Esc steps out) is store.set('groupRan', self.name + ' saw ' + target.name). btnFwd's click is store.set('memberRan', self.name) followed by forward(). groupInner and the other buttons have NO scripts — which is precisely why the message passes through them.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_gpTip3",
           "name": "gpTip3",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 672, "w": 1180, "h": 40 } },
-          "props": { "text": "Design tip: ⌥G groups a selection, ⌥U ungroups, double-click drills one level per double-click, Esc steps out one level and is ignored at the outermost level.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 672,
+            "height": 40
+          },
+          "props": {
+            "text": "Design tip: ⌥G groups a selection, ⌥U ungroups, double-click drills one level per double-click, Esc steps out one level and is ignored at the outermost level.",
+            "fontSize": 14
+          },
           "on": {}
         }
-
       ]
     },
     {
       "id": "page_ks_motion",
       "name": "Motion",
       "script": "async function pageEnter() {\n  store.set('where', page.name)\n  mover.x = 420\n  mover.y = -160\n  for (let i = 0; i < 18; i++) {\n    await new Promise((r) => setTimeout(r, 16))\n    mover.y += 20\n  }\n  mover.y = 200\n}\n\nfunction pageLeave() {\n  store.set('leftMotion', true)\n}\n\nfunction resetBox() {\n  box.x = 640\n  box.y = 360\n  box.width = 240\n  box.height = 140\n  box.visible = true\n}\n",
-      "background": "#f1f5f9",
+      "backgroundId": "bg_10c0b2b54",
       "objects": [
         {
           "id": "obj_ks_mtTitle",
           "name": "mtTitle",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 32, "w": 1050, "h": 48 } },
-          "props": { "text": "Scripted motion — x / y / width / height, await, pageEnter", "fontSize": 22 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1050
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "Scripted motion — x / y / width / height, await, pageEnter",
+            "fontSize": 22
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_mtHint",
           "name": "mtHint",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 96, "w": 1180, "h": 48 } },
-          "props": { "text": "Positions and sizes are writable from scripts. pageEnter already ran the drop-in animation on the mover card the moment this page opened.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 96,
+            "height": 48
+          },
+          "props": {
+            "text": "Positions and sizes are writable from scripts. pageEnter already ran the drop-in animation on the mover card the moment this page opened.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_mover",
           "name": "mover",
           "control": "card",
-          "rects": { "desktop": { "x": 420, "y": 200, "w": 240, "h": 140 } },
-          "props": { "title": "I move", "text": "pageEnter drops me in from the top" },
+          "x": {
+            "mode": "left",
+            "left": 420,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 200,
+            "height": 140
+          },
+          "props": {
+            "title": "I move",
+            "text": "pageEnter drops me in from the top"
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_randomButton",
           "name": "randomButton",
           "control": "button",
-          "rects": { "desktop": { "x": 96, "y": 200, "w": 240, "h": 48 } },
-          "props": { "text": "Random spot" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 200,
+            "height": 48
+          },
+          "props": {
+            "text": "Random spot"
+          },
           "on": {
             "click": "mover.x = 100 + Math.floor(Math.random() * 800)\nmover.y = 150 + Math.floor(Math.random() * 420)"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_sizeButton",
           "name": "sizeButton",
           "control": "button",
-          "rects": { "desktop": { "x": 96, "y": 264, "w": 240, "h": 48 } },
-          "props": { "text": "Grow / shrink" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 264,
+            "height": 48
+          },
+          "props": {
+            "text": "Grow / shrink"
+          },
           "on": {
             "click": "if (mover.width > 320) {\n  mover.width = 240\n  mover.height = 140\n} else {\n  mover.width += 40\n  mover.height += 20\n}"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_backBtn",
           "name": "backBtn",
           "control": "button",
-          "rects": { "desktop": { "x": 96, "y": 328, "w": 240, "h": 48 } },
-          "props": { "text": "← Menu" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 328,
+            "height": 48
+          },
+          "props": {
+            "text": "← Menu"
+          },
           "on": {
             "click": "page.go('Home')"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_mtWhere",
           "name": "mtWhere",
           "control": "label",
-          "rects": { "desktop": { "x": 96, "y": 392, "w": 480, "h": 36 } },
-          "props": { "text": "You are on: {{where}}", "fontSize": 16 },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 480
+          },
+          "y": {
+            "mode": "top",
+            "top": 392,
+            "height": 36
+          },
+          "props": {
+            "text": "You are on: {{where}}",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_mtStatus",
           "name": "mtStatus",
           "control": "label",
-          "rects": { "desktop": { "x": 96, "y": 436, "w": 480, "h": 36 } },
-          "props": { "text": "You left this page before: {{leftMotion}}", "fontSize": 16 },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 480
+          },
+          "y": {
+            "mode": "top",
+            "top": 436,
+            "height": 36
+          },
+          "props": {
+            "text": "You left this page before: {{leftMotion}}",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_box",
           "name": "box",
           "control": "card",
-          "rects": { "desktop": { "x": 640, "y": 360, "w": 240, "h": 140 } },
-          "props": { "title": "Box", "text": "Nudge / grow / hide me" },
+          "x": {
+            "mode": "left",
+            "left": 640,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 360,
+            "height": 140
+          },
+          "props": {
+            "title": "Box",
+            "text": "Nudge / grow / hide me"
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_nudgeButton",
           "name": "nudgeButton",
           "control": "button",
-          "rects": { "desktop": { "x": 640, "y": 520, "w": 116, "h": 44 } },
-          "props": { "text": "Nudge" },
+          "x": {
+            "mode": "left",
+            "left": 640,
+            "width": 116
+          },
+          "y": {
+            "mode": "top",
+            "top": 520,
+            "height": 44
+          },
+          "props": {
+            "text": "Nudge"
+          },
           "on": {
             "click": "box.x += 24"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_growButton",
           "name": "growButton",
           "control": "button",
-          "rects": { "desktop": { "x": 772, "y": 520, "w": 108, "h": 44 } },
-          "props": { "text": "Grow" },
+          "x": {
+            "mode": "left",
+            "left": 772,
+            "width": 108
+          },
+          "y": {
+            "mode": "top",
+            "top": 520,
+            "height": 44
+          },
+          "props": {
+            "text": "Grow"
+          },
           "on": {
             "click": "box.width += 20\nbox.height += 10"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_hideButton",
           "name": "hideButton",
           "control": "button",
-          "rects": { "desktop": { "x": 640, "y": 572, "w": 116, "h": 44 } },
-          "props": { "text": "Hide box" },
+          "x": {
+            "mode": "left",
+            "left": 640,
+            "width": 116
+          },
+          "y": {
+            "mode": "top",
+            "top": 572,
+            "height": 44
+          },
+          "props": {
+            "text": "Hide box"
+          },
           "on": {
             "click": "box.visible = !box.visible"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_resetButton",
           "name": "resetButton",
           "control": "button",
-          "rects": { "desktop": { "x": 772, "y": 572, "w": 108, "h": 44 } },
-          "props": { "text": "Reset box" },
+          "x": {
+            "mode": "left",
+            "left": 772,
+            "width": 108
+          },
+          "y": {
+            "mode": "top",
+            "top": 572,
+            "height": 44
+          },
+          "props": {
+            "text": "Reset box"
+          },
           "on": {
             "click": "resetBox()"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_mtTip",
           "name": "mtTip",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 648, "w": 1180, "h": 64 } },
-          "props": { "text": "Where the scripts live: the drop-in animation is pageEnter on this page (an async loop stepping mover.y with await). Random spot and Grow / shrink write mover.x/y/width/height directly. Reset box calls resetBox() — a shared page function, callable from any object script. pageLeave records the visit for the You-left label.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 648,
+            "height": 64
+          },
+          "props": {
+            "text": "Where the scripts live: the drop-in animation is pageEnter on this page (an async loop stepping mover.y with await). Random spot and Grow / shrink write mover.x/y/width/height directly. Reset box calls resetBox() — a shared page function, callable from any object script. pageLeave records the visit for the You-left label.",
+            "fontSize": 14
+          },
           "on": {}
         }
-
       ]
     },
     {
       "id": "page_ks_events",
       "name": "Events",
       "script": "function pageEnter() {\n  store.set('where', page.name)\n  if (store.get('lastEvent') === undefined) store.set('lastEvent', '—')\n}\n",
-      "background": "#f6f7fb",
+      "backgroundId": "bg_8927af1d3",
       "objects": [
         {
           "id": "obj_ks_evTitle",
           "name": "evTitle",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 32, "w": 1050, "h": 48 } },
-          "props": { "text": "Events — one object, many handlers", "fontSize": 22 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1050
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "Events — one object, many handlers",
+            "fontSize": 22
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_evHint",
           "name": "evHint",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 96, "w": 1180, "h": 48 } },
-          "props": { "text": "Each object can carry a script per event (the Script panel's event dropdown marks scripted ones with a •). A double-click fires click, click, then dblclick — browser rules.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 96,
+            "height": 48
+          },
+          "props": {
+            "text": "Each object can carry a script per event (the Script panel's event dropdown marks scripted ones with a •). A double-click fires click, click, then dblclick — browser rules.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_eventDemo",
           "name": "eventDemo",
           "control": "button",
-          "rects": { "desktop": { "x": 96, "y": 208, "w": 380, "h": 72 } },
-          "props": { "text": "click / dbl-click / hover me" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 380
+          },
+          "y": {
+            "mode": "top",
+            "top": 208,
+            "height": 72
+          },
+          "props": {
+            "text": "click / dbl-click / hover me"
+          },
           "on": {
             "click": "store.set('lastEvent', 'click on ' + self.name)",
             "dblclick": "store.set('lastEvent', 'double-click on ' + self.name)",
             "mouseenter": "store.set('lastEvent', 'mouse entered ' + self.name)",
             "mouseleave": "store.set('lastEvent', 'mouse left ' + self.name)"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_evLast",
           "name": "evLast",
           "control": "label",
-          "rects": { "desktop": { "x": 508, "y": 208, "w": 640, "h": 36 } },
-          "props": { "text": "Last button event: {{lastEvent}}", "fontSize": 16 },
+          "x": {
+            "mode": "left",
+            "left": 508,
+            "width": 640
+          },
+          "y": {
+            "mode": "top",
+            "top": 208,
+            "height": 36
+          },
+          "props": {
+            "text": "Last button event: {{lastEvent}}",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_typer",
           "name": "typer",
           "control": "input",
-          "rects": { "desktop": { "x": 96, "y": 296, "w": 380, "h": 48 } },
-          "props": { "placeholder": "type here…" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 380
+          },
+          "y": {
+            "mode": "top",
+            "top": 296,
+            "height": 48
+          },
+          "props": {
+            "placeholder": "type here…"
+          },
           "on": {
             "input": "store.set('typed', event.target.value)",
             "change": "store.set('committed2', event.target.value)"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_evTyped",
           "name": "evTyped",
           "control": "label",
-          "rects": { "desktop": { "x": 508, "y": 296, "w": 640, "h": 36 } },
-          "props": { "text": "Typed: {{typed}}", "fontSize": 16 },
+          "x": {
+            "mode": "left",
+            "left": 508,
+            "width": 640
+          },
+          "y": {
+            "mode": "top",
+            "top": 296,
+            "height": 36
+          },
+          "props": {
+            "text": "Typed: {{typed}}",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_evCommitted",
           "name": "evCommitted",
           "control": "label",
-          "rects": { "desktop": { "x": 508, "y": 340, "w": 640, "h": 36 } },
-          "props": { "text": "Committed (blur / Enter): {{committed2}}", "fontSize": 16 },
+          "x": {
+            "mode": "left",
+            "left": 508,
+            "width": 640
+          },
+          "y": {
+            "mode": "top",
+            "top": 340,
+            "height": 36
+          },
+          "props": {
+            "text": "Committed (blur / Enter): {{committed2}}",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_evTip",
           "name": "evTip",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 400, "w": 1180, "h": 64 } },
-          "props": { "text": "Where the scripts live: all on the two objects. evDemo has click / dblclick / mouseenter / mouseleave (each writes '… on ' + self.name); typer has input / change. event is the raw DOM event, so event.target.value reads the field's live text.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 400,
+            "height": 64
+          },
+          "props": {
+            "text": "Where the scripts live: all on the two objects. evDemo has click / dblclick / mouseenter / mouseleave (each writes '… on ' + self.name); typer has input / change. event is the raw DOM event, so event.target.value reads the field's live text.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_mnBack4",
           "name": "mnBack4",
           "control": "button",
-          "rects": { "desktop": { "x": 1080, "y": 32, "w": 152, "h": 48 } },
-          "props": { "text": "← Menu" },
+          "x": {
+            "mode": "left",
+            "left": 1080,
+            "width": 152
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "← Menu"
+          },
           "on": {
             "click": "page.go('Home')"
           }
         }
-
       ]
     },
     {
       "id": "page_ks_editor",
       "name": "Editor",
       "script": "function pageEnter() {\n  store.set('where', page.name)\n}\n",
-      "background": "#f6f7fb",
+      "backgroundId": "bg_8927af1d3",
       "objects": [
         {
           "id": "obj_ks_edTitle",
           "name": "edTitle",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 32, "w": 1050, "h": 48 } },
-          "props": { "text": "Editor tricks — no scripts needed", "fontSize": 22 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1050
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "Editor tricks — no scripts needed",
+            "fontSize": 22
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_edHint",
           "name": "edHint",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 96, "w": 1180, "h": 64 } },
-          "props": { "text": "Stop the run (F3) and try these on the group below. Undo/redo: ⌘Z / ⌘⇧Z or the ↶ ↷ buttons — every design edit is undoable, including grouping, duplicating and deleting. Duplicate: ⧉ or ⌥D copies the selection +24px down-right (a group copies its whole subtree, re-idded and re-named). Group/ungroup: ⌥G / ⌥U.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 96,
+            "height": 64
+          },
+          "props": {
+            "text": "Stop the run (F3) and try these on the group below. Undo/redo: ⌘Z / ⌘⇧Z or the ↶ ↷ buttons — every design edit is undoable, including grouping, duplicating and deleting. Duplicate: ⧉ or ⌥D copies the selection +24px down-right (a group copies its whole subtree, re-idded and re-named). Group/ungroup: ⌥G / ⌥U.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_edHint2",
           "name": "edHint2",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 176, "w": 1180, "h": 76 } },
-          "props": { "text": "Copy JSON: the { } JSON button in the Selection panel copies the selected object — sub-objects included — as pretty-printed JSON (a multi-selection copies an array). Great for describing structures. Drill into groups: double-click descends one level per double-click; Esc steps out one level and is ignored at the outermost — it never deselects.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 176,
+            "height": 76
+          },
+          "props": {
+            "text": "Copy JSON: the { } JSON button in the Selection panel copies the selected object — sub-objects included — as pretty-printed JSON (a multi-selection copies an array). Great for describing structures. Drill into groups: double-click descends one level per double-click; Esc steps out one level and is ignored at the outermost — it never deselects.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_edTryGroup",
           "name": "edTryGroup",
           "control": "group",
-          "rects": { "desktop": { "x": 96, "y": 280, "w": 520, "h": 72 } },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 520
+          },
+          "y": {
+            "mode": "top",
+            "top": 280,
+            "height": 72
+          },
           "props": {},
           "on": {},
           "children": [
@@ -865,226 +1733,448 @@
               "id": "obj_ks_edTry1",
               "name": "edTry1",
               "control": "button",
-              "rects": { "desktop": { "x": 16, "y": 12, "w": 240, "h": 48 } },
-              "props": { "text": "Try me" },
+              "x": {
+                "mode": "left",
+                "left": 16,
+                "width": 240
+              },
+              "y": {
+                "mode": "top",
+                "top": 12,
+                "height": 48
+              },
+              "props": {
+                "text": "Try me"
+              },
               "on": {}
-            }
-,
+            },
             {
               "id": "obj_ks_edTry2",
               "name": "edTry2",
               "control": "button",
-              "rects": { "desktop": { "x": 272, "y": 12, "w": 232, "h": 48 } },
-              "props": { "text": "…and me" },
+              "x": {
+                "mode": "left",
+                "left": 272,
+                "width": 232
+              },
+              "y": {
+                "mode": "top",
+                "top": 12,
+                "height": 48
+              },
+              "props": {
+                "text": "…and me"
+              },
               "on": {}
             }
-
           ]
-        }
-,
+        },
         {
           "id": "obj_ks_edTip1",
           "name": "edTip1",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 384, "w": 1180, "h": 64 } },
-          "props": { "text": "This pair arrives pre-grouped: click once selects the group, double-click drills in, Esc steps out. With the group selected press ⧉ — the whole subtree duplicates with fresh names. ⌥U ungroups; ⌘Z undoes any of it.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 384,
+            "height": 64
+          },
+          "props": {
+            "text": "This pair arrives pre-grouped: click once selects the group, double-click drills in, Esc steps out. With the group selected press ⧉ — the whole subtree duplicates with fresh names. ⌥U ungroups; ⌘Z undoes any of it.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_edTip2",
           "name": "edTip2",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 464, "w": 1180, "h": 64 } },
-          "props": { "text": "Also in the editor: Des/Tab/Mob previews breakpoints (objects without their own rect fall back to desktop); drag the splitter to widen the properties panel; the Objects tab is a tree with group members indented; the Store tab streams store.set calls during a run.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 464,
+            "height": 64
+          },
+          "props": {
+            "text": "Also in the editor: Des/Tab/Mob previews breakpoints (objects without their own rect fall back to desktop); drag the splitter to widen the properties panel; the Objects tab is a tree with group members indented; the Store tab streams store.set calls during a run.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_mnBack5",
           "name": "mnBack5",
           "control": "button",
-          "rects": { "desktop": { "x": 1080, "y": 32, "w": 152, "h": 48 } },
-          "props": { "text": "← Menu" },
+          "x": {
+            "mode": "left",
+            "left": 1080,
+            "width": 152
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "← Menu"
+          },
           "on": {
             "click": "page.go('Home')"
           }
         }
-
       ]
     },
     {
       "id": "page_ks_npm",
       "name": "Npm",
       "script": "function pageEnter() {\n  store.set('where', page.name)\n  if (store.get('midiInfo') === undefined) store.set('midiInfo', 'nothing built yet — press a button')\n  if (store.get('playInfo') === undefined) store.set('playInfo', '')\n}\n\n// One shared source of truth: the same two-note MIDI (C4, then E4) fuels every\n// demo below. addNote takes a midi note number, time/duration in seconds, and\n// velocity 0..1. Imports resolve via esm.sh (or the shelf — offline books).\nasync function buildMidi() {\n  const { Midi } = await import('@tonejs/midi')\n  const midi = new Midi()\n  const track = midi.addTrack()\n  track.name = 'toolback demo'\n  track.addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 })\n  track.addNote({ midi: 64, time: 0.5, duration: 0.5, velocity: 0.8 })\n  return midi\n}\n\n// Data path: @tonejs/midi is a data library — build, serialize with\n// midi.toArray(), re-parse. No files, no sound, no servers.\nasync function parseDemo() {\n  const midi = await buildMidi()\n  const { Midi } = await import('@tonejs/midi')\n  const reparsed = new Midi(midi.toArray())\n  const track = reparsed.tracks[0]\n  store.set('midiInfo', `tracks: ${reparsed.tracks.length}, notes: ${track.notes.length} — ${track.notes.map((n) => n.name).join(' + ')}`)\n}\n\n// Audio path: the notes are data, so Tone.js makes them audible. Browsers\n// require a user gesture before audio starts — a button click is one.\nasync function playDemo() {\n  store.set('playInfo', 'starting audio…')\n  const Tone = await import('tone')\n  const track = (await buildMidi()).tracks[0]\n\n  await Tone.start() // unlock the AudioContext\n  const synth = new Tone.PolySynth(Tone.Synth).toDestination()\n  const when = Tone.now() + 0.1 // tiny delay so both notes land cleanly\n  for (const note of track.notes) {\n    synth.triggerAttackRelease(note.name, note.duration, note.time + when, note.velocity)\n  }\n  store.set('playInfo', `playing ${track.notes.map((n) => n.name).join(' + ')}`)\n\n  // Dispose the synth after the last note has rung out.\n  const last = track.notes[track.notes.length - 1]\n  setTimeout(() => {\n    synth.dispose()\n    store.set('playInfo', 'done')\n  }, (last.time + last.duration + 0.5) * 1000)\n}\n\n// File path: midi.toArray() is the raw bytes — wrap them in a Blob and click a\n// temporary <a download> link. The same pattern exports any binary payload.\nasync function downloadDemo() {\n  const midi = await buildMidi()\n  const bytes = midi.toArray()\n  const blob = new Blob([bytes], { type: 'audio/midi' })\n  const url = URL.createObjectURL(blob)\n  const a = document.createElement('a')\n  a.href = url\n  a.download = 'toolback_demo.mid'\n  document.body.appendChild(a)\n  a.click()\n  a.remove()\n  URL.revokeObjectURL(url)\n  store.set('midiInfo', `downloaded toolback_demo.mid — ${bytes.length} bytes`)\n  store.set('playInfo', 'saved toolback_demo.mid')\n}",
-      "background": "#f6f7fb",
+      "backgroundId": "bg_8927af1d3",
       "objects": [
         {
           "id": "obj_ks_npTitle",
           "name": "npTitle",
           "control": "label",
-          "rects": {"desktop":{"x":48,"y":32,"w":980,"h":48}},
-          "props": {"text":"npm libraries — any package, one import line","fontSize":22},
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 980
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "npm libraries — any package, one import line",
+            "fontSize": 22
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_npHint",
           "name": "npHint",
           "control": "label",
-          "rects": {"desktop":{"x":48,"y":96,"w":1180,"h":96}},
-          "props": {"text":"Any npm package works in scripts. The three buttons below all start from the same script-built two-note song (C4 → E4): Build re-parses it (data path), Play makes it audible through Tone.js (audio path — browsers demand a gesture first, and a click is one), and Download saves it as a real .mid file (file path). Package docs say import { Midi } from '@tonejs/midi' — in toolback the same line goes inside a function, awaited.","fontSize":14},
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 96,
+            "height": 96
+          },
+          "props": {
+            "text": "Any npm package works in scripts. The three buttons below all start from the same script-built two-note song (C4 → E4): Build re-parses it (data path), Play makes it audible through Tone.js (audio path — browsers demand a gesture first, and a click is one), and Download saves it as a real .mid file (file path). Package docs say import { Midi } from '@tonejs/midi' — in toolback the same line goes inside a function, awaited.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_npBuild",
           "name": "npBuild",
           "control": "button",
-          "rects": {"desktop":{"x":96,"y":216,"w":300,"h":52}},
-          "props": {"text":"Build & parse a MIDI"},
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 300
+          },
+          "y": {
+            "mode": "top",
+            "top": 216,
+            "height": 52
+          },
+          "props": {
+            "text": "Build & parse a MIDI"
+          },
           "on": {
             "click": "parseDemo()"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_npPlay",
           "name": "npPlay",
           "control": "button",
-          "rects": {"desktop":{"x":412,"y":216,"w":240,"h":52}},
-          "props": {"text":"Play","background":"teal"},
+          "x": {
+            "mode": "left",
+            "left": 412,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 216,
+            "height": 52
+          },
+          "props": {
+            "text": "Play",
+            "background": "teal"
+          },
           "on": {
             "click": "playDemo()"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_npDownload",
           "name": "npDownload",
           "control": "button",
-          "rects": {"desktop":{"x":668,"y":216,"w":240,"h":52}},
-          "props": {"text":"Download .mid","background":"navy"},
+          "x": {
+            "mode": "left",
+            "left": 668,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 216,
+            "height": 52
+          },
+          "props": {
+            "text": "Download .mid",
+            "background": "navy"
+          },
           "on": {
             "click": "downloadDemo()"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_npResult",
           "name": "npResult",
           "control": "label",
-          "rects": {"desktop":{"x":96,"y":288,"w":1180,"h":40}},
-          "props": {"text":"Result: {{midiInfo}}","fontSize":16},
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 288,
+            "height": 40
+          },
+          "props": {
+            "text": "Result: {{midiInfo}}",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_npSound",
           "name": "npSound",
           "control": "label",
-          "rects": {"desktop":{"x":96,"y":336,"w":1180,"h":36}},
-          "props": {"text":"Sound: {{playInfo}}","fontSize":16},
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 336,
+            "height": 36
+          },
+          "props": {
+            "text": "Sound: {{playInfo}}",
+            "fontSize": 16
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_npTip",
           "name": "npTip",
           "control": "label",
-          "rects": {"desktop":{"x":48,"y":688,"w":1180,"h":80}},
-          "props": {"text":"Where the scripts live: three async page functions. parseDemo (data) uses @tonejs/midi only; playDemo (audio) does await import('tone'), Tone.start() to unlock the AudioContext, then a PolySynth schedules track.notes at note.time + Tone.now(); downloadDemo (file) wraps midi.toArray() in a Blob and clicks a temporary <a download>. buildMidi() builds the song once and all three share it. Repeat imports are cheap — modules are cached. 'tone' isn't on the shelf yet, so previews fetch it from esm.sh; add it with pnpm --filter @toolback/libs add tone to embed it offline.","fontSize":13},
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 688,
+            "height": 80
+          },
+          "props": {
+            "text": "Where the scripts live: three async page functions. parseDemo (data) uses @tonejs/midi only; playDemo (audio) does await import('tone'), Tone.start() to unlock the AudioContext, then a PolySynth schedules track.notes at note.time + Tone.now(); downloadDemo (file) wraps midi.toArray() in a Blob and clicks a temporary <a download>. buildMidi() builds the song once and all three share it. Repeat imports are cheap — modules are cached. 'tone' isn't on the shelf yet, so previews fetch it from esm.sh; add it with pnpm --filter @toolback/libs add tone to embed it offline.",
+            "fontSize": 13
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_mnBack7",
           "name": "mnBack7",
           "control": "button",
-          "rects": {"desktop":{"x":1080,"y":32,"w":152,"h":48}},
-          "props": {"text":"← Menu"},
+          "x": {
+            "mode": "left",
+            "left": 1080,
+            "width": 152
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "← Menu"
+          },
           "on": {
             "click": "page.go('Home')"
           }
         }
-
       ]
-    }
-,
+    },
     {
       "id": "page_ks_viewers",
       "name": "Viewers",
       "script": "function pageEnter() {\n  store.set('where', page.name)\n  if (store.get('demoScore') === undefined) store.set('demoScore', 0)\n}\n",
-      "background": "#f6f7fb",
+      "backgroundId": "bg_8927af1d3",
       "objects": [
         {
           "id": "obj_ks_vwTitle",
           "name": "vwTitle",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 32, "w": 980, "h": 48 } },
-          "props": { "text": "Markdown & HTML viewers — rich content from a prop", "fontSize": 22 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 980
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "Markdown & HTML viewers — rich content from a prop",
+            "fontSize": 22
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_vwHint",
           "name": "vwHint",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 96, "w": 1180, "h": 64 } },
-          "props": { "text": "Two read-only viewer controls. The markdown viewer renders its Text property from Markdown; the HTML viewer injects its html property as raw markup. Both accept {{key}} bindings inside the source and re-render on every store.set. Press Run (F3) and hit +1 score.", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1180
+          },
+          "y": {
+            "mode": "top",
+            "top": 96,
+            "height": 64
+          },
+          "props": {
+            "text": "Two read-only viewer controls. The markdown viewer renders its Text property from Markdown; the HTML viewer injects its html property as raw markup. Both accept {{key}} bindings inside the source and re-render on every store.set. Press Run (F3) and hit +1 score.",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_vwMd",
           "name": "vwMd",
           "control": "markdown",
-          "rects": { "desktop": { "x": 48, "y": 184, "w": 560, "h": 320 } },
-          "props": { "text": "## Score: {{demoScore}}\n\nMarkdown is written in the **Text** property and rendered live.\n\n- the heading updates on every `store.set`\n- lists, **bold**, `code`, quotes, tables…\n\n> Both viewers are ordinary objects — move, resize and script them.", "fontSize": 15 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 560
+          },
+          "y": {
+            "mode": "top",
+            "top": 184,
+            "height": 320
+          },
+          "props": {
+            "text": "## Score: {{demoScore}}\n\nMarkdown is written in the **Text** property and rendered live.\n\n- the heading updates on every `store.set`\n- lists, **bold**, `code`, quotes, tables…\n\n> Both viewers are ordinary objects — move, resize and script them.",
+            "fontSize": 15
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_vwHtml",
           "name": "vwHtml",
           "control": "html",
-          "rects": { "desktop": { "x": 640, "y": 184, "w": 560, "h": 320 } },
-          "props": { "html": "<h2>Raw HTML</h2>\n<p>This markup comes from the <strong>html</strong> property.</p>\n<ul><li>Any tags work</li><li>Authors are trusted — no sanitiser</li></ul>" },
+          "x": {
+            "mode": "left",
+            "left": 640,
+            "width": 560
+          },
+          "y": {
+            "mode": "top",
+            "top": 184,
+            "height": 320
+          },
+          "props": {
+            "html": "<h2>Raw HTML</h2>\n<p>This markup comes from the <strong>html</strong> property.</p>\n<ul><li>Any tags work</li><li>Authors are trusted — no sanitiser</li></ul>"
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_vwInc",
           "name": "vwInc",
           "control": "button",
-          "rects": {"desktop":{"x":48,"y":524,"w":220,"h":52}},
-          "props": {"text":"+1 score"},
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 220
+          },
+          "y": {
+            "mode": "top",
+            "top": 524,
+            "height": 52
+          },
+          "props": {
+            "text": "+1 score"
+          },
           "on": {
             "click": "store.set('demoScore', (store.get('demoScore') ?? 0) + 1)"
           }
-        }
-,
+        },
         {
           "id": "obj_ks_vwTip",
           "name": "vwTip",
           "control": "label",
-          "rects": { "desktop": { "x": 48, "y": 596, "w": 1150, "h": 72 } },
-          "props": { "text": "Where it lives: vwMd's Text property is \"## Score: {{demoScore}}\" — {{key}} resolves in the source before the Markdown renders, so the heading tracks the store. vwHtml's html property is injected as-is (raw HTML, no sanitiser — books already run your own scripts).", "fontSize": 14 },
+          "x": {
+            "mode": "left",
+            "left": 48,
+            "width": 1150
+          },
+          "y": {
+            "mode": "top",
+            "top": 596,
+            "height": 72
+          },
+          "props": {
+            "text": "Where it lives: vwMd's Text property is \"## Score: {{demoScore}}\" — {{key}} resolves in the source before the Markdown renders, so the heading tracks the store. vwHtml's html property is injected as-is (raw HTML, no sanitiser — books already run your own scripts).",
+            "fontSize": 14
+          },
           "on": {}
-        }
-,
+        },
         {
           "id": "obj_ks_vwBack",
           "name": "vwBack",
           "control": "button",
-          "rects": {"desktop":{"x":1080,"y":32,"w":152,"h":48}},
-          "props": {"text":"← Menu"},
+          "x": {
+            "mode": "left",
+            "left": 1080,
+            "width": 152
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 48
+          },
+          "props": {
+            "text": "← Menu"
+          },
           "on": {
             "click": "page.go('Home')"
           }
         }
-
       ]
     }
-  ]
+  ],
+  "store": []
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CONTROL_KINDS,
   DEFAULT_SIZES,
+  FORMAT_VERSION,
   IMAGE_PROVIDERS,
   alignRects,
   applyRectToObject,
@@ -134,41 +135,6 @@ describe('format', () => {
       expect(() => parseBook(book)).not.toThrow()
     })
 
-    it('migrates legacy books: one background per distinct page colour', () => {
-      const legacy = {
-        id: 'b1',
-        title: 'old',
-        pages: [
-          { id: 'p1', name: 'A', background: '#ffffff', objects: [] },
-          { id: 'p2', name: 'B', background: '#ffffff', objects: [] },
-          { id: 'p3', name: 'C', background: '#0000ff', objects: [] },
-        ],
-      }
-      const book = parseBook(legacy)
-      expect(book.backgrounds.map((b) => b.color)).toEqual(['#ffffff', '#0000ff'])
-      expect(book.backgrounds[0]!.name).toBe('Background 1')
-      expect(book.backgrounds[1]!.name).toBe('Background 2')
-      expect(book.pages[0]!.backgroundId).toBe(book.backgrounds[0]!.id)
-      expect(book.pages[1]!.backgroundId).toBe(book.backgrounds[0]!.id)
-      expect(book.pages[2]!.backgroundId).toBe(book.backgrounds[1]!.id)
-      // the legacy field is stripped
-      expect('background' in book.pages[0]!).toBe(false)
-    })
-
-    it('normalises dangling backgroundIds to the first background', () => {
-      const raw = {
-        id: 'b1',
-        title: 'x',
-        backgrounds: [{ id: 'bg1', name: 'B', color: '#fff', objects: [] }],
-        pages: [
-          { id: 'p1', name: 'A', backgroundId: 'nope', objects: [] },
-          { id: 'p2', name: 'B', backgroundId: 'bg1', objects: [] },
-        ],
-      }
-      const book = parseBook(raw)
-      expect(book.pages[0]!.backgroundId).toBe('bg1')
-    })
-
     it('backgroundFor resolves and falls back to the first background', () => {
       const book = createBook('F')
       const page = book.pages[0]!
@@ -259,36 +225,6 @@ describe('format', () => {
       expect(parsed.pages[0]!.size).toEqual({ width: 320, height: 240 })
     })
 
-    it('migrates a background size to fixed pages and drops the old sizing fields', () => {
-      const raw = {
-        id: 'b1',
-        title: 'old',
-        canvas: {
-          desktop: { width: 1024, height: 768 },
-          tablet: { width: 800, height: 600 },
-        },
-        backgrounds: [
-          {
-            id: 'bg1',
-            name: 'Popup',
-            color: '#ffffff',
-            size: { desktop: { width: 320, height: 240 } },
-            objects: [],
-          },
-          { id: 'bg2', name: 'Main', color: '#ffffff', objects: [] },
-        ],
-        pages: [
-          { id: 'p1', name: 'Dialog', backgroundId: 'bg1', objects: [] },
-          { id: 'p2', name: 'Other', backgroundId: 'bg2', objects: [] },
-        ],
-      }
-      const book = parseBook(raw)
-      expect(book.pages[0]!.size).toEqual({ width: 320, height: 240 })
-      expect(book.pages[1]!.size).toBeUndefined()
-      expect('canvas' in book).toBe(false)
-      expect('design' in book).toBe(false)
-      expect('size' in book.backgrounds[0]!).toBe(false)
-    })
   })
 
   describe('groups', () => {
@@ -303,23 +239,6 @@ describe('format', () => {
       expect(g.control).toBe('group')
       expect(g.children![0]!.control).toBe('group')
       expect(g.children![0]!.children![0]!.name).toBe('inner')
-    })
-
-    it('parses legacy books without children', () => {
-      const legacy = {
-        id: 'b1',
-        title: 'old',
-        pages: [
-          {
-            id: 'p1',
-            name: 'P',
-            objects: [
-              { id: 'o1', name: 'a', control: 'label', rect: { x: 0, y: 0, w: 10, h: 10 } },
-            ],
-          },
-        ],
-      }
-      expect(() => parseBook(legacy)).not.toThrow()
     })
 
     it('flattenObjects walks groups pre-order; treeRows annotates depth', () => {
@@ -378,7 +297,6 @@ describe('format', () => {
 })
 
 describe('edge constraints', () => {
-  const ref = { width: 1280, height: 800 }
   const box = { width: 1000, height: 600 }
   const base = { x: 1080, y: 200, w: 176, h: 48 }
 
@@ -512,88 +430,6 @@ describe('edge constraints', () => {
     const o = obj({ mode: 'right', right: 30, width: 100 })
     applyRectToObject(o, { x: 100, y: 0, w: 100, h: 40 }, box)
     expect(o.x).toEqual({ mode: 'right', right: box.width - 200, width: 100 })
-  })
-
-  it('migrates rect + fit to frozen edge distances at the reference size', () => {
-    const legacy = (fit: Record<string, string>) => ({
-      id: 'b',
-      title: 't',
-      canvas: { desktop: ref },
-      backgrounds: [],
-      pages: [
-        {
-          id: 'p',
-          name: 'p',
-          backgroundId: '',
-          objects: [{ id: 'o', name: 'o', control: 'label', rect: { ...base }, props: {}, on: {}, fit }],
-        },
-      ],
-    })
-    const left = parseBook(legacy({ x: 'left', y: 'top' })).pages[0]!.objects[0]!
-    expect(left.x).toEqual({ mode: 'left', left: 1080, width: 176 })
-    expect(left.y).toEqual({ mode: 'top', top: 200, height: 48 })
-    const right = parseBook(legacy({ x: 'right', y: 'pin-bottom' })).pages[0]!.objects[0]!
-    expect(right.x).toEqual({ mode: 'right', right: 24, width: 176 })
-    expect(right.y).toEqual({ mode: 'bottom', bottom: 552, height: 48 })
-    const fill = parseBook(legacy({ x: 'fill', y: 'fill' })).pages[0]!.objects[0]!
-    expect(fill.x).toEqual({ mode: 'both', left: 1080, right: 24 })
-    expect(fill.y).toEqual({ mode: 'both', top: 200, bottom: 552 })
-    // proportional stretch collapses to the near edge (nearest fixed equivalent)
-    const stretch = parseBook(legacy({ x: 'stretch', y: 'stretch' })).pages[0]!.objects[0]!
-    expect(stretch.x).toEqual({ mode: 'left', left: 1080, width: 176 })
-    expect(stretch.y).toEqual({ mode: 'top', top: 200, height: 48 })
-    const center = parseBook(legacy({ x: 'center', y: 'center' })).pages[0]!.objects[0]!
-    expect(center.x).toEqual({ mode: 'center', width: 176 })
-    expect(center.y).toEqual({ mode: 'center', height: 48 })
-    // legacy tokens prop/middle upgrade first
-    const tokens = parseBook(legacy({ x: 'prop', y: 'middle' })).pages[0]!.objects[0]!
-    expect(tokens.x).toEqual({ mode: 'left', left: 1080, width: 176 })
-    expect(tokens.y).toEqual({ mode: 'center', height: 48 })
-    // no fit at all -> fixed left/top
-    const plain = parseBook({
-      id: 'b',
-      title: 't',
-      canvas: { desktop: ref },
-      backgrounds: [],
-      pages: [
-        {
-          id: 'p',
-          name: 'p',
-          backgroundId: '',
-          objects: [{ id: 'o', name: 'o', control: 'label', rect: { ...base }, props: {}, on: {} }],
-        },
-      ],
-    }).pages[0]!.objects[0]!
-    expect(plain.x).toEqual({ mode: 'left', left: 1080, width: 176 })
-  })
-
-  it('migrates legacy rects.desktop and drops rects', () => {
-    const book = parseBook({
-      id: 'b',
-      title: 't',
-      canvas: { desktop: ref },
-      backgrounds: [],
-      pages: [
-        {
-          id: 'p',
-          name: 'p',
-          backgroundId: '',
-          objects: [
-            {
-              id: 'o',
-              name: 'o',
-              control: 'label',
-              rects: { desktop: { ...base }, tablet: { x: 1, y: 1, w: 10, h: 10 } },
-              props: {},
-              on: {},
-            },
-          ],
-        },
-      ],
-    })
-    const o = book.pages[0]!.objects[0]!
-    expect('rects' in o).toBe(false)
-    expect(o.x).toEqual({ mode: 'left', left: 1080, width: 176 })
   })
 
   it('round-trips constraints through parse', () => {
@@ -774,6 +610,51 @@ describe('style prop → control kinds', () => {
       expect(styleKindsForProp(prop)).not.toContain('group')
     }
     expect(styleKindsForProp('trackColor')).toEqual(['switch'])
+  })
+})
+
+describe('format version', () => {
+  it('stamps the current version when parsing an unversioned book', () => {
+    const raw = JSON.parse(JSON.stringify(createBook('V'))) as Record<string, unknown>
+    delete raw['formatVersion']
+    expect(parseBook(raw).formatVersion).toBe(FORMAT_VERSION)
+  })
+
+  it('round-trips a book already at the current version', () => {
+    const book = createBook('V')
+    expect(book.formatVersion).toBe(FORMAT_VERSION)
+    expect(parseBook(JSON.parse(JSON.stringify(book))).formatVersion).toBe(FORMAT_VERSION)
+  })
+
+  it('rejects a book from a newer format version', () => {
+    const raw = JSON.parse(JSON.stringify(createBook('V'))) as Record<string, unknown>
+    raw['formatVersion'] = FORMAT_VERSION + 1
+    expect(() => parseBook(raw)).toThrow(/newer version/)
+    expect(safeParseBook(raw).success).toBe(false)
+  })
+
+  it('rejects an older version with no migration step', () => {
+    const raw = JSON.parse(JSON.stringify(createBook('V'))) as Record<string, unknown>
+    raw['formatVersion'] = 0
+    expect(() => parseBook(raw)).toThrow(/No migration/)
+  })
+
+  it('rejects legacy rect books now that v0 handling is gone', () => {
+    const legacy = {
+      id: 'b1',
+      title: 'old',
+      pages: [
+        {
+          id: 'p1',
+          name: 'P',
+          objects: [
+            { id: 'o1', name: 'a', control: 'label', rect: { x: 0, y: 0, w: 10, h: 10 } },
+          ],
+        },
+      ],
+    }
+    expect(() => parseBook(legacy)).toThrow()
+    expect(safeParseBook(legacy).success).toBe(false)
   })
 })
 

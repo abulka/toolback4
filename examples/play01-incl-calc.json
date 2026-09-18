@@ -1,0 +1,2109 @@
+{
+  "id": "book_9d3be9237",
+  "title": "Untitled",
+  "backgrounds": [
+    {
+      "id": "bg_c66d9f9e6",
+      "name": "Background 1",
+      "color": "#ffffff",
+      "script": "",
+      "objects": []
+    },
+    {
+      "id": "bg_78c0951c6",
+      "name": "Background 2",
+      "color": "#eacbec",
+      "script": "",
+      "objects": [
+        {
+          "id": "obj_f8052e4e7",
+          "name": "button1",
+          "control": "button",
+          "x": {
+            "mode": "center",
+            "width": 176
+          },
+          "y": {
+            "mode": "top",
+            "top": 27,
+            "height": 48
+          },
+          "props": {
+            "text": "Button",
+            "fontSize": 15
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_320211388",
+          "name": "button2",
+          "control": "button",
+          "x": {
+            "mode": "center",
+            "width": 120
+          },
+          "y": {
+            "mode": "top",
+            "top": 89,
+            "height": 24
+          },
+          "props": {
+            "text": "Button",
+            "fontSize": 15
+          },
+          "on": {}
+        }
+      ]
+    },
+    {
+      "id": "bg_bfeed34b6",
+      "name": "Main",
+      "color": "#0f172a",
+      "script": "",
+      "objects": []
+    }
+  ],
+  "pages": [
+    {
+      "id": "page_35267e3f8",
+      "name": "Page 1",
+      "script": "",
+      "backgroundId": "bg_c66d9f9e6",
+      "objects": [
+        {
+          "id": "obj_d47ef84510",
+          "name": "button1",
+          "control": "button",
+          "x": {
+            "mode": "right",
+            "right": 70,
+            "width": 176
+          },
+          "y": {
+            "mode": "bottom",
+            "bottom": 26,
+            "height": 48
+          },
+          "props": {
+            "text": "bottom right",
+            "fontSize": 15
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_02ef47437",
+          "name": "image1",
+          "control": "image",
+          "x": {
+            "mode": "left",
+            "left": 140,
+            "width": 538
+          },
+          "y": {
+            "mode": "top",
+            "top": 149,
+            "height": 208
+          },
+          "props": {
+            "src": "https://dummyimage.com/538x208/3b82f6/ffffff&text=pattern"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_fec80b4b9",
+          "name": "button3",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 222,
+            "width": 176
+          },
+          "y": {
+            "mode": "top",
+            "top": 54,
+            "height": 48
+          },
+          "props": {
+            "text": "top left",
+            "fontSize": 15
+          },
+          "on": {}
+        }
+      ]
+    },
+    {
+      "id": "page_5ec1cf0f8",
+      "name": "Page 2",
+      "script": "",
+      "backgroundId": "bg_78c0951c6",
+      "size": {
+        "width": 330,
+        "height": 346
+      },
+      "objects": []
+    },
+    {
+      "id": "page_34ac61c06",
+      "name": "Page 3",
+      "script": "",
+      "backgroundId": "bg_78c0951c6",
+      "size": {
+        "width": 355,
+        "height": 335
+      },
+      "objects": [
+        {
+          "id": "obj_fa19d4c46",
+          "name": "label1",
+          "control": "label",
+          "x": {
+            "mode": "center",
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 160,
+            "height": 40
+          },
+          "props": {
+            "text": "Hello",
+            "fontSize": 15
+          },
+          "on": {}
+        }
+      ]
+    },
+    {
+      "id": "page_4d5a086610",
+      "name": "Page 4",
+      "script": "",
+      "backgroundId": "bg_c66d9f9e6",
+      "objects": [
+        {
+          "id": "obj_92b3c66311",
+          "name": "button1",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 763,
+            "width": 176
+          },
+          "y": {
+            "mode": "top",
+            "top": 580,
+            "height": 48
+          },
+          "props": {
+            "text": "Button",
+            "fontSize": 15
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_d53836d99",
+          "name": "group4",
+          "control": "group",
+          "x": {
+            "mode": "left",
+            "left": 56,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 628,
+            "height": 108
+          },
+          "props": {},
+          "on": {},
+          "children": [
+            {
+              "id": "obj_fe9a3dc46",
+              "name": "group3",
+              "control": "group",
+              "x": {
+                "mode": "left",
+                "left": 129,
+                "width": 111
+              },
+              "y": {
+                "mode": "top",
+                "top": 10,
+                "height": 98
+              },
+              "props": {},
+              "on": {},
+              "children": [
+                {
+                  "id": "obj_e9ee15857",
+                  "name": "button6",
+                  "control": "button",
+                  "x": {
+                    "mode": "right",
+                    "right": 0,
+                    "width": 111
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 70,
+                    "height": 28
+                  },
+                  "props": {
+                    "text": "Button",
+                    "fontSize": 15
+                  },
+                  "on": {}
+                },
+                {
+                  "id": "obj_53009d188",
+                  "name": "button7",
+                  "control": "button",
+                  "x": {
+                    "mode": "center",
+                    "width": 70
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 0,
+                    "height": 28
+                  },
+                  "props": {
+                    "text": "Button",
+                    "fontSize": 15
+                  },
+                  "on": {}
+                }
+              ]
+            },
+            {
+              "id": "obj_912d7cd07",
+              "name": "group1",
+              "control": "group",
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 111
+              },
+              "y": {
+                "mode": "top",
+                "top": 0,
+                "height": 82
+              },
+              "props": {},
+              "on": {},
+              "children": [
+                {
+                  "id": "obj_6b59e3af6",
+                  "name": "button3",
+                  "control": "button",
+                  "x": {
+                    "mode": "right",
+                    "right": 0,
+                    "width": 111
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 54,
+                    "height": 28
+                  },
+                  "props": {
+                    "text": "Button",
+                    "fontSize": 15
+                  },
+                  "on": {}
+                },
+                {
+                  "id": "obj_2352d34012",
+                  "name": "button2",
+                  "control": "button",
+                  "x": {
+                    "mode": "center",
+                    "width": 70
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 0,
+                    "height": 28
+                  },
+                  "props": {
+                    "text": "Button",
+                    "fontSize": 15
+                  },
+                  "on": {}
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "obj_4da9211c8",
+          "name": "group2",
+          "control": "group",
+          "x": {
+            "mode": "right",
+            "right": 393,
+            "width": 272
+          },
+          "y": {
+            "mode": "bottom",
+            "bottom": 481,
+            "height": 239
+          },
+          "props": {},
+          "on": {},
+          "children": [
+            {
+              "id": "obj_78cb79f27",
+              "name": "button5",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 131,
+                "width": 141
+              },
+              "y": {
+                "mode": "top",
+                "top": 185,
+                "height": 54
+              },
+              "props": {
+                "text": "Button",
+                "fontSize": 15
+              },
+              "on": {}
+            },
+            {
+              "id": "obj_2d684c886",
+              "name": "button4",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 157
+              },
+              "y": {
+                "mode": "top",
+                "top": 0,
+                "height": 54
+              },
+              "props": {
+                "text": "Button",
+                "fontSize": 15
+              },
+              "on": {}
+            }
+          ]
+        },
+        {
+          "id": "obj_fe7e8d036",
+          "name": "card1",
+          "control": "card",
+          "x": {
+            "mode": "left",
+            "left": 394,
+            "width": 376
+          },
+          "y": {
+            "mode": "top",
+            "top": 408,
+            "height": 112
+          },
+          "props": {
+            "title": "Card",
+            "text": "Card body asd asd asdlkj laksjd laksjd lkasjd lkasjd lkasjd klasjd klajsd lkjasd lkjasdlkj askldj "
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_05a2138f6",
+          "name": "button8",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 16,
+            "width": 176
+          },
+          "y": {
+            "mode": "top",
+            "top": 136,
+            "height": 48
+          },
+          "props": {
+            "text": "Button",
+            "fontSize": 15
+          },
+          "on": {}
+        }
+      ]
+    },
+    {
+      "id": "page_e4c4c3696",
+      "name": "md expand",
+      "script": "",
+      "backgroundId": "bg_c66d9f9e6",
+      "objects": [
+        {
+          "id": "obj_b9f457ab7",
+          "name": "markdown1",
+          "control": "markdown",
+          "x": {
+            "mode": "both",
+            "left": 8,
+            "right": 8
+          },
+          "y": {
+            "mode": "both",
+            "top": 56,
+            "bottom": 124
+          },
+          "props": {
+            "text": "Fixed. The size badge now prefers sitting below the selected control, flips above when there's no room, and clamps inside the page box on both axes — so it stays visible on a bottom/right-edge control.\n\n- New pure `badgePosition()` helper in `packages/runtime/src/design.ts:19`, used by `redrawSelection` (`design.ts:959`).\n- Added 4 unit tests; docs updated (`runtime-internals.md` §4).\n- `pnpm test` (442 pass), `pnpm typecheck`, `pnpm build` green; verified in-browser: a button at y=900 on a page grown to 948.\n\n---\n\nFixed. The size badge now prefers sitting below the selected control, flips above when there's no room, and clamps inside the page box on both axes — so it stays visible on a bottom/right-edge control.\n\n- New pure `badgePosition()` helper in `packages/runtime/src/design.ts:19`, used by `redrawSelection` (`design.ts:959`).\n- Added 4 unit tests; docs updated (`runtime-internals.md` §4).\n- `pnpm test` (442 pass), `pnpm typecheck`, `pnpm build` green; verified in-browser: a button at y=900 on a page grown to 948.\n\n# MORE STUFF\n\nFixed. The size badge now prefers sitting below the selected control, flips above when there's no room, and clamps inside the page box on both axes — so it stays visible on a bottom/right-edge control.\n\n- New pure `badgePosition()` helper in `packages/runtime/src/design.ts:19`, used by `redrawSelection` (`design.ts:959`).\n- Added 4 unit tests; docs updated (`runtime-internals.md` §4).\n- `pnpm test` (442 pass), `pnpm typecheck`, `pnpm build` green; verified in-browser: a button at y=900 on a page grown to 948.\n\n---\n\nFixed. The size badge now prefers sitting below the selected control, flips above when there's no room, and clamps inside the page box on both axes — so it stays visible on a bottom/right-edge control.\n\n- New pure `badgePosition()` helper in `packages/runtime/src/design.ts:19`, used by `redrawSelection` (`design.ts:959`).\n- Added 4 unit tests; docs updated (`runtime-internals.md` §4).\n- `pnpm test` (442 pass), `pnpm typecheck`, `pnpm build` green; verified in-browser: a button at y=900 on a page grown to 948.\n\n# toolback v4 — runtime & editor internals\n\nThe deep architectural reference: how scripts are compiled and dispatched, how\nthe editor and canvas talk, and the invariants that hold the system together.\nThe [scripting guide](./scripting-guide.md) documents what authors *use*; this\ndocument explains how it *works*. When you change the runtime, update both.\n\n---\n\n## 1. Architecture map\n\n```\ntoolback4/\n├── packages/\n│   ├── format/    # zod schemas, factories, geometry/tree helpers (no runtime deps beyond zod)\n│   ├── controls/  # DOM renderers per control + content registry + design tokens (bundles `marked`)\n│   └── runtime/   # player (scripts/store), design controller (canvas editing), editorLink (protocol)\n└── apps/\n    └── editor/    # Vue 3 + Pinia + Monaco; the single source of truth for the book\n```\n\nDependency direction: `format ← controls ← runtime ← editor`. The editor never\nimports controls directly; it renders everything through the runtime inside a\n**same-origin sandbox iframe** (`canvas.html`), so broken user scripts can\nnever take the editor down and design/run mode share one iframe (ToolBook's\nF3 pattern).\n\nEverything the user authors — objects, geometry, scripts — lives in one plain\nJSON document (`Book`). The editor owns it; the canvas is a renderer.\n\n## 2. Data model (`packages/format`)\n\n```ts\nBook    { id, title,\n          backgrounds: Background[], pages: Page[],\n          startPageId?, store?: [key,value][] }\nBackground {\n  id, name, color, script,        // script = shared fns + backgroundEnter() hook\n  objects: PageObject[],\n}\nPage    { id, name, script, backgroundId, author?, size?: {w,h}, objects: PageObject[] }\nPageObject {\n  id, name,                       // name = unique per page/background; the `controls[name]` handle\n  control: 'button'|'label'|'input'|'image'|'card'|'container'|'switch'|'group',\n  x: XEdge,                       // horizontal edge constraint (see §4.1)\n  y: YEdge,                       // vertical edge constraint\n  props: Record<string, unknown>, // control-specific, e.g. { text }\n  on: Record<string, string>,     // eventName -> script source\n  children?: PageObject[],        // groups only; members constrain to the group box\n}\nXEdge = { mode:'left'; left; width }\n      | { mode:'right'; right; width }\n      | { mode:'both'; left; right }\n      | { mode:'center'; width }\nYEdge = { mode:'top'; top; height }\n      | { mode:'bottom'; bottom; height }\n      | { mode:'both'; top; bottom }\n      | { mode:'center'; height }\n```\n\n- **Pages are web pages.** A page with no `size` fills the window it is shown in\n  (the editor canvas area, or the browser) and grows with its content, never\n  shorter than the window. A page with a `size` is a fixed surface (dialog /\n  popup / author plugin window). Breakpoints, `Book.canvas`, `Book.design`,\n  `Background.size` and `Background.autoHeight` are gone; `parseBook` migrates\n  old files (`canvas` desktop size → the reference every old fitted rect is\n  measured against, then discarded; a background `size` → its pages' `size`).\n\n- Zod schemas with `.default()`s; `parseBook` normalizes on load. Factories\n  (`createObject`, `createGroup`, `createPage`, `createBook`) return parsed\n  plain objects, safe to JSON round-trip.\n- **Start page.** `book.startPageId` names the page a run opens on. It is\n  optional/dangling-safe: `resolveStartPageIndex(book)` returns the matching\n  index or `0`. The published entry (`player-entry.ts`) passes it to `runBook`,\n  and the editor opens it on load/refresh; it is not a per-run override.\n- Every object stores its **edge distances** (`x`/`y`; see §4.1), not a rect or\n  a scale mode; there is no remembered \"designed at\" size.\n- Groups are **parent objects**: a member constrains to the group box; a group's\n  box is its own `x`/`y` and hugs its members. A group handle resize (or a typed\n  W/H / scripted size) scales the members with it (see §5).\n- Style props: `color` (colour names via `resolveColor` — a curated map plus\n  any CSS colour string — or raw CSS) and `fontFamily` (one of the five\n  simplified stacks in `FONT_STACKS`) are applied at render\n  (`applyStyleProps`) and are also live accessors on `ControlApi`\n  (`color`/`fontFamily` getters/setters that write the prop AND the inline\n  style, surface vs text depending on the control). Switches apply\n  fontFamily/size to their text span and `color` to the toggle track\n  (`--tb-switch-on`).\n- Pinia reactive proxies are **not structured-cloneable** — the book always\n  crosses the iframe boundary as `JSON.parse(JSON.stringify(book))`.\n\n## 3. The player (`packages/runtime/src/player.ts`)\n\n### 3.1 Run loop & navigation\n\n`runBook(book, root, onError, startPageIndex)` builds a `RunState` and calls\n`runPage`. One global `active` handle — a second `runBook` replaces the first\n(`stopRun` unwinds everything). `runPage`:\n\n1. `navLock` guards re-entrancy (`page.go` inside `pageEnter` etc.).\n2. Fires `pageLeave` (async-safe: `Promise.resolve(leave()).catch`), then\n   tears down **all** listeners and store subscriptions.\n3. Re-renders the page DOM wholesale (`renderBookPage`), rebuilds\n   `st.controls` (one `ControlApi` per object, keyed by name).\n4. Compiles the page script → `st.pageFns` (§3.3), wires event dispatchers\n   (§3.4), wires dynamic labels (§3.5), clears the lock, fires `pageEnter`.\n\n`page.go(name)` finds the page by name (unknown names report an error and stay\nput) and re-enters `runPage`. The store survives navigation; scripts do not.\n\n`startPageIndex` defaults to `0`; the published player passes\n`resolveStartPageIndex(book)` (the book's `startPageId`), while the editor's\nRun previews the page being edited (`editorLink.ts`) rather than the start page.\n\n### 3.2 The store\n\n`createStore(initial?)`: a `Map` (optionally pre-seeded) plus a subscriber set.\n`set` writes and **notifies every subscriber synchronously** — that is what\nre-renders `{{key}}` labels and drives the editor's store browser. No per-key\ngranularity; snapshots are insertion-ordered entries.\n\n**The design-time store.** `Book.store` is an ordered array of `[key, value]`\npairs (zod default `[]`; JSON data only — the book crosses the iframe as a JSON\nclone). `runBook` seeds its store with `book.store`, so **every run starts from\nthe book's stored values** (`runBook` reads the book it already receives — no\ncaller changes; published exports inherit the same seed via `player-entry.ts`).\nRun mutations never write back into the book; the editor's Store tab offers an\nexplicit per-row \"copy to design\" for deliberately freezing a computed value.\nAuthor-mode (`author.ts`) sessions seed from `book.store` the same way.\n\n### 3.3 Script compilation — one factory per script\n\nUser scripts are compiled with `new Function` inside the iframe (no CSP-safe\nalternatives are needed for a local tool). Two factory shapes:\n\n**Page script** — one factory, executed **once** per page entry; its body\ndeclares the page's shared functions, which are harvested and returned:\n\n```\nnew Function('api', 'self',\n  `\"use strict\";\n   const { page, controls, store } = api;\n   const { <bareNames> } = controls;      // omitted when empty\n   <user page script>\n   ;return { fnName: typeof fnName === 'function' ? fnName : undefined, ... }`)\nfactory(api, pageApi)   // self = the page API (self.name = the page name)\n```\n\n- `extractFunctionNames` regex-scans top-level `function name(` /\n  `async function name(` declarations; the returned functions become\n  `st.pageFns`, callable **directly** from object scripts (`bump(3)`) — the\n  ToolBook \"shared script\" pattern.\n- `pageEnter`/`pageLeave` are just page functions recognized by name; they get\n  **no parameters** (no `event`/`target`/`self`), invoked async-safe.\n\n**Object event scripts** — one factory per (object, event), compiled once per\npage render, invoked per dispatch:\n\n```\nnew Function('api', ...params,\n  `\"use strict\";\n   const { page, controls, store } = api;\n   return (async () => {\n     const { <bareNames> } = controls;    // inside the IIFE\n     <user event script>\n   })()`)\n```\n\n- `params = [...new Set([...pageFnNames, 'event', 'target', 'self', 'forward'])]`.\n- The async IIFE wrapper is why `await` works anywhere in a script; the\n  returned promise's rejections are routed to `onError` labelled\n  `` `${owner}.${event}: …` `` and shown in the editor status bar.\n- `\"use strict\"` — bare-word typos throw `ReferenceError` (reported in the\n  status bar) instead of silently writing globals.\n- **Reserved slots win**: a page function named `event`, `target`, `self`, or\n  `forward` is shadowed by the runtime binding at that position (the param\n  list dedupes; the dispatcher matches reserved names first). Bare object\n  names are excluded from the destructure when they collide with page function\n  names, so the page function wins for those — the single rule: *runtime\n  reserved words > page functions > bare object names*.\n- **`this`**: each invocation is `factory.call(selfValue, ...args)`. Strict\n  mode preserves it, and the body's async IIFE is an arrow, so `this` inside\n  the script (and inside arrow functions it spawns) is the script owner —\n  `this === self`.\n\n### 3.4 Event dispatch — the ToolBook forward chain\n\nScripts do **not** rely on DOM bubbling. Each page render builds:\n\n- a `parentOf` map (owner chains from the object tree),\n- a `compiled` registry: `owner name → event → invoke(e, self, forward)`.\n\nFor every **non-group** element (group wrappers are `pointer-events: none` —\nevents always originate on members), the union of event names across its whole\nowner chain is attached as **one dispatcher per event type**:\n\n```\ndispatch(e):\n  i = 0\n  forward = () => {                 // step one level up the chain\n    while (i < chain.length && !compiled[chain[i]]?.has(event)) i++\n    if (i < chain.length) compiled[chain[i++]].invoke(e, selfOfOwner, forward)\n  }\n  forward()                         // run the first owner with a handler\n```\n\nSemantics (ToolBook-faithful):\n\n1. The **innermost owner with a handler** for the event runs first.\n2. It **stops** unless it calls `forward()` — so a member can handle-and-stop\n   (override) or continue.\n3. An owner **without** a handler for the event auto-continues to its parent —\n   a group script fires even when the clicked member has no script.\n4. `forward()` is a closure over the dispatch's chain cursor: callable after\n   `await`, and each call steps exactly one handler up (the chain is walked\n   monotonically — no loops).\n5. `self` = the owner whose handler is running (in a group script: the group\n   itself); `target` = the member that received the event (resolved from\n   `e.target` up to the nearest `[data-tb-name]` with a live ControlApi).\n6. Because dispatch is an explicit chain walk, **non-bubbling events**\n   (`mouseenter`, `mouseleave`, …) reach group handlers the same way bubbling\n   ones do.\n7. `control.on(event, fn)` (the API method) attaches a *direct* listener on the\n   object's element — outside the chain, no forward.\n\n`pageLeave`/`stop()` remove every dispatcher and store subscription.\n\n### 3.5 Dynamic labels `{{…}}`\n\n`wireDynamicText` resolves `{{…}}` for every object with a **content prop** —\n`CONTENT_PROPS`/`contentKeyFor` in `@toolback/controls` map a control kind to\nthe prop that carries its templatable content (`button`/`label`/`card`/`switch`\n→ `text`, `markdown` → `text`, `html` → `html`; inputs have none). The\nresolved source is fed through `applyContent(el, kind, source)`, which is the\nsingle place DOM content is written:\n\n- Regex: `/\\{\\{\\s*([\\w$]+(?:\\.[\\w$]+)*)\\s*\\}\\}/g` — bare store keys **and**\n  one-level dotted paths.\n- `{{key}}` → `store.get(key) ?? ''` (unset keys render empty).\n- `{{self.name}}` / `{{this.name}}` → the object's own name. This is how a\n  duplicated button displays its own fresh name automatically. Any other\n  dotted member (`{{self.nme}}`) renders empty, like an unset key.\n- **Substitution runs on the source, before rendering.** Plain kinds get\n  `textContent`; `card` targets `.tb-card-body` and `switch` targets\n  `.tb-switch-text` (never the root, which would wipe the title / checkbox +\n  track); `markdown` re-parses the substituted source with `marked` and `html`\n  sets `innerHTML` (empty sources → a placeholder). This is why a store change\n  re-parses a viewer instead of replacing its rendered DOM with plain text.\n- Substitution runs once at render and again on **every** `store.set` (the\n  store subscription is torn down with the listeners).\n- **Design mode** calls the same one-shot renderer (`renderDynamicText`,\n  exported) against a throwaway store seeded from `book.store` on every design\n  `load` — so the canvas shows the design-time values, not the literal\n  template, and unset keys still render empty exactly as at run time. Templates\n  re-resolve on every design sync (each sync re-renders the page).\n\n## 4. The design controller (`packages/runtime/src/design.ts`)\n\nOwns in-canvas editing: selection, drill-in, drag, resize, marquee. It works\non a `rects` map (page-absolute, refreshed from the DOM after every render)\nand communicates with the editor only through messages (`toolback:selection`,\n`toolback:commit`).\n\n- **Hit-testing**: `chainAt(x, y)` — the deepest `[data-tb-id]` whose rect\n  contains the point (topmost-paint wins on overlap), then the ancestor walk\n  gives the full chain `[outerGroup, …, innerGroup, object]`.\n- **Viewer wheel forwarding**: design mode gives page content\n  `pointer-events: none` (so the overlay can select), which would also stop a\n  markdown/HTML viewer from scrolling natively. The overlay's `wheel` handler\n  hit-tests the point (`chainAt`), finds the object's `.tb-markdown`/`.tb-html`,\n  and adds the delta to its `scrollTop`/`scrollLeft` (only when it actually\n  overflows). At run time the viewer scrolls natively — `overflow: auto` in\n  `styles.ts`.\n- **Drill path** (`drillPath: string[]`): the ancestors of the selected\n  object. The \"current level\" is `chain[drillPath.length]`. Gentle clicks\n  select at the current level and never descend; double-click descends exactly\n  one level past the selection; alt-click jumps to the deepest object;\n  `Escape` pops one level (selecting the group you were in) and is **ignored\n  at the outermost level** — it never deselects.\n- **Drag**: one batched `toolback:commit {kind:'move', objects:[{id, rect}]}` per\n  gesture, rects in **page-absolute** coordinates. The store rebases each into\n  its parent-relative slot (`absOriginOf` sums the ancestor origins) and\n  re-snaps group boxes to the tight union of their members. During a move the\n  controller also re-derives the cached `rects` of every descendant of a moved\n  object from their start rects (`followers`, captured at pointer-down), so a\n  group's members' springs and hit-testing track the ghost live instead of\n  lagging until the commit's re-render.\n- **Group resize**: a group handle drag leaves the layout box alone and previews\n  a CSS `transform: scale(fx, fy)` anchored on the fixed corner, stretching the\n  whole subtree. The commit sends only the group's rect + `dir`; the store scales\n  every descendant's edge distances by the box ratio (`scaleSubtreeEdges`, §5)\n  and writes the box, so the preview maps onto the re-render. A stretch axis\n  (`both`) that the handle moved becomes a fixed near-edge size. Non-group\n  objects resize their own box directly; their members re-resolve their edges.\n- **Aspect lock (Shift-drag)**: holding Shift on a **corner** handle resizes\n  with the object's start aspect ratio held (`resizeRectAspect`,\n  `packages/runtime/src/design.ts`) — the driver axis is whichever the pointer\n  moved further along, and the fixed-opposite-corner math is preserved.\n  Single-axis edge handles resize normally. No schema field: the lock is a\n  gesture, captured at drag start.\n- **Clip indicators**: after every render (and live during drags) the\n  controller lays a dashed red `.tb-clip` box over any object that sticks out\n  of the page. The controller's `rects` map is always the source of truth for\n  these — it reads rendered DOM positions, so CSS edge rendering is\n  automatically reflected.\n- **Selection chrome**: the `.tb-sel` outline, the eight resize handles and the\n  `w × h` size badge are drawn in the overlay. The badge prefers just below the\n  selected object, flips above it when there is no room, and is clamped inside\n  the page box (`badgePosition`, `design.ts`) — so a control on the bottom/right\n  page edge keeps its size label visible instead of clipping it against the\n  overlay's `overflow: hidden`.\n- **Edge springs**: the `.tb-fithint` overlay draws a spring from every object\n  to each edge it follows, **one axis at a time** (by default every object draws\n  at least the left/top springs). The load message carries the whole\n  `FitHintOptions` (`mode: 'all' | 'selected' | 'off'` plus the popover options)\n  and `setFitHints` normalizes a bare mode string for back-compat; the All/Sel/Off\n  buttons patch `mode`, the fourth segment opens the options popover.\n  `springShown(el)` gates the drawing pass: the `modeAllows` gate (Selected =\n  selection only) plus `groupMembers:false` (skip members in All) and\n  `nonDefaultOnly` (skip objects whose x/y are both the default left/top). The\n  group-outline pass uses `modeAllows` alone, so hiding a member's spring never\n  hides the group box it sits in. Each spring carries a\n  `.tb-fithint-label` caption with the edge word and (unless `lengths:false`) its\n  pixel distance (`right 198`, `top 46`, `centre`); `labels:false` drops captions\n  entirely and `skipZeroLabels` (default on) drops the ones whose distance rounds\n  to 0, so a flush edge is not captioned. Captions are **placed on the roomier\n  side of the spring and clamped inside the page/group box** using text-derived\n  size estimates (no layout read), so a page-edge caption is pushed clear of the\n  border instead of sitting on it. **Shape encodes the anchor**: an **edge**\n  choice (left/top/right/bottom, and both) is a zigzag with a square anchor and an\n  arrowhead at the object pointing back at it; **center** is a plain straight\n  connector with circle anchors. Distances are always fixed, so every edge spring\n  is solid. Edges are slate, center is pale grey, and every spring is drawn over a\n  translucent white halo so it reads on dark pages. **Members draw their own\n  springs against the parent group box** (the group wrapper's rect, via the\n  `rects`/`bgRects` maps) rather than the page; top-level objects use the page box\n  (`origin` + `pageBounds`). Covers background objects too (`bgRects` fallback),\n  with a **?** help popup in the toolbar (buttons + options + line legend). The\n  hint is the page's first child, so it\n  paints above the page background but **under** the controls; page-edge anchor\n  glyphs are nudged just inside the page so clipping doesn't cut them. Pure\n  decoration — `pointer-events: none`, rebuilt on render, drag redraws and window\n  resizes (`DesignController.refresh`). Reads the `data-tb-edge-x/y` modes the\n  renderer stamps on each wrapper.\n- **Group outlines** (`.tb-group-outline`): a quiet dashed slate box tracing a\n  group that has no selection box of its own but whose edges matter — every\n  group in `drillPath` (so each nesting level stays faintly visible while an\n  inner child is selected), plus every group whose members are in view at the\n  current mode (so a member's springs always land on a visible edge; the\n  `groupMembers`/`nonDefaultOnly` filters hide springs, not the box). A group\n  can be both drilled and in-view, or selected: a selected group is\n  always excluded — its `.tb-sel` box is the loud one — and `fitHints.mode:'off'`\n  leaves only the drilled ancestors. Built by `redrawGroupOutlines` (the set is\n  the pure `groupOutlineIds`), positioned from the `rects`/`bgRects` maps like\n  the selection boxes, painted under `.tb-sel`, and refreshed whenever the\n  selection, drill path or hint mode changes.\n- **Drags rewrite edge distances**: canvas drags send page-absolute rects; the\n  store converts each to the object's `x`/`y` distances against its page/group\n  box, keeping the edges it already follows. A centred axis is rigid (the canvas\n  clamps it); there is nothing to release.\n\n### 4.1 Edge constraints (`x` / `y`)\n\nEvery `PageObject` stores the distance(s) it keeps from the edges it follows,\nlike CSS `left`/`right`/`top`/`bottom`:\n\n- `{ mode:'left', left, width }` — fixed distance from the left edge, fixed size\n- `{ mode:'right', right, width }` — fixed distance from the right edge\n- `{ mode:'both', left, right }` — both margins fixed, so the size stretches\n- `{ mode:'center', width }` — fixed size, centred\n\n`y` mirrors with `top` / `bottom` / `both` / `center`. There is no stored\nreference size and no scaling mode; `resolveX`/`resolveY` derive a rect against a\ncontaining box (`rectForObject`), and the renderer writes the distances straight\nto CSS (`applyEdgeStyles`: `left`+`width`, `right`+`width`, `left`+`right`, or\n`left: calc(50% - w/2)`). Percentages resolve against the containing box — the\npage for top-level objects, the parent group wrapper for members — so the browser\nrepositions everything on resize with **no JavaScript re-render**.\n\nAn optional **outer margin** (`PageObject.margin: { top?, right?, bottom?, left? }`,\nmissing sides = 0) folds into the same resolution, like CSS `margin` around an\nabsolutely-positioned box. On a followed edge it offsets the control away from\nthat edge (`left` → `left + margin.left`, `right` → `right + margin.right`,\n`both` shrinks by both margins); a centred axis centres the **margin box**, so\nequal margins cancel and the control stays centred. `rectForObject` and\n`applyEdgeStyles` share this math, and `xEdgeFromRect`/`yEdgeFromRect` subtract\nthe margin again so a drag/typed write cannot double-count it. `scaleEdges`\nscales the margin with a group resize; `marginOf` fills in the missing sides.\nMargins are editor-authored only (the Geometry panel's **Margin** row) — there is\nno `ControlApi`/author-bridge setter.\n\nThe author-facing surface is the **Responsive** section of the properties panel\n(`apps/editor/src/components/PropertiesPanel.vue`): four plain choices per axis\n(Follows left · Follows right · Follows both (stretches) · Centred), stored\ndirectly as the `mode`. `apps/editor/src/fitModes.ts` holds the labels and\ndescriptions. Switching a choice re-derives the distances from the current\nrendered rect (`xEdgeFromRect`/`yEdgeFromRect`), so the object stays put.\n\nInvariant: **an edge constraint is the stored geometry, not a render lens.**\nDeliberate writes (`writeRectPart`, used by panel fields, scripts and the author\nbridge) move the control now while keeping the mode: `x`/`y` on a follows-both\ncontrol translates it, on a centred control drops the centring to a near edge,\nand a `width`/`height` write on a follows-both control switches that axis to a\nfixed size held to the left/top. Canvas drags go through `applyRects`, which\nbuilds the new distances for top-level objects and rebases members into their\ngroup's frame.\n\nA legacy book with `rect` + `fit` is migrated at parse time\n(`migrateConstraints`): free/left/top/stretch → follows the near edge,\nright/bottom/pin-* → follows the far edge, fill → follows both, center → centred,\neach measured at the old desktop reference size and frozen into fixed distances.\n\nControlApi reads use the same resolution: `runPage` and `author.ts` build a\n`parentBoxMap` (the resolved page box for top-level objects, the resolved group\nbox for members) plus `pageBoxFor`, and each `ControlApi` resolves its\n`x`/`y`/`width`/`height` — and the box a write re-derives against — from that\ncontaining box, so script reads agree with the render.\n\nKnown limitations: a centred axis is rigid (its position is fully determined, so\nthe canvas clamps it and it must be changed from the dropdown); group members\ncarry their own constraints **relative to the group box** (see §5).\n\n### 4.2 Fluid pages (the page box)\n\n`resolvePageBox(page, container, objects)` (`packages/format`) is the single\nsource of a page's size. A **fixed** page (`Page.size`) returns that size. An\n**ordinary** page returns `max(container, content extent)`, where the extent is\n`contentExtent(objects)`: the outer (margin-box) right/bottom of every object\nwhose x/y mode is **left/top** (near edge, groups included). Right/bottom/both/\ncentred objects sit inside the page box by definition and never enlarge it — this\nis what makes \"follows bottom\" mean a fixed distance from the page's real bottom\nedge without circularity. Including the margin box is what lets a Follows-top\ncontrol keep `margin.bottom` px of empty page below it instead of sitting flush\non the auto-grown edge.\n\nAt render time a fluid page is given `width:100%; height:100vh` (or `100%` inside\na sized popup/author box) with `min-width`/`min-height` set to the content\nextent, so the browser grows and scrolls the page with no re-measure. Only layout\nat render/navigation time drives growth; a script moving an object mid-run does\nnot re-grow the page. The container is `measureViewport(root)` (the document's\nclient box) for a base page, or an explicit box for popups/author windows. A\nfixed page is centred in the window (`margin: auto`); a fluid page fills it.\n\nThe editor canvas mirrors this: `renderBookPage`/`renderBackgroundView` render\nfluid pages, and `editorLink`'s `syncCanvasWidth()` toggles\n`.tb-canvas-root--fluid` so the wrapper spans **max(viewport, content extent)**\n— `min-width:100%` covers the empty case (a plain `max-content` wrapper would\ncollapse a fluid page whose content fits), while the inherited `max-content`\ncovers horizontal overflow so objects past the right edge stay inside the design\noverlay and remain hit-testable. `syncCanvasWidth()` runs **before** the rects\nare measured/`onRendered`, because a fixed→fluid navigation must widen the\nwrapper first: measuring against a still-collapsed wrapper puts right/bottom\nanchors (and the selection/clip overlays derived from them) in the wrong place\nuntil the next re-render. On resize the editor sends a fresh viewport and\ncalls `design.refresh()` to re-measure the overlay; the page itself reflows\npurely in CSS. Scroll preservation is gone — the page's size comes from\nconstraints, not from measuring the DOM, so clearing and rebuilding the page no\nlonger collapses it.\n\n## 5. Group invariants (`apps/editor/src/stores/book.ts`)\n\n1. **Hug the members**: after any member move/resize/delete, a member's edge\n   change, or a group-level resize, `expandGroup` solves every member against\n   the current group box, shifts the group so the union starts at its local\n   origin, and sets the box to the union — near/far members keep their absolute\n   positions. Members keep their own edge modes. A **centred** member re-centres\n   when the box changes, so `expandGroup` **iterates to a fixed point** (up to\n   12 passes) to reach a genuinely tight box. Recurses up for nested groups.\n   **Two ways a group changes size:** a **handle drag** — and a typed W/H, and a\n   scripted `group.width`/`height` — means \"size the group\": the store scales\n   every descendant's edges by the box ratio (`scaleSubtreeEdges` in\n   `@toolback/format`) around the fixed corner, so sizes and positions scale\n   together, and `expandGroup` then only rounds the box tight. A **page/window\n   resize** is ambient: CSS re-resolves each member's own edges and nothing is\n   scaled. Because a page box change caused by a **content** edit (moving another\n   control, resizing the page) would otherwise leave a stretch (`both`) group\n   larger than its members, every `sync()` first runs `rehugStretchedGroups()` —\n   an idempotent depth-first `expandGroup` over `both`-axis groups, so only a\n   pure viewport reflow (no store mutation) can leave a group bigger than its\n   contents. A stretch (`both`) axis that a handle resized becomes a fixed\n   near-edge size so the hand resize sticks.\n2. **Same-parent rule**: grouping requires all selected objects to share a\n   parent. Ungrouping splices children back at the group's index with their\n   rects made absolute against the group's rendered box at the current\n   viewport (so it never jumps on screen); ungrouping a scripted group asks\n   first (the script is lost).\n3. **Duplication** (`duplicateSelected`): deep-clone with fresh ids and fresh\n   names from a shared used-names set (nested group levels never collide),\n   inserted after each original and nudged +24px down-right; group subtrees\n   copy whole; undoable in one step.\n\n## 6. Editor ↔ canvas protocol (`packages/runtime/src/editorLink.ts`)\n\nAll messages are `type: 'toolback:*'` posted between the editor window and the\niframe.\n\n| Editor → canvas | payload | meaning |\n|---|---|---|\n| `toolback:load` | book, pageIndex, view, design, selection, fitHints | full re-render (the only sync; idempotent) |\n| `toolback:dragOver` / `dragEnd` | control, rect | palette ghost preview |\n| `toolback:authorStart` | book, pageIndex | run a plugin page in author mode (M6c) |\n| `toolback:authorStop` | — | stop the running plugin |\n| `toolback:authorReply` | id, ok, result / error | resolves one pending bridge call |\n\n| Canvas → editor | payload | meaning |\n|---|---|---|\n| `toolback:ready` | — | iframe booted; editor answers with `load` |\n| `toolback:viewport` | width, height | measured canvas viewport (the editor store mirrors it for its page-box/edge math) |\n| `toolback:rects` | rects map | layout measured (design hit-testing) |\n| `toolback:selection` | ids | canvas selection changed (multi-select, drill) |\n| `toolback:commit` | kind move/resize, objects | a drag/resize finished (undoable edit) |\n| `toolback:scriptError` / `toolback:error` | message | status bar |\n| `toolback:runToggle` | — | F3/⌥3 pressed inside the canvas |\n| `toolback:store` | entries | run-mode store browser stream — cloneable values raw, functions as `{__tbLabel}` sentinels |\n| `toolback:popups` | open names | run-mode popup stack changed |\n| `toolback:authorCall` | id, op, args | plugin script called `author.<op>` (async bridge) |\n| `toolback:authorState` | active, pageName | plugin started/stopped (✕ in the box) |\n| `toolback:reorder` / `deleteSelection` / `undo` / `redo` / `duplicate` / `group` / `ungroup` | — | canvas-focused shortcuts forwarded |\n\nKeyboard routing: canvas-side keydowns never reach the editor window, so\nevery editor-wide shortcut exists twice — in the editor (`App.vue` capture\nphase, skipped in editable targets so Monaco keeps its own ⌘Z) and inside the\ncanvas (`listenForEditor` forwards as messages). The design controller claims\nkeyboard focus on pointer-down (`window.focus()`) because `preventDefault`\notherwise leaves the iframe focusless and canvas-side keys silently die.\n\n## 7. Editor store (`apps/editor/src/stores/book.ts`)\n\nSingle Pinia store; **all** content mutations live here and end in `sync()`,\nwhich (a) posts the full book to the canvas and (b) schedules the debounced\nIndexedDB autosave. Components never touch `book` directly.\n\n- **Undo/redo**: whole-book snapshots (book + selection + page index) pushed\n  *before* each mutation via `record(label, coalesceKey?)`. Continuous edits\n  coalesce by key within 800 ms (one step per typing burst / drag); redo\n  clears on new edits; stacks capped at 100; nothing records while running;\n  `newBook`/`hydrate`/autosave-restore reset history. `redo()` pushes the\n  *pre-redo* state so undo-after-redo steps back instead of bouncing.\n- **Run mode** (`isRunning`): the same iframe re-rendered by `runBook`; edits\n  made during a run mutate the book but are not recorded in history.\n- **Design-time store** (`setDesignStore`): replaces `book.store` (ordered\n  `[key, value]` pairs) through the normal `record → sync` path, so Store-tab\n  edits are undoable/redoable like any book edit (coalesced under\n  `designstore`); still applied while running (record no-ops, matching every\n  run-mode edit), which is how the ⇓ \"copy to design\" action works.\n- **Edge writes / page box**: `pageBox()` is `resolvePageBox` against the\n  mirrored viewport; `renderedRectOf`/`renderedPageRectOf` resolve an object's\n  rect from its `x`/`y` against its page/group box (`boxForObject`).\n  `applyRects` (canvas commits), `setGeometry` (panel fields, author bridge) and\n  `setObjectEdge` (Responsive dropdowns) all write through\n  `writeRectPart`/`applyRectToObject`, keeping the edges each control follows.\n  `fillObjectToPage`/`fillObjectWidth`/`fillObjectHeight` pin both margins;\n  `centerObjectInPage` sets both axes centred. `expandGroup` re-hugs a group box\n  around its members.\n- **Align / distribute / match** (`alignSelection`, `distributeSelection`,\n  `matchSizeSelection`, `centerSelectionOnPage`): five pure helpers in\n  `@toolback/format` (`alignRects`, `centerBlockRects`, `distributeRects`,\n  `matchSizeRects`) applied to the selection's **rendered** page-absolute rects\n  (`renderedPageRectOf` sums the ancestor group boxes), then written back through\n  `writeRenderedRects` (members rebase into the group's local frame; every\n  object keeps its edges). All four are one `record` step each and no-op on a\n  mixed-parent selection.\n\n## 8. IntelliSense generation (`apps/editor/src/monacoApiLib.ts`)\n\nThe Monaco TS extra-lib is generated from the **same** runtime helper\n(`shortNamesFor`) the player uses for bare-name binding — completions exactly\nmatch what will resolve at runtime:\n\n- `declare const controls: { <name>: TBControl … }` for every object on the\n  page (members included), one `declare const <bareName>: TBControl` each for\n  the surviving bare names (page-fn collisions and reserved words excluded).\n- `self` is **not** declared in the TS lib — `lib.dom` already declares the\n  global `self` (Window.self) and a duplicate would raise identifier errors.\n  It is offered through the curated completion lists instead (top-level +\n  `self.`/`this.` member lists), and works at runtime regardless.\n- Worker completions are disabled; one curated provider supplies everything\n  (Monaco silently discards suggestions whose range covers non-word\n  characters — ranges are caret-anchored with `additionalTextEdits`).\n- Diagnostics run with explicit compiler options on `javascriptDefaults`:\n  `module: ESNext` + `moduleResolution: node` make `await import('pkg')` legal\n  (no TS1323) and bare specifiers resolve like a bundler. The unresolved-module\n  diagnostics TS2307/TS2792 and the in-memory-URL noise TS80001 are ignored —\n  library imports (shelf / esm.sh) legitimately have no installed types.\n- The completion **context** is per editor instance, keyed by the editor's\n  model URI (`updateApiLib` registers `EditorIntellisenseContext` per URI, and\n  the provider looks it up from the model being completed). Page, background\n  and object script editors therefore never share stale state, even though\n  they may be mounted at the same time.\n- User-defined functions from the page and its background scripts are offered\n  as top-level completions (`ctx.functionNames`): the same `extractFunctionNames`\n  that harvests them at runtime. A page's own helpers and its background's\n  shared functions are both callable from any object script, so they all appear.\n- Popout: a script editor's ⤢ button renders the same content in a\n  draggable/resizable window (`EditorWindow.vue`). The popout **shares the\n  parent editor's Monaco `model`** (`sharedModel` prop) rather than creating a\n  second one — critical for diagnostics: two models with the same function\n  definitions would otherwise produce phantom TS2393 \"Duplicate function\n  implementation\" squiggles. The shared model keeps one diagnosis for both\n  views, and the embedded editor neither registers a lib nor disposes the\n  model (the owner does). Window z-order uses a module-level counter (a\n  `<script setup>` top-level `let` would be per-instance and never stack).\n  **Markdown/HTML viewer fields reuse the same shell** (`ContentEditor.vue`):\n  ⤢ opens a plain `MonacoContent.vue` (markdown/html highlighting, no toolback\n  lib) in an `EditorWindow`, and the inline field stays the `{{`-aware\n  textarea. The two bind to the same `modelValue` and sync live, so no shared\n  Monaco model is involved.\n- `{{` completion in the viewer popout: `monacoApi.ts` registers one\n  completion provider for the `markdown` and `html` languages (independent of\n  the `javascript` provider's registration flag), reading a shared book-wide\n  key list set by `ContentEditor` (`setContentStoreKeys`). It inserts\n  `key}}` (or just `key` when the closing braces are already typed).\n- VS Code link: `scriptLink.ts` writes the script (plus a short comment\n  header marking the marker boundary) to a `.ts` file via the File System\n  Access API (\"⇄ file\" button). It deliberately does **not** dump the generated\n  toolback API into the file — the export is the author's script, not a\n  library reference; toolback-style autocomplete is a built-in-editor feature.\n  The link is **flavour-aware** (`script` / `markdown` / `html`): the picker\n  filters to `.js` / `.md` / `.html`, and viewer files use an HTML-comment\n  header + marker (`<!-- … -->`) so the file still reads naturally. Same\n  mechanics, separate persisted handles (`link:<key>`), so a viewer field and a\n  script never share a file.\n  Linking to an **empty** file never clobbers the editor's content (the editor\n  is the source of truth), and the current script is written out immediately so\n  the file is never left blank. A poll re-reads the file; content differing\n  from the last toolback write is pulled back into the book. Echo-loop safety\n  comes from tracking what the file *actually* contains (`lastWritten` only\n  advances after a write lands, never before), and empty files never trigger a\n  pull. **The poll never races our own edits:** a `dirty` flag is set from the\n  first keystroke until the write completes, and an 800 ms grace window follows\n  every write (the OS can serve stale bytes), so the poll cannot mistake our\n  in-flight/stale write for an external save and yank the editor back. Writes\n  are serialized on a promise chain and always flush the *latest* draft, so\n  rapid typing collapses into one write of the final text.\n\n## 9. Persistence & publish\n\n- Autosave: debounced 800 ms after every `sync()`, into IndexedDB (`kv` store).\n- `.toolbook.json` via File System Access API with download/input fallbacks.\n- Publish: `player-entry.ts` self-plays an embedded, `<`-escaped book;\n  esbuild bundles it to `public/toolback-player.js`; `buildStandaloneHtml`\n  wraps runtime + book into one HTML file.\n- Libraries: user scripts write plain `import('name')`; every compile site\n  (`player.ts` background/page/object-event factories, `author.ts`) rewrites\n  bare specifiers to the injected `__tbImport` param (see `runtime/src/libs.ts`,\n  `rewriteLibImports`). The resolver consults `window.__TOOLBACK_LIBS__`\n  (`{specifier: url}`) — exports embed shelf libraries as base64 `data:` URLs,\n  previews set the map from `public/libs/importmap.json` (the shelf manifest\n  built by `scripts/build-libs.mjs`) — and falls back to `https://esm.sh/<spec>`\n  for anything else, then normalizes CJS interop (`{default: exports}` unwrap).\n  `scanLibImports` (same regex as the rewrite) finds bare specifiers at publish\n  time; `libUrlMapFor` maps shelf hits to data: URLs and emits\n  `<script>window.__TOOLBACK_LIBS__=…</script>` between the book JSON and the\n  player. No import map, no modulepreload — imports run through the same\n  `new Function` bodies as every other script. Base64 payloads cannot contain\n  `<`, so the `</script>` breakout escaping never applies to library code.\n- **Rejected alternatives** (kept for the record): `<script type=\"importmap\">`\n  with inline data URLs (higher browser-support floor, no clean per-book CDN\n  story in preview); baking every shelf library into the player IIFE (every\n  hello-world carries every lib); esbuild-wasm / browser-side bundling\n  (reimplements npm resolution client-side); a Node CLI publish (forks the\n  all-browser publishing story — reserved for a possible later Electron/Tauri\n  rung). CDN-primary was chosen because hosted toolback users can never run\n  local npm installs; the shelf is the opt-in offline path, not the default.\n\n## 10. Invariants to preserve when extending\n\n1. The book crosses the iframe as a **plain JSON clone** (no proxies).\n2. Every content mutation goes through the store and ends in `sync()`.\n3. New script variables must be added to: the runtime param list + dispatch\n   args, `NAME_RESERVED` (both bare-name sources), and the curated completions\n   (not the TS lib if the name collides with a DOM global). Pages/backgrounds\n   should also be excluded from `FUNCTION_RESERVED` in `monacoApiLib.ts` if\n   they become callable user functions.\n4. **Edges are the stored geometry.** `x`/`y` are the single source of a\n   control's rect at render and ControlApi reads (`rectForObject` + CSS). A\n   geometry write keeps the control's mode via `writeRectPart`; a canvas drag\n   converts the page-absolute rect through `applyRects`. Never bake a resolved\n   rect back into `x`/`y` — the distances are the authored data.\n5. Group handlers must be reached through the **owner-chain dispatch**, never\n   by attaching listeners to group wrappers (double-fire risk).\n6. `{{…}}` template grammar and `collectStoreKeys` must stay in sync about\n   what is a store key vs a self-binding; `collectStoreKeys` also harvests\n   keys from `book.store` so design-time keys surface in the `{{` picker.\n7. The examples test (`examples/examples.test.ts`) runs every page of every\n   example book and fails on any script error — new runtime features should be\n   exercised by an example.\n8. Library imports: `rewriteLibImports` and `scanLibImports` must stay in sync\n   (same bare-specifier regex); `__tbImport` is a reserved name\n   (`NAME_RESERVED` + the author-mode lists) and must stay in every compile\n   site's param list; `window.__TOOLBACK_LIBS__` must be set before user\n   scripts compile — exports embed it as a script tag before the player, the\n   canvas sets it at boot from `public/libs/importmap.json`; shelf output must\n   always be ESM — `build-libs.mjs` emits `/libs/<name>.js` and both publish\n   and preview consume that layout.\n9. **Far edges cannot feed the page size.** `resolvePageBox` may grow the page\n   *box* past the container; only left/top (near-edge) objects contribute to\n   `contentExtent` (see §4.2), measured to their outer (margin-box) edge. A\n   right/bottom/both/centred object never enlarges the page — its margin only\n   offsets it. Margins must be subtracted again by `xEdgeFromRect`/`yEdgeFromRect`\n   on write (never bake a resolved rect back into `x`/`y`).\n10. **A group scales when you size it, not when the page reflows.** A group\n    resize — a handle drag (`applyRects` with `dir`), a typed W/H\n    (`setGeometry`), or a scripted `group.width`/`height` — scales descendants'\n    edge distances via `scaleSubtreeEdges`, around the fixed corner. An ambient\n    reflow (page/window resize, no `dir`) must **not** scale: CSS re-resolves\n    each member's own edges. A stretch (`both`) axis a handle resized becomes a\n    fixed near-edge size. `sync()` re-hugs every `both`-axis group\n    (`rehugStretchedGroups`) so a page box change caused by an edit can never\n    leave a group larger than its members — never re-hug on a pure viewport\n    resize (no store mutation), which must stay CSS-only.\n",
+            "fontSize": 15
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_110ba34710",
+          "name": "group1",
+          "control": "group",
+          "x": {
+            "mode": "center",
+            "width": 392
+          },
+          "y": {
+            "mode": "bottom",
+            "bottom": 0,
+            "height": 48
+          },
+          "props": {},
+          "on": {},
+          "children": [
+            {
+              "id": "obj_b824a8d09",
+              "name": "button2",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 216,
+                "width": 176
+              },
+              "y": {
+                "mode": "top",
+                "top": 0,
+                "height": 48
+              },
+              "props": {
+                "text": "B",
+                "fontSize": 15
+              },
+              "on": {}
+            },
+            {
+              "id": "obj_a8ca595e8",
+              "name": "button1",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 176
+              },
+              "y": {
+                "mode": "top",
+                "top": 0,
+                "height": 48
+              },
+              "props": {
+                "text": "A",
+                "fontSize": 15
+              },
+              "on": {}
+            }
+          ]
+        },
+        {
+          "id": "obj_49699e106",
+          "name": "label1",
+          "control": "label",
+          "x": {
+            "mode": "center",
+            "width": 360
+          },
+          "y": {
+            "mode": "top",
+            "top": 8,
+            "height": 40
+          },
+          "props": {
+            "text": "Some Markdown for you to view",
+            "fontSize": 24
+          },
+          "on": {}
+        }
+      ]
+    },
+    {
+      "id": "page_218687676",
+      "name": "Page 6",
+      "script": "",
+      "backgroundId": "bg_c66d9f9e6",
+      "padding": 32,
+      "objects": [
+        {
+          "id": "obj_7fa511e87",
+          "name": "button1",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 544,
+            "width": 176
+          },
+          "y": {
+            "mode": "top",
+            "top": 252,
+            "height": 48
+          },
+          "props": {
+            "text": "Button",
+            "fontSize": 15
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_b5c09e7e6",
+          "name": "button2",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 544,
+            "width": 176
+          },
+          "y": {
+            "mode": "top",
+            "top": 396,
+            "height": 48
+          },
+          "props": {
+            "text": "Button",
+            "fontSize": 15,
+            "bold": true,
+            "background": "#48e5b6",
+            "textColor": "#e82121",
+            "italic": false,
+            "textAlign": "center",
+            "vAlign": "middle"
+          },
+          "on": {
+            "click": "// hi there"
+          }
+        },
+        {
+          "id": "obj_7d76ea0f6",
+          "name": "label1",
+          "control": "label",
+          "x": {
+            "mode": "left",
+            "left": 64,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 16,
+            "height": 40
+          },
+          "props": {
+            "text": "Label",
+            "fontSize": 24,
+            "textAlign": "center",
+            "background": "#f01919",
+            "vAlign": "middle",
+            "textColor": "#f6f7f9",
+            "fontFamily": "mono",
+            "bold": true,
+            "borderStyle": "solid",
+            "borderColor": "#29bc42",
+            "radius": 11,
+            "borderWidth": 2
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_4ff9a3178",
+          "name": "group1",
+          "control": "group",
+          "x": {
+            "mode": "left",
+            "left": 88,
+            "width": 280
+          },
+          "y": {
+            "mode": "top",
+            "top": 192,
+            "height": 128
+          },
+          "props": {},
+          "on": {},
+          "children": [
+            {
+              "id": "obj_0d4e9dad7",
+              "name": "label3",
+              "control": "label",
+              "x": {
+                "mode": "left",
+                "left": 40,
+                "width": 240
+              },
+              "y": {
+                "mode": "top",
+                "top": 88,
+                "height": 40
+              },
+              "props": {
+                "text": "Label",
+                "fontSize": 15,
+                "background": "#477ed7"
+              },
+              "on": {}
+            },
+            {
+              "id": "obj_dd3872d36",
+              "name": "label2",
+              "control": "label",
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 240
+              },
+              "y": {
+                "mode": "top",
+                "top": 0,
+                "height": 40
+              },
+              "props": {
+                "text": "Label",
+                "fontSize": 15,
+                "background": "#477ed7"
+              },
+              "on": {}
+            }
+          ]
+        },
+        {
+          "id": "obj_0e8b88529",
+          "name": "label4",
+          "control": "label",
+          "x": {
+            "mode": "left",
+            "left": 112,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 384,
+            "height": 40
+          },
+          "props": {
+            "text": "Label",
+            "fontSize": 16,
+            "background": "#ce77cf",
+            "textAlign": "center"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_192631bd10",
+          "name": "label5",
+          "control": "label",
+          "x": {
+            "mode": "left",
+            "left": 112,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 440,
+            "height": 40
+          },
+          "props": {
+            "text": "Label",
+            "fontSize": 16,
+            "background": "#ce77cf",
+            "textAlign": "center"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_137373f715",
+          "name": "image1",
+          "control": "image",
+          "x": {
+            "mode": "left",
+            "left": 480,
+            "width": 296
+          },
+          "y": {
+            "mode": "top",
+            "top": 480,
+            "height": 168
+          },
+          "props": {
+            "src": "https://picsum.photos/seed/589c472a/280/200"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_34b5168f6",
+          "name": "card1",
+          "control": "card",
+          "x": {
+            "mode": "left",
+            "left": 88,
+            "width": 304
+          },
+          "y": {
+            "mode": "top",
+            "top": 504,
+            "height": 172
+          },
+          "props": {
+            "title": "Card",
+            "text": "Card body i3-12100T (2022)i3-12100T (2022)i3-12100T (2022)i3-12100T (2022)i3-12100T (2022)i3-12100T (2022)i3-12100T (2022)i3-12100T (2022)",
+            "background": "#eb6f6f",
+            "textColor": "#e8eaed",
+            "borderStyle": "solid",
+            "borderColor": "#0f65e6",
+            "borderWidth": 0
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_8081bb497",
+          "name": "container1",
+          "control": "container",
+          "x": {
+            "mode": "left",
+            "left": 400,
+            "width": 408
+          },
+          "y": {
+            "mode": "top",
+            "top": 8,
+            "height": 96
+          },
+          "props": {
+            "background": "#65a6e6",
+            "borderStyle": "solid",
+            "borderWidth": 0
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_ebf9b7f013",
+          "name": "switch1",
+          "control": "switch",
+          "x": {
+            "mode": "left",
+            "left": 424,
+            "width": 160
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 40
+          },
+          "props": {
+            "text": "Switch",
+            "checked": true,
+            "fontSize": 15,
+            "trackColor": "#48e552",
+            "textColor": "#db397f"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_94e434958",
+          "name": "markdown1",
+          "control": "markdown",
+          "x": {
+            "mode": "left",
+            "left": 392,
+            "width": 420
+          },
+          "y": {
+            "mode": "top",
+            "top": 120,
+            "height": 84
+          },
+          "props": {
+            "text": "# Heading\n\nBody…",
+            "fontSize": 15
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_923adeba7",
+          "name": "label6",
+          "control": "label",
+          "x": {
+            "mode": "left",
+            "left": 56,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 88,
+            "height": 40
+          },
+          "props": {
+            "text": "Label",
+            "fontSize": 15
+          },
+          "on": {}
+        }
+      ]
+    },
+    {
+      "id": "page_04d9c3437",
+      "name": "Main",
+      "script": "const BUTTONS = {\n  btn1: { label: 'Red', name: 'Red', hex: '#ef4444' },\n  btn2: { label: 'Amber', name: 'Amber', hex: '#f59e0b' },\n  btn3: { label: 'Green', name: 'Green', hex: '#10b981' },\n  btn4: { label: 'Blue', name: 'Blue', hex: '#3b82f6' },\n  btn5: { label: 'Violet', name: 'Violet', hex: '#8b5cf6' },\n  btn6: { label: 'Pink', name: 'Pink', hex: '#ec4899' },\n  btn7: { label: 'Indigo', name: 'Indigo', hex: '#6366f1' }\n}\n\nfunction infoFor(name) {\n  for (const key in BUTTONS) {\n    if (BUTTONS[key].label === name) return BUTTONS[key]\n  }\n  return { label: name, name: name, hex: '#6366f1' }\n}\n\nfunction showColor(name) {\n  const info = infoFor(name)\n  store.set('lastColor', info.name)\n  controls.swatch.color = info.hex\n}\n\nfunction press(name) {\n  store.set('last', name)\n  showColor(name)\n}\n\nfunction wire(btn, name) {\n  if (!btn) return\n  btn.on('click', function () {\n    showColor(name)\n  })\n}\n\nfunction pageEnter() {\n  store.set('last', '')\n  store.set('lastColor', '')\n  controls.swatch.color = '#1e293b'\n  controls.colorText.textColor = '#f8fafc'\n  wire(controls.btn1, 'Red')\n  wire(controls.btn2, 'Amber')\n  wire(controls.btn3, 'Green')\n  wire(controls.btn4, 'Blue')\n  wire(controls.btn5, 'Violet')\n  wire(controls.btn6, 'Pink')\n  wire(controls.btn7, 'Indigo')\n}\n",
+      "backgroundId": "bg_bfeed34b6",
+      "objects": [
+        {
+          "id": "obj_3f720d6e16",
+          "name": "btn1",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 200
+          },
+          "y": {
+            "mode": "top",
+            "top": 40,
+            "height": 50
+          },
+          "props": {
+            "text": "Red",
+            "background": "#ef4444",
+            "textColor": "#ffffff",
+            "fontSize": 15
+          },
+          "on": {
+            "click": "store.set('last', 'Red')"
+          },
+          "children": []
+        },
+        {
+          "id": "obj_2c7e37d417",
+          "name": "btn2",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 200
+          },
+          "y": {
+            "mode": "top",
+            "top": 110,
+            "height": 50
+          },
+          "props": {
+            "text": "Amber",
+            "background": "#f59e0b",
+            "textColor": "#ffffff",
+            "fontSize": 15
+          },
+          "on": {
+            "click": "store.set('last', 'Amber')"
+          },
+          "children": []
+        },
+        {
+          "id": "obj_38b6f52618",
+          "name": "btn3",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 200
+          },
+          "y": {
+            "mode": "top",
+            "top": 180,
+            "height": 50
+          },
+          "props": {
+            "text": "Green",
+            "background": "#10b981",
+            "textColor": "#ffffff",
+            "fontSize": 15
+          },
+          "on": {
+            "click": "store.set('last', 'Green')"
+          },
+          "children": []
+        },
+        {
+          "id": "obj_acfe84ae19",
+          "name": "btn4",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 200
+          },
+          "y": {
+            "mode": "top",
+            "top": 250,
+            "height": 50
+          },
+          "props": {
+            "text": "Blue",
+            "background": "#3b82f6",
+            "textColor": "#ffffff",
+            "fontSize": 15
+          },
+          "on": {
+            "click": "store.set('last', 'Blue')"
+          },
+          "children": []
+        },
+        {
+          "id": "obj_8fd7e55720",
+          "name": "btn5",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 200
+          },
+          "y": {
+            "mode": "top",
+            "top": 320,
+            "height": 50
+          },
+          "props": {
+            "text": "Violet",
+            "background": "#8b5cf6",
+            "textColor": "#ffffff",
+            "fontSize": 15
+          },
+          "on": {
+            "click": "store.set('last', 'Violet')"
+          },
+          "children": []
+        },
+        {
+          "id": "obj_d3306c8721",
+          "name": "btn6",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 200
+          },
+          "y": {
+            "mode": "top",
+            "top": 390,
+            "height": 50
+          },
+          "props": {
+            "text": "Pink",
+            "background": "#ec4899",
+            "textColor": "#ffffff",
+            "fontSize": 15
+          },
+          "on": {
+            "click": "store.set('last', 'Pink')"
+          },
+          "children": []
+        },
+        {
+          "id": "obj_7ec2643622",
+          "name": "btn7",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 200
+          },
+          "y": {
+            "mode": "top",
+            "top": 460,
+            "height": 50
+          },
+          "props": {
+            "text": "Indigo",
+            "background": "#6366f1",
+            "textColor": "#ffffff",
+            "fontSize": 15
+          },
+          "on": {
+            "click": "press('Indigo')"
+          },
+          "children": []
+        },
+        {
+          "id": "obj_ea51c1e323",
+          "name": "colorText",
+          "control": "label",
+          "x": {
+            "mode": "left",
+            "left": 320,
+            "width": 420
+          },
+          "y": {
+            "mode": "top",
+            "top": 90,
+            "height": 40
+          },
+          "props": {
+            "text": "Colour: {{lastColor}}",
+            "fontSize": 22,
+            "fontFamily": "system",
+            "textColor": "#f8fafc",
+            "vAlign": "middle"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_9e13542524",
+          "name": "swatch",
+          "control": "container",
+          "x": {
+            "mode": "left",
+            "left": 320,
+            "width": 220
+          },
+          "y": {
+            "mode": "top",
+            "top": 150,
+            "height": 120
+          },
+          "props": {
+            "color": "#1e293b"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_f4fca1e725",
+          "name": "btnRandom",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 200
+          },
+          "y": {
+            "mode": "top",
+            "top": 570,
+            "height": 50
+          },
+          "props": {
+            "text": "Random",
+            "fontFamily": "system",
+            "fontSize": 15,
+            "background": "#ffffff",
+            "textColor": "#0f172a"
+          },
+          "on": {
+            "click": "const hex = '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')\nconst r = parseInt(hex.slice(1, 3), 16)\nconst g = parseInt(hex.slice(3, 5), 16)\nconst b = parseInt(hex.slice(5, 7), 16)\nconst lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255\nself.background = hex\nself.textColor = lum > 0.6 ? '#0f172a' : '#ffffff'\ncontrols.swatch.color = hex\nstore.set('lastColor', hex)\nstore.set('last', 'Random')"
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "page_6031667615",
+      "name": "Main 2",
+      "script": "function pageEnter() {\n  store.set('msg', 'Click a colour')\n}\n",
+      "backgroundId": "bg_bfeed34b6",
+      "objects": [
+        {
+          "id": "obj_8c51f6056",
+          "name": "label",
+          "control": "label",
+          "x": {
+            "mode": "center",
+            "width": 340
+          },
+          "y": {
+            "mode": "top",
+            "top": 30,
+            "height": 60
+          },
+          "props": {
+            "text": "{{msg}}",
+            "fontSize": 24,
+            "textAlign": "center",
+            "textColor": "#111111",
+            "background": "#e2e8f0",
+            "vAlign": "middle"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_c010c36c7",
+          "name": "btnRed",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 100
+          },
+          "y": {
+            "mode": "top",
+            "top": 120,
+            "height": 50
+          },
+          "props": {
+            "text": "Red",
+            "background": "#e53935",
+            "textColor": "#ffffff",
+            "fontSize": 18,
+            "vAlign": "middle"
+          },
+          "on": {
+            "click": "store.set('msg', 'Red')"
+          }
+        },
+        {
+          "id": "obj_70bdc55a8",
+          "name": "btnGreen",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 150,
+            "width": 100
+          },
+          "y": {
+            "mode": "top",
+            "top": 120,
+            "height": 50
+          },
+          "props": {
+            "text": "Green",
+            "background": "#43a047",
+            "textColor": "#ffffff",
+            "fontSize": 18,
+            "vAlign": "middle"
+          },
+          "on": {
+            "click": "store.set('msg', 'Green')"
+          }
+        },
+        {
+          "id": "obj_5b8d5fff9",
+          "name": "btnBlue",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 260,
+            "width": 100
+          },
+          "y": {
+            "mode": "top",
+            "top": 120,
+            "height": 50
+          },
+          "props": {
+            "text": "Blue",
+            "background": "#1e88e5",
+            "textColor": "#ffffff",
+            "fontSize": 18,
+            "vAlign": "middle"
+          },
+          "on": {
+            "click": "store.set('msg', 'Blue')"
+          }
+        },
+        {
+          "id": "obj_0de225ca10",
+          "name": "btnOrange",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 100
+          },
+          "y": {
+            "mode": "top",
+            "top": 190,
+            "height": 50
+          },
+          "props": {
+            "text": "Orange",
+            "background": "#fb8c00",
+            "textColor": "#ffffff",
+            "fontSize": 18,
+            "vAlign": "middle"
+          },
+          "on": {
+            "click": "store.set('msg', 'Orange')"
+          }
+        },
+        {
+          "id": "obj_f85811e311",
+          "name": "btnPurple",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 150,
+            "width": 100
+          },
+          "y": {
+            "mode": "top",
+            "top": 190,
+            "height": 50
+          },
+          "props": {
+            "text": "Purple",
+            "background": "#8e24aa",
+            "textColor": "#ffffff",
+            "fontSize": 18,
+            "vAlign": "middle"
+          },
+          "on": {
+            "click": "store.set('msg', 'Purple')"
+          }
+        },
+        {
+          "id": "obj_fe75715012",
+          "name": "btnTeal",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 260,
+            "width": 100
+          },
+          "y": {
+            "mode": "top",
+            "top": 190,
+            "height": 50
+          },
+          "props": {
+            "text": "Teal",
+            "background": "#00897b",
+            "textColor": "#ffffff",
+            "fontSize": 18,
+            "vAlign": "middle"
+          },
+          "on": {
+            "click": "store.set('msg', 'Teal')"
+          }
+        },
+        {
+          "id": "obj_8be15ba813",
+          "name": "btnYellow",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 100
+          },
+          "y": {
+            "mode": "top",
+            "top": 260,
+            "height": 50
+          },
+          "props": {
+            "text": "Yellow",
+            "background": "#fdd835",
+            "textColor": "#000000",
+            "fontSize": 18,
+            "vAlign": "middle"
+          },
+          "on": {
+            "click": "store.set('msg', 'Yellow')"
+          }
+        },
+        {
+          "id": "obj_5d26b51b14",
+          "name": "btnPink",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 150,
+            "width": 100
+          },
+          "y": {
+            "mode": "top",
+            "top": 260,
+            "height": 50
+          },
+          "props": {
+            "text": "Pink",
+            "background": "#e91e63",
+            "textColor": "#ffffff",
+            "fontSize": 18,
+            "vAlign": "middle"
+          },
+          "on": {
+            "click": "store.set('msg', 'Pink')"
+          }
+        },
+        {
+          "id": "obj_6376dbe115",
+          "name": "btnAll",
+          "control": "button",
+          "x": {
+            "mode": "center",
+            "width": 340
+          },
+          "y": {
+            "mode": "top",
+            "top": 330,
+            "height": 60
+          },
+          "props": {
+            "text": "All",
+            "background": "#6366f1",
+            "textColor": "#f8fafc",
+            "fontSize": 20,
+            "vAlign": "middle"
+          },
+          "on": {
+            "click": "store.set('msg', 'All')"
+          }
+        },
+        {
+          "id": "obj_b7f0224116",
+          "name": "btnAllBig",
+          "control": "button",
+          "x": {
+            "mode": "center",
+            "width": 340
+          },
+          "y": {
+            "mode": "top",
+            "top": 410,
+            "height": 80
+          },
+          "props": {
+            "text": "All",
+            "background": "#6366f1",
+            "textColor": "#f8fafc",
+            "fontSize": 24,
+            "vAlign": "middle"
+          },
+          "on": {
+            "click": "store.set('msg', 'All')"
+          }
+        }
+      ]
+    },
+    {
+      "id": "page_329081a468",
+      "name": "Calculator",
+      "script": "function pageEnter() {\n  store.set('display', '0')\n  store.set('acc', null)\n  store.set('op', null)\n  store.set('fresh', true)\n  installMemWatch()\n}\n\nfunction round(n) {\n  return Math.round(n * 1e10) / 1e10\n}\n\nfunction show(n) {\n  if (!isFinite(n)) {\n    store.set('display', 'Error')\n    store.set('acc', null)\n    store.set('op', null)\n    store.set('fresh', true)\n    return\n  }\n  store.set('display', String(round(n)))\n}\n\nfunction digit(d) {\n  const cur = String(store.get('display'))\n  if (store.get('fresh') || cur === 'Error') {\n    store.set('display', String(d))\n    store.set('fresh', false)\n    return\n  }\n  if (cur === '0') store.set('display', String(d))\n  else if (cur.replace('-', '').replace('.', '').length < 12) store.set('display', cur + d)\n}\n\nfunction dot() {\n  const cur = String(store.get('display'))\n  if (store.get('fresh') || cur === 'Error') {\n    store.set('display', '0.')\n    store.set('fresh', false)\n    return\n  }\n  if (!cur.includes('.')) store.set('display', cur + '.')\n}\n\nfunction compute() {\n  const acc = store.get('acc')\n  const op = store.get('op')\n  const cur = Number(store.get('display'))\n  if (op === null || acc === null) return cur\n  let r = acc\n  if (op === '+') r = acc + cur\n  else if (op === '-') r = acc - cur\n  else if (op === '*') r = acc * cur\n  else if (op === '/') r = cur === 0 ? NaN : acc / cur\n  return round(r)\n}\n\nfunction chooseOp(o) {\n  const r = compute()\n  show(r)\n  if (store.get('display') === 'Error') return\n  store.set('acc', r)\n  store.set('op', o)\n  store.set('fresh', true)\n}\n\nfunction equals() {\n  const r = compute()\n  show(r)\n  store.set('acc', null)\n  store.set('op', null)\n  store.set('fresh', true)\n}\n\nfunction clearAll() {\n  store.set('display', '0')\n  store.set('acc', null)\n  store.set('op', null)\n  store.set('fresh', true)\n}\n\nfunction toggleSign() {\n  const cur = String(store.get('display'))\n  if (cur === 'Error') return\n  if (cur.startsWith('-')) store.set('display', cur.slice(1))\n  else if (cur !== '0') store.set('display', '-' + cur)\n}\n\nfunction percent() {\n  const cur = Number(store.get('display'))\n  if (!isFinite(cur)) return\n  show(cur / 100)\n  store.set('fresh', false)\n}\n\nfunction syncMem() {\n  const m = Number(store.get('mem'))\n  memDot.visible = isFinite(m) && m !== 0\n}\n\nfunction installMemWatch() {\n  syncMem()\n  if (store.get('memWatch')) return\n  store.set('memWatch', true)\n  const rawSet = store.set.bind(store)\n  store.set = function (key, value) {\n    const r = rawSet(key, value)\n    if (key === 'mem') syncMem()\n    return r\n  }\n}\n",
+      "backgroundId": "bg_bfeed34b6",
+      "objects": [
+        {
+          "id": "obj_eeb645ce6",
+          "name": "group1",
+          "control": "group",
+          "x": {
+            "mode": "center",
+            "width": 360
+          },
+          "y": {
+            "mode": "top",
+            "top": 20,
+            "height": 538
+          },
+          "props": {},
+          "on": {},
+          "children": [
+            {
+              "id": "obj_cb557c2f48",
+              "name": "display",
+              "control": "label",
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 360
+              },
+              "y": {
+                "mode": "top",
+                "top": 0,
+                "height": 90
+              },
+              "props": {
+                "text": "{{display}}",
+                "fontSize": 44,
+                "fontFamily": "system",
+                "textAlign": "right",
+                "vAlign": "middle",
+                "textColor": "#f8fafc",
+                "background": "#1e293b",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {}
+            },
+            {
+              "id": "obj_e7ae068b49",
+              "name": "btnAC",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 110,
+                "height": 64
+              },
+              "props": {
+                "text": "AC",
+                "fontSize": 22,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#475569",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "clearAll()"
+              }
+            },
+            {
+              "id": "obj_93c680bc50",
+              "name": "btnSign",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 93,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 110,
+                "height": 64
+              },
+              "props": {
+                "text": "±",
+                "fontSize": 22,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#475569",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "toggleSign()"
+              }
+            },
+            {
+              "id": "obj_4a86896651",
+              "name": "btnPct",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 186,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 110,
+                "height": 64
+              },
+              "props": {
+                "text": "%",
+                "fontSize": 22,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#475569",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "percent()"
+              }
+            },
+            {
+              "id": "obj_2712dcdc52",
+              "name": "btnDiv",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 279,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 110,
+                "height": 64
+              },
+              "props": {
+                "text": "÷",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#6366f1",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "chooseOp('/')"
+              }
+            },
+            {
+              "id": "obj_c5d8f7da53",
+              "name": "btn7",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 186,
+                "height": 64
+              },
+              "props": {
+                "text": "7",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#1e293b",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "digit(7)"
+              }
+            },
+            {
+              "id": "obj_34dcea1754",
+              "name": "btn8",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 93,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 186,
+                "height": 64
+              },
+              "props": {
+                "text": "8",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#1e293b",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "digit(8)"
+              }
+            },
+            {
+              "id": "obj_0b35a54d55",
+              "name": "btn9",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 186,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 186,
+                "height": 64
+              },
+              "props": {
+                "text": "9",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#1e293b",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "digit(9)"
+              }
+            },
+            {
+              "id": "obj_7970653656",
+              "name": "btnMul",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 279,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 186,
+                "height": 64
+              },
+              "props": {
+                "text": "×",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#6366f1",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "chooseOp('*')"
+              }
+            },
+            {
+              "id": "obj_4bdbdb0957",
+              "name": "btn4",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 262,
+                "height": 64
+              },
+              "props": {
+                "text": "4",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#1e293b",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "digit(4)"
+              }
+            },
+            {
+              "id": "obj_044d83a658",
+              "name": "btn5",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 93,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 262,
+                "height": 64
+              },
+              "props": {
+                "text": "5",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#1e293b",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "digit(5)"
+              }
+            },
+            {
+              "id": "obj_132a4c6e59",
+              "name": "btn6",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 186,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 262,
+                "height": 64
+              },
+              "props": {
+                "text": "6",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#1e293b",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "digit(6)"
+              }
+            },
+            {
+              "id": "obj_f8522ae460",
+              "name": "btnSub",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 279,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 262,
+                "height": 64
+              },
+              "props": {
+                "text": "−",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#6366f1",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "chooseOp('-')"
+              }
+            },
+            {
+              "id": "obj_9944903561",
+              "name": "btn1",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 338,
+                "height": 64
+              },
+              "props": {
+                "text": "1",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#1e293b",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "digit(1)"
+              }
+            },
+            {
+              "id": "obj_08c1da0a62",
+              "name": "btn2",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 93,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 338,
+                "height": 64
+              },
+              "props": {
+                "text": "2",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#1e293b",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "digit(2)"
+              }
+            },
+            {
+              "id": "obj_ac952f6563",
+              "name": "btn3",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 186,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 338,
+                "height": 64
+              },
+              "props": {
+                "text": "3",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#1e293b",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "digit(3)"
+              }
+            },
+            {
+              "id": "obj_23f60df664",
+              "name": "btnAdd",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 279,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 338,
+                "height": 64
+              },
+              "props": {
+                "text": "+",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#6366f1",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "chooseOp('+')"
+              }
+            },
+            {
+              "id": "obj_49c390b365",
+              "name": "btn0",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 174
+              },
+              "y": {
+                "mode": "top",
+                "top": 414,
+                "height": 64
+              },
+              "props": {
+                "text": "0",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#1e293b",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "digit(0)"
+              }
+            },
+            {
+              "id": "obj_1ee708f766",
+              "name": "btnDot",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 186,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 414,
+                "height": 64
+              },
+              "props": {
+                "text": ".",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#1e293b",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "dot()"
+              }
+            },
+            {
+              "id": "obj_3d780a7967",
+              "name": "btnEq",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 279,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 414,
+                "height": 64
+              },
+              "props": {
+                "text": "=",
+                "fontSize": 26,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#6366f1",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "equals()"
+              }
+            },
+            {
+              "id": "obj_bb5681c26",
+              "name": "btnMC",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 490,
+                "height": 48
+              },
+              "props": {
+                "text": "MC",
+                "fontSize": 18,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#475569",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "store.set('mem', 0)\nstore.set('fresh', true)"
+              }
+            },
+            {
+              "id": "obj_b5bfdc097",
+              "name": "btnMR",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 93,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 490,
+                "height": 48
+              },
+              "props": {
+                "text": "MR",
+                "fontSize": 18,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#475569",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "const m = Number(store.get('mem')) || 0\nstore.set('display', String(m))\nstore.set('fresh', true)"
+              }
+            },
+            {
+              "id": "obj_eb0975a08",
+              "name": "btnMPlus",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 186,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 490,
+                "height": 48
+              },
+              "props": {
+                "text": "M+",
+                "fontSize": 18,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#475569",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "const v = Number(store.get('display'))\nif (isFinite(v)) {\n  const m = Number(store.get('mem')) || 0\n  store.set('mem', Math.round((m + v) * 1e10) / 1e10)\n  store.set('fresh', true)\n}"
+              }
+            },
+            {
+              "id": "obj_cb285a499",
+              "name": "btnMMinus",
+              "control": "button",
+              "x": {
+                "mode": "left",
+                "left": 279,
+                "width": 81
+              },
+              "y": {
+                "mode": "top",
+                "top": 490,
+                "height": 48
+              },
+              "props": {
+                "text": "M−",
+                "fontSize": 18,
+                "fontFamily": "system",
+                "textColor": "#f8fafc",
+                "background": "#475569",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {
+                "click": "const v = Number(store.get('display'))\nif (isFinite(v)) {\n  const m = Number(store.get('mem')) || 0\n  store.set('mem', Math.round((m - v) * 1e10) / 1e10)\n  store.set('fresh', true)\n}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "obj_513a82047",
+          "name": "memIndicatorGroup",
+          "control": "group",
+          "x": {
+            "mode": "center",
+            "width": 360
+          },
+          "y": {
+            "mode": "top",
+            "top": 30,
+            "height": 16
+          },
+          "props": {},
+          "on": {},
+          "children": [
+            {
+              "id": "obj_e48fc3988",
+              "name": "memDot",
+              "control": "container",
+              "x": {
+                "mode": "left",
+                "left": 334,
+                "width": 16
+              },
+              "y": {
+                "mode": "top",
+                "top": 0,
+                "height": 16
+              },
+              "props": {
+                "color": "#ef4444",
+                "radius": 8,
+                "borderWidth": 0
+              },
+              "on": {}
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "startPageId": "page_329081a468",
+  "store": []
+}

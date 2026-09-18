@@ -1,4 +1,5 @@
 {
+  "formatVersion": 1,
   "id": "book_calculator",
   "title": "Calculator",
   "backgrounds": [
@@ -21,8 +22,16 @@
           "id": "obj_calc_display",
           "name": "display",
           "control": "label",
-          "x": { "mode": "left", "left": 40, "width": 310 },
-          "y": { "mode": "top", "top": 30, "height": 60 },
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 310
+          },
+          "y": {
+            "mode": "top",
+            "top": 30,
+            "height": 60
+          },
           "props": {
             "text": "{{display}}",
             "fontSize": 28,
@@ -36,145 +45,354 @@
           "id": "obj_calc_c",
           "name": "btnClear",
           "control": "button",
-          "x": { "mode": "left", "left": 40, "width": 70 },
-          "y": { "mode": "top", "top": 110, "height": 50 },
-          "props": { "text": "C", "fontSize": 18 },
-          "on": { "click": "clearAll()" }
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 110,
+            "height": 50
+          },
+          "props": {
+            "text": "C",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "clearAll()"
+          }
         },
         {
           "id": "obj_calc_div",
           "name": "btnDiv",
           "control": "button",
-          "x": { "mode": "left", "left": 120, "width": 70 },
-          "y": { "mode": "top", "top": 110, "height": 50 },
-          "props": { "text": "÷", "fontSize": 18 },
-          "on": { "click": "chooseOp('/')" }
+          "x": {
+            "mode": "left",
+            "left": 120,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 110,
+            "height": 50
+          },
+          "props": {
+            "text": "÷",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "chooseOp('/')"
+          }
         },
         {
           "id": "obj_calc_mul",
           "name": "btnMul",
           "control": "button",
-          "x": { "mode": "left", "left": 200, "width": 70 },
-          "y": { "mode": "top", "top": 110, "height": 50 },
-          "props": { "text": "×", "fontSize": 18 },
-          "on": { "click": "chooseOp('*')" }
+          "x": {
+            "mode": "left",
+            "left": 200,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 110,
+            "height": 50
+          },
+          "props": {
+            "text": "×",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "chooseOp('*')"
+          }
         },
         {
           "id": "obj_calc_sub",
           "name": "btnSub",
           "control": "button",
-          "x": { "mode": "left", "left": 280, "width": 70 },
-          "y": { "mode": "top", "top": 110, "height": 50 },
-          "props": { "text": "−", "fontSize": 18 },
-          "on": { "click": "chooseOp('-')" }
+          "x": {
+            "mode": "left",
+            "left": 280,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 110,
+            "height": 50
+          },
+          "props": {
+            "text": "−",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "chooseOp('-')"
+          }
         },
         {
           "id": "obj_calc_7",
           "name": "btn7",
           "control": "button",
-          "x": { "mode": "left", "left": 40, "width": 70 },
-          "y": { "mode": "top", "top": 170, "height": 50 },
-          "props": { "text": "7", "fontSize": 18 },
-          "on": { "click": "digit(7)" }
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 170,
+            "height": 50
+          },
+          "props": {
+            "text": "7",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "digit(7)"
+          }
         },
         {
           "id": "obj_calc_8",
           "name": "btn8",
           "control": "button",
-          "x": { "mode": "left", "left": 120, "width": 70 },
-          "y": { "mode": "top", "top": 170, "height": 50 },
-          "props": { "text": "8", "fontSize": 18 },
-          "on": { "click": "digit(8)" }
+          "x": {
+            "mode": "left",
+            "left": 120,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 170,
+            "height": 50
+          },
+          "props": {
+            "text": "8",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "digit(8)"
+          }
         },
         {
           "id": "obj_calc_9",
           "name": "btn9",
           "control": "button",
-          "x": { "mode": "left", "left": 200, "width": 70 },
-          "y": { "mode": "top", "top": 170, "height": 50 },
-          "props": { "text": "9", "fontSize": 18 },
-          "on": { "click": "digit(9)" }
+          "x": {
+            "mode": "left",
+            "left": 200,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 170,
+            "height": 50
+          },
+          "props": {
+            "text": "9",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "digit(9)"
+          }
         },
         {
           "id": "obj_calc_add",
           "name": "btnAdd",
           "control": "button",
-          "x": { "mode": "left", "left": 280, "width": 70 },
-          "y": { "mode": "top", "top": 170, "height": 50 },
-          "props": { "text": "+", "fontSize": 18 },
-          "on": { "click": "chooseOp('+')" }
+          "x": {
+            "mode": "left",
+            "left": 280,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 170,
+            "height": 50
+          },
+          "props": {
+            "text": "+",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "chooseOp('+')"
+          }
         },
         {
           "id": "obj_calc_4",
           "name": "btn4",
           "control": "button",
-          "x": { "mode": "left", "left": 40, "width": 70 },
-          "y": { "mode": "top", "top": 230, "height": 50 },
-          "props": { "text": "4", "fontSize": 18 },
-          "on": { "click": "digit(4)" }
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 230,
+            "height": 50
+          },
+          "props": {
+            "text": "4",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "digit(4)"
+          }
         },
         {
           "id": "obj_calc_5",
           "name": "btn5",
           "control": "button",
-          "x": { "mode": "left", "left": 120, "width": 70 },
-          "y": { "mode": "top", "top": 230, "height": 50 },
-          "props": { "text": "5", "fontSize": 18 },
-          "on": { "click": "digit(5)" }
+          "x": {
+            "mode": "left",
+            "left": 120,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 230,
+            "height": 50
+          },
+          "props": {
+            "text": "5",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "digit(5)"
+          }
         },
         {
           "id": "obj_calc_6",
           "name": "btn6",
           "control": "button",
-          "x": { "mode": "left", "left": 200, "width": 70 },
-          "y": { "mode": "top", "top": 230, "height": 50 },
-          "props": { "text": "6", "fontSize": 18 },
-          "on": { "click": "digit(6)" }
+          "x": {
+            "mode": "left",
+            "left": 200,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 230,
+            "height": 50
+          },
+          "props": {
+            "text": "6",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "digit(6)"
+          }
         },
         {
           "id": "obj_calc_1",
           "name": "btn1",
           "control": "button",
-          "x": { "mode": "left", "left": 40, "width": 70 },
-          "y": { "mode": "top", "top": 290, "height": 50 },
-          "props": { "text": "1", "fontSize": 18 },
-          "on": { "click": "digit(1)" }
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 290,
+            "height": 50
+          },
+          "props": {
+            "text": "1",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "digit(1)"
+          }
         },
         {
           "id": "obj_calc_2",
           "name": "btn2",
           "control": "button",
-          "x": { "mode": "left", "left": 120, "width": 70 },
-          "y": { "mode": "top", "top": 290, "height": 50 },
-          "props": { "text": "2", "fontSize": 18 },
-          "on": { "click": "digit(2)" }
+          "x": {
+            "mode": "left",
+            "left": 120,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 290,
+            "height": 50
+          },
+          "props": {
+            "text": "2",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "digit(2)"
+          }
         },
         {
           "id": "obj_calc_3",
           "name": "btn3",
           "control": "button",
-          "x": { "mode": "left", "left": 200, "width": 70 },
-          "y": { "mode": "top", "top": 290, "height": 50 },
-          "props": { "text": "3", "fontSize": 18 },
-          "on": { "click": "digit(3)" }
+          "x": {
+            "mode": "left",
+            "left": 200,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 290,
+            "height": 50
+          },
+          "props": {
+            "text": "3",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "digit(3)"
+          }
         },
         {
           "id": "obj_calc_eq",
           "name": "btnEquals",
           "control": "button",
-          "x": { "mode": "left", "left": 280, "width": 70 },
-          "y": { "mode": "top", "top": 290, "height": 50 },
-          "props": { "text": "=", "fontSize": 18, "color": "gold" },
-          "on": { "click": "equals()" }
+          "x": {
+            "mode": "left",
+            "left": 280,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 290,
+            "height": 50
+          },
+          "props": {
+            "text": "=",
+            "fontSize": 18,
+            "color": "gold"
+          },
+          "on": {
+            "click": "equals()"
+          }
         },
         {
           "id": "obj_calc_0",
           "name": "btn0",
           "control": "button",
-          "x": { "mode": "left", "left": 40, "width": 70 },
-          "y": { "mode": "top", "top": 350, "height": 50 },
-          "props": { "text": "0", "fontSize": 18 },
-          "on": { "click": "digit(0)" }
+          "x": {
+            "mode": "left",
+            "left": 40,
+            "width": 70
+          },
+          "y": {
+            "mode": "top",
+            "top": 350,
+            "height": 50
+          },
+          "props": {
+            "text": "0",
+            "fontSize": 18
+          },
+          "on": {
+            "click": "digit(0)"
+          }
         }
       ]
     }

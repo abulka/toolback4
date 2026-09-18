@@ -1,9 +1,10 @@
-import { createBackground, createObject, newId, type Book } from './index'
+import { createBackground, createObject, newId, FORMAT_VERSION, type Book } from './index'
 
 export function sampleBook(): Book {
   const bg = createBackground('Background 1')
   return {
     id: newId('book'),
+    formatVersion: FORMAT_VERSION,
     title: 'Hello Toolbook',
     backgrounds: [bg],
     store: [],

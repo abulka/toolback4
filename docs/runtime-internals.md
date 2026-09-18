@@ -31,7 +31,7 @@ JSON document (`Book`). The editor owns it; the canvas is a renderer.
 ## 2. Data model (`packages/format`)
 
 ```ts
-Book    { id, title,
+Book    { formatVersion, id, title,
           backgrounds: Background[], pages: Page[],
           startPageId?, store?: [key,value][] }
 Background {
@@ -62,9 +62,17 @@ YEdge = { mode:'top'; top; height }
   (the editor canvas area, or the browser) and grows with its content, never
   shorter than the window. A page with a `size` is a fixed surface (dialog /
   popup / author plugin window). Breakpoints, `Book.canvas`, `Book.design`,
-  `Background.size` and `Background.autoHeight` are gone; `parseBook` migrates
-  old files (`canvas` desktop size → the reference every old fitted rect is
-  measured against, then discarded; a background `size` → its pages' `size`).
+  `Background.size` and `Background.autoHeight` are gone.
+
+- **Format version.** `Book.formatVersion` (`FORMAT_VERSION` in
+  `packages/format`) is the persisted-format baseline. `parseBook` stamps it,
+  treats an absent version as current (AI output needs no version), rejects a
+  book from a newer version (it may use unknown shapes), and runs the ordered
+  `MIGRATIONS` chain for an older one. There is no pre-v1 migration:
+  `rect`/`rects`/`fit`/`canvas` books are unsupported. **When the stored shape
+  changes, bump `FORMAT_VERSION` and add a `{ from, run }` step to `MIGRATIONS`**
+  — the chain upgrades a book one version at a time, then the schema parse stamps
+  the current version.
 
 - Zod schemas with `.default()`s; `parseBook` normalizes on load. Factories
   (`createObject`, `createGroup`, `createPage`, `createBook`) return parsed
@@ -440,10 +448,8 @@ fixed size held to the left/top. Canvas drags go through `applyRects`, which
 builds the new distances for top-level objects and rebases members into their
 group's frame.
 
-A legacy book with `rect` + `fit` is migrated at parse time
-(`migrateConstraints`): free/left/top/stretch → follows the near edge,
-right/bottom/pin-* → follows the far edge, fill → follows both, center → centred,
-each measured at the old desktop reference size and frozen into fixed distances.
+Edge constraints are the only stored layout: pre-v1 `rect`/`rects` + `fit`
+books are unsupported and fail the version gate (`parseBook`), not migrated.
 
 ControlApi reads use the same resolution: `runPage` and `author.ts` build a
 `parentBoxMap` (the resolved page box for top-level objects, the resolved group
@@ -776,9 +782,9 @@ AGENTS.md).
 2. Parse the reply (`extractJson` tolerates markdown fences).
 3. `normalizeBook` fills gaps only — ids/names, geometry from `DEFAULT_SIZES`,
    `DEFAULT_PROPS` — returning notes and never overriding an explicit value.
-4. `validateBook` = zod `safeParseBook` + semantic lints (unique/valid names,
-   `controls.<x>` / `page.go` / `popupOpen` targets, `{{key}}` seeds, unknown
-   props as warnings, deprecated shapes).
+4. `validateBook` = zod `safeParseBook` (which also enforces the version gate)
+   + semantic lints (unique/valid names, `controls.<x>` / `page.go` /
+   `popupOpen` targets, `{{key}}` seeds, unknown props as warnings).
 5. `smokeBook` runs the parsed book off-screen in the canvas
    (`toolback:smoke`) and returns any script errors. Each smoke is independent:
    `runSmoke` finishes with `stopRun()`, which clears the player's module `active`

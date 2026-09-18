@@ -7,10 +7,12 @@ function twoObjectBook(): Book {
   return parseBook({
     id: 'b1',
     title: 'T',
+    backgrounds: [{ id: 'bg1', name: 'Background 1', color: '#ffffff', script: '', objects: [] }],
     pages: [
       {
         id: 'p1',
         name: 'P',
+        backgroundId: 'bg1',
         objects: [
           { id: 'a', name: 'labelA', control: 'label', x: { mode: 'left', left: 0, width: 100 }, y: { mode: 'top', top: 0, height: 50 } },
           { id: 'b', name: 'labelB', control: 'label', x: { mode: 'left', left: 120, width: 80 }, y: { mode: 'top', top: 40, height: 60 } },

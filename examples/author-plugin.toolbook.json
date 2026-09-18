@@ -1,236 +1,243 @@
 {
- "id": "book_author_plugin",
- "title": "Author Plugin Demo",
- "canvas": {
-  "desktop": {
-   "width": 1280,
-   "height": 800
-  },
-  "tablet": {
-   "width": 768,
-   "height": 1024
-  },
-  "mobile": {
-   "width": 390,
-   "height": 844
-  }
- },
- "backgrounds": [
-  {
-   "id": "bg_main",
-   "name": "Main",
-   "color": "#ffffff",
-   "script": "",
-   "objects": []
-  },
-  {
-   "id": "bg_poster",
-   "name": "Poster (plugin window)",
-   "color": "#f6f4ff",
-   "script": "",
-   "size": {
-    "desktop": {
-     "width": 360,
-     "height": 420
+  "formatVersion": 1,
+  "id": "book_author_plugin",
+  "title": "Author Plugin Demo",
+  "backgrounds": [
+    {
+      "id": "bg_main",
+      "name": "Main",
+      "color": "#ffffff",
+      "script": "",
+      "objects": []
+    },
+    {
+      "id": "bg_poster",
+      "name": "Poster (plugin window)",
+      "color": "#f6f4ff",
+      "script": "",
+      "objects": []
     }
-   }
-  }
- ],
- "pages": [
-  {
-   "id": "page_poster",
-   "name": "Poster",
-   "script": "",
-   "backgroundId": "bg_poster",
-   "author": true,
-   "objects": [
+  ],
+  "pages": [
     {
-     "id": "obj_poster_title",
-     "name": "posterTitle",
-     "control": "label",
-     "rects": {
-      "desktop": {
-       "x": 32,
-       "y": 24,
-       "w": 260,
-       "h": 40
-      }
-     },
-     "props": {
-      "text": "Poster plugin",
-      "fontSize": 18
-     },
-     "on": {}
+      "id": "page_poster",
+      "name": "Poster",
+      "script": "",
+      "backgroundId": "bg_poster",
+      "size": {
+        "width": 360,
+        "height": 420
+      },
+      "author": true,
+      "objects": [
+        {
+          "id": "obj_poster_title",
+          "name": "posterTitle",
+          "control": "label",
+          "x": {
+            "mode": "left",
+            "left": 32,
+            "width": 260
+          },
+          "y": {
+            "mode": "top",
+            "top": 24,
+            "height": 40
+          },
+          "props": {
+            "text": "Poster plugin",
+            "fontSize": 18
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_poster_hint",
+          "name": "posterHint",
+          "control": "label",
+          "x": {
+            "mode": "left",
+            "left": 32,
+            "width": 260
+          },
+          "y": {
+            "mode": "top",
+            "top": 64,
+            "height": 140
+          },
+          "props": {
+            "text": "Select objects on the Playground page, then press the buttons here. This plugin keeps running while you edit."
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_poster_color",
+          "name": "colorBtn",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 32,
+            "width": 260
+          },
+          "y": {
+            "mode": "top",
+            "top": 220,
+            "height": 48
+          },
+          "props": {
+            "text": "Random colour"
+          },
+          "on": {
+            "click": "const objs = await author.selected()\nif (!objs.length) {\n  await author.message('Select an object first, then press me')\n} else {\n  const colors = ['red', 'orange', 'gold', 'green', 'teal', 'navy', 'indigo', 'purple']\n  const c = colors[Math.floor(Math.random() * colors.length)]\n  for (const o of objs) await o.set({ color: c })\n  await author.message('Coloured ' + objs.length + ' object(s) ' + c)\n}"
+          }
+        },
+        {
+          "id": "obj_poster_group",
+          "name": "groupBtn",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 32,
+            "width": 260
+          },
+          "y": {
+            "mode": "top",
+            "top": 288,
+            "height": 48
+          },
+          "props": {
+            "text": "Group + 20px right"
+          },
+          "on": {
+            "click": "const sel = await author.getSelection()\nif (sel.ids.length < 2) {\n  await author.message('Select two or more objects, then press me')\n} else {\n  const g = await author.command('group')\n  await g.move(20, 0)\n  await author.message('Grouped ' + sel.ids.length + ' objects, nudged 20px right')\n}"
+          }
+        }
+      ]
     },
     {
-     "id": "obj_poster_hint",
-     "name": "posterHint",
-     "control": "label",
-     "rects": {
-      "desktop": {
-       "x": 32,
-       "y": 64,
-       "w": 260,
-       "h": 140
-      }
-     },
-     "props": {
-      "text": "Select objects on the Playground page, then press the buttons here. This plugin keeps running while you edit."
-     },
-     "on": {}
-    },
-    {
-     "id": "obj_poster_color",
-     "name": "colorBtn",
-     "control": "button",
-     "rects": {
-      "desktop": {
-       "x": 32,
-       "y": 220,
-       "w": 260,
-       "h": 48
-      }
-     },
-     "props": {
-      "text": "Random colour"
-     },
-     "on": {
-      "click": "const objs = await author.selected()\nif (!objs.length) {\n  await author.message('Select an object first, then press me')\n} else {\n  const colors = ['red', 'orange', 'gold', 'green', 'teal', 'navy', 'indigo', 'purple']\n  const c = colors[Math.floor(Math.random() * colors.length)]\n  for (const o of objs) await o.set({ color: c })\n  await author.message('Coloured ' + objs.length + ' object(s) ' + c)\n}"
-     }
-    },
-    {
-     "id": "obj_poster_group",
-     "name": "groupBtn",
-     "control": "button",
-     "rects": {
-      "desktop": {
-       "x": 32,
-       "y": 288,
-       "w": 260,
-       "h": 48
-      }
-     },
-     "props": {
-      "text": "Group + 20px right"
-     },
-     "on": {
-      "click": "const sel = await author.getSelection()\nif (sel.ids.length < 2) {\n  await author.message('Select two or more objects, then press me')\n} else {\n  const g = await author.command('group')\n  await g.move(20, 0)\n  await author.message('Grouped ' + sel.ids.length + ' objects, nudged 20px right')\n}"
-     }
+      "id": "page_playground",
+      "name": "Playground",
+      "script": "",
+      "backgroundId": "bg_main",
+      "objects": [
+        {
+          "id": "obj_play_hint",
+          "name": "playHint",
+          "control": "label",
+          "x": {
+            "mode": "left",
+            "left": 64,
+            "width": 640
+          },
+          "y": {
+            "mode": "top",
+            "top": 40,
+            "height": 56
+          },
+          "props": {
+            "text": "Playground — select objects here (shift-click for several), then use the Poster plugin (⚡ Author plugins)."
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_play_a",
+          "name": "blockA",
+          "control": "card",
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 160,
+            "height": 160
+          },
+          "props": {
+            "title": "A",
+            "background": "teal"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_play_b",
+          "name": "blockB",
+          "control": "card",
+          "x": {
+            "mode": "left",
+            "left": 400,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 160,
+            "height": 160
+          },
+          "props": {
+            "title": "B",
+            "background": "gold"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_play_c",
+          "name": "blockC",
+          "control": "card",
+          "x": {
+            "mode": "left",
+            "left": 704,
+            "width": 240
+          },
+          "y": {
+            "mode": "top",
+            "top": 160,
+            "height": 160
+          },
+          "props": {
+            "title": "C",
+            "background": "indigo"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_play_d",
+          "name": "blockD",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 200
+          },
+          "y": {
+            "mode": "top",
+            "top": 420,
+            "height": 48
+          },
+          "props": {
+            "text": "Button D"
+          },
+          "on": {}
+        },
+        {
+          "id": "obj_play_e",
+          "name": "blockE",
+          "control": "button",
+          "x": {
+            "mode": "left",
+            "left": 340,
+            "width": 200
+          },
+          "y": {
+            "mode": "top",
+            "top": 420,
+            "height": 48
+          },
+          "props": {
+            "text": "Button E"
+          },
+          "on": {}
+        }
+      ]
     }
-   ]
-  },
-  {
-   "id": "page_playground",
-   "name": "Playground",
-   "script": "",
-   "backgroundId": "bg_main",
-   "objects": [
-    {
-     "id": "obj_play_hint",
-     "name": "playHint",
-     "control": "label",
-     "rects": {
-      "desktop": {
-       "x": 64,
-       "y": 40,
-       "w": 640,
-       "h": 56
-      }
-     },
-     "props": {
-      "text": "Playground — select objects here (shift-click for several), then use the Poster plugin (⚡ Author plugins)."
-     },
-     "on": {}
-    },
-    {
-     "id": "obj_play_a",
-     "name": "blockA",
-     "control": "card",
-     "rects": {
-      "desktop": {
-       "x": 96,
-       "y": 160,
-       "w": 240,
-       "h": 160
-      }
-     },
-     "props": {
-      "title": "A",
-      "background": "teal"
-     },
-     "on": {}
-    },
-    {
-     "id": "obj_play_b",
-     "name": "blockB",
-     "control": "card",
-     "rects": {
-      "desktop": {
-       "x": 400,
-       "y": 160,
-       "w": 240,
-       "h": 160
-      }
-     },
-     "props": {
-      "title": "B",
-      "background": "gold"
-     },
-     "on": {}
-    },
-    {
-     "id": "obj_play_c",
-     "name": "blockC",
-     "control": "card",
-     "rects": {
-      "desktop": {
-       "x": 704,
-       "y": 160,
-       "w": 240,
-       "h": 160
-      }
-     },
-     "props": {
-      "title": "C",
-      "background": "indigo"
-     },
-     "on": {}
-    },
-    {
-     "id": "obj_play_d",
-     "name": "blockD",
-     "control": "button",
-     "rects": {
-      "desktop": {
-       "x": 96,
-       "y": 420,
-       "w": 200,
-       "h": 48
-      }
-     },
-     "props": {
-      "text": "Button D"
-     },
-     "on": {}
-    },
-    {
-     "id": "obj_play_e",
-     "name": "blockE",
-     "control": "button",
-     "rects": {
-      "desktop": {
-       "x": 340,
-       "y": 420,
-       "w": 200,
-       "h": 48
-      }
-     },
-     "props": {
-      "text": "Button E"
-     },
-     "on": {}
-    }
-   ]
-  }
- ]
+  ],
+  "store": []
 }

@@ -88,6 +88,12 @@ authors. New script variables must also follow
 Full list in [`docs/runtime-internals.md` §10](docs/runtime-internals.md); the
 ones most easily broken:
 
+- **The persisted shape is versioned.** `Book.formatVersion` (`FORMAT_VERSION`
+  in `@toolback/format`) is the baseline: `parseBook` stamps it, rejects a book
+  from a newer version, and runs the ordered `MIGRATIONS` chain for an older one
+  (there is no pre-v1 migration — `rect`/`canvas` books are unsupported). When you
+  change the stored shape, bump `FORMAT_VERSION` and add a migration step in the
+  same change.
 - **Edge distances are the stored geometry.** `PageObject.x`/`.y` store the
   fixed distance(s) to the page (or parent-group) edges a control follows:
   `left`+`width`, `right`+`width`, `both`, or `center` (and the vertical

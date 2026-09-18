@@ -1,5 +1,4 @@
 {
-  "formatVersion": 1,
   "id": "book_cc924a911",
   "title": "Hello Toolbook",
   "backgrounds": [
@@ -61,7 +60,7 @@
             "height": 280
           },
           "props": {
-            "background": "#b7ca9b"
+            "color": "#b7ca9b"
           },
           "on": {}
         },
@@ -126,7 +125,7 @@
             "text": "Switch",
             "checked": true,
             "fontFamily": "mono",
-            "trackColor": "yellow"
+            "color": "yellow"
           },
           "on": {}
         },
@@ -167,7 +166,7 @@
           "props": {
             "text": "Button 3",
             "fontFamily": "mono",
-            "background": "#1fad96",
+            "color": "#1fad96",
             "fontSize": 28
           },
           "on": {
@@ -191,10 +190,10 @@
           "props": {
             "text": "turn above button red",
             "fontFamily": "mono",
-            "background": "teal"
+            "color": "teal"
           },
           "on": {
-            "click": "button3.background = 'red'"
+            "click": "button3.color = 'red'"
           }
         },
         {
@@ -215,7 +214,7 @@
             "text": "A \"kitchen sink\" demo in JavaScript refers to a comprehensive sample application or showcase that displays all available UI controls, components, or library features in a single place.Popular JavaScript and web libraries provide these kitchen sink demos to let developers test components like buttons, sliders, switches, and tabs interactively:",
             "fontFamily": "rounded",
             "fontSize": 14,
-            "textColor": "#d80e0e"
+            "color": "#d80e0e"
           },
           "on": {}
         },
@@ -298,7 +297,7 @@
           },
           "props": {
             "text": "Label",
-            "textColor": "orange"
+            "color": "orange"
           },
           "on": {}
         },
@@ -318,7 +317,7 @@
           },
           "props": {
             "text": "Label",
-            "textColor": "green"
+            "color": "green"
           },
           "on": {}
         },
@@ -339,7 +338,7 @@
           "props": {
             "text": "MIDI demos",
             "fontSize": 15,
-            "textColor": "#1a8e43",
+            "color": "#1a8e43",
             "fontFamily": "mono"
           },
           "on": {}
@@ -368,7 +367,7 @@
           },
           "props": {
             "text": "Hello, Toolbook nostalgia!",
-            "textColor": "#968bbb",
+            "color": "#968bbb",
             "fontSize": 22,
             "fontFamily": "mono"
           },
@@ -433,7 +432,7 @@
           "props": {
             "text": "Open Popup",
             "fontSize": 15,
-            "background": "#5f89d3"
+            "color": "#5f89d3"
           },
           "on": {
             "click": "page.popupOpen('Page 5')\n//page.popupOpen('Page 5', { modal: false, chrome: 'none', x: 100, y: 60 })"

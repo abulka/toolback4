@@ -38,6 +38,9 @@ must be JSON data (no functions, `undefined`, or comments).
 }
 ```
 
+`formatVersion` is managed by the loader — omit it. The current build stamps the
+version on every parsed book and rejects a book from a newer toolback.
+
 ### PageObject
 
 ```jsonc

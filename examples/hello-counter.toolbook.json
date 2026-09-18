@@ -1,32 +1,59 @@
 {
+  "formatVersion": 1,
   "id": "book_hello_counter",
   "title": "Hello Counter",
-  "canvas": {
-    "desktop": { "width": 1280, "height": 800 },
-    "tablet": { "width": 768, "height": 1024 },
-    "mobile": { "width": 390, "height": 844 }
-  },
+  "backgrounds": [
+    {
+      "id": "bg_44b5c3372",
+      "name": "Background 1",
+      "color": "#ffffff",
+      "script": "",
+      "objects": []
+    }
+  ],
   "pages": [
     {
       "id": "page_counter",
       "name": "Counter",
       "script": "function pageEnter() {\n  store.set('count', 100)\n}\n",
-      "background": "#ffffff",
+      "backgroundId": "bg_44b5c3372",
       "objects": [
         {
           "id": "obj_counter_label",
           "name": "counterLabel",
           "control": "label",
-          "rects": { "desktop": { "x": 96, "y": 96, "w": 480, "h": 56 } },
-          "props": { "text": "Count: {{count}}" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 480
+          },
+          "y": {
+            "mode": "top",
+            "top": 96,
+            "height": 56
+          },
+          "props": {
+            "text": "Count: {{count}}"
+          },
           "on": {}
         },
         {
           "id": "obj_counter_add",
           "name": "addButton",
           "control": "button",
-          "rects": { "desktop": { "x": 96, "y": 184, "w": 176, "h": 48 } },
-          "props": { "text": "+1" },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 176
+          },
+          "y": {
+            "mode": "top",
+            "top": 184,
+            "height": 48
+          },
+          "props": {
+            "text": "+1"
+          },
           "on": {
             "click": "store.set('count', (store.get('count') ?? 0) + 1)"
           }
@@ -35,8 +62,19 @@
           "id": "obj_counter_reset",
           "name": "resetButton",
           "control": "button",
-          "rects": { "desktop": { "x": 296, "y": 184, "w": 176, "h": 48 } },
-          "props": { "text": "Reset" },
+          "x": {
+            "mode": "left",
+            "left": 296,
+            "width": 176
+          },
+          "y": {
+            "mode": "top",
+            "top": 184,
+            "height": 48
+          },
+          "props": {
+            "text": "Reset"
+          },
           "on": {
             "click": "store.set('count', 0)"
           }
@@ -45,11 +83,23 @@
           "id": "obj_counter_hint",
           "name": "hintLabel",
           "control": "label",
-          "rects": { "desktop": { "x": 96, "y": 280, "w": 480, "h": 40 } },
-          "props": { "text": "Press Run — pageEnter seeds count = 100, the +1 button's click script bumps it, the label is bound with {{count}}." },
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 480
+          },
+          "y": {
+            "mode": "top",
+            "top": 280,
+            "height": 56
+          },
+          "props": {
+            "text": "Press Run — pageEnter seeds count = 100, the +1 button's click script bumps it, the label is bound with {{count}}."
+          },
           "on": {}
         }
       ]
     }
-  ]
+  ],
+  "store": []
 }

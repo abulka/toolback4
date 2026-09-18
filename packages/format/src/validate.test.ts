@@ -75,12 +75,20 @@ describe('validateBook', () => {
     expect(result.issues.some((i) => i.message.includes('{{who}}'))).toBe(true)
   })
 
-  it('warns about deprecated shapes but still parses', () => {
+  it('accepts an unversioned book and stamps the current version', () => {
     const raw = JSON.parse(JSON.stringify(sampleBook())) as Record<string, unknown>
-    raw['canvas'] = { desktop: { width: 1280, height: 800 } }
+    delete raw['formatVersion']
     const result = validateBook(raw)
-    expect(result.book).toBeDefined()
-    expect(result.issues.some((i) => i.message.includes('deprecated'))).toBe(true)
+    expect(result.ok).toBe(true)
+    expect(result.book?.formatVersion).toBe(1)
+  })
+
+  it('reports a book from a newer format version as an error', () => {
+    const raw = JSON.parse(JSON.stringify(sampleBook())) as Record<string, unknown>
+    raw['formatVersion'] = 999
+    const result = validateBook(raw)
+    expect(result.ok).toBe(false)
+    expect(result.issues.some((i) => i.message.includes('newer version'))).toBe(true)
   })
 
   it('formats issues for a repair turn', () => {

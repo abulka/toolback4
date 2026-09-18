@@ -204,7 +204,15 @@ const StoreEntrySchema = z.tuple([z.string().min(1), z.unknown()])
 const StoreSchema = z.array(StoreEntrySchema).default([])
 export type StoreEntry = z.infer<typeof StoreEntrySchema>
 
+/**
+ * Persisted book format version. Bump when the stored shape changes and add a
+ * matching step to {@link MIGRATIONS}; every book is stamped on parse.
+ */
+export const FORMAT_VERSION = 1
+
 const BookSchema = z.object({
+  /** persisted book format; stamped on parse (see {@link FORMAT_VERSION}) */
+  formatVersion: z.number().int().nonnegative().default(FORMAT_VERSION),
   id: z.string().min(1),
   title: z.string().min(1),
   backgrounds: z.array(BackgroundSchema).default([]),
@@ -214,219 +222,54 @@ const BookSchema = z.object({
   startPageId: z.string().optional(),
   store: StoreSchema,
 })
-export type Book = Omit<z.infer<typeof BookSchema>, 'store'> & {
+export type Book = Omit<z.infer<typeof BookSchema>, 'store' | 'formatVersion'> & {
+  /** persisted book format; parseBook always stamps it, hand-built books may omit it */
+  formatVersion?: number
   /** design-time store values; seeded into every run (see StoreEntrySchema) */
   store?: StoreEntry[]
 }
 
 /**
- * Legacy upgrade: pre-background books carried the fill color on each page
- * (`page.background`). Group pages by color into one background per distinct
- * color (in page order), assign `backgroundId`s, and normalize dangling
- * backgroundIds. Runs before schema validation so old files parse unchanged.
+ * A persisted-format migration: takes raw book data at version `from` and
+ * returns it upgraded to `from + 1`. Add a step here and bump
+ * {@link FORMAT_VERSION} whenever the stored shape changes.
  */
-function migrateBackgrounds(data: unknown): unknown {
-  if (!data || typeof data !== 'object') return data
-  const raw = data as Record<string, unknown>
-  if (!Array.isArray(raw['pages'])) return data
-  const pages = raw['pages'] as Array<Record<string, unknown>>
-  const backgrounds = Array.isArray(raw['backgrounds']) ? (raw['backgrounds'] as Background[]) : []
-  if (backgrounds.length === 0) {
-    // one background per distinct legacy page color, in first-seen order
-    const byColor = new Map<string, Background>()
-    for (const page of pages) {
-      const color = typeof page['background'] === 'string' ? (page['background'] as string) : '#ffffff'
-      let bg = byColor.get(color)
-      if (!bg) {
-        bg = {
-          id: newId('bg'),
-          name: `Background ${byColor.size + 1}`,
-          color,
-          script: '',
-          objects: [],
-        }
-        byColor.set(color, bg)
-      }
-      page['backgroundId'] = bg.id
-    }
-    raw['backgrounds'] = [...byColor.values()]
-  } else {
-    for (const page of pages) {
-      const known =
-        typeof page['backgroundId'] === 'string' &&
-        backgrounds.some((b) => b.id === page['backgroundId'])
-      if (!known) page['backgroundId'] = backgrounds[0]!.id
-    }
-  }
-  return data
+type Migration = (data: Record<string, unknown>) => Record<string, unknown>
+
+const MIGRATIONS: Array<{ from: number; run: Migration }> = []
+
+/** An absent `formatVersion` is treated as current (AI output, fresh books). */
+function versionOf(data: Record<string, unknown>): number {
+  const v = data['formatVersion']
+  return typeof v === 'number' ? v : FORMAT_VERSION
 }
 
 /**
- * Legacy size upgrade, run after {@link migrateBackgrounds}:
- *  - `book.canvas` (a size per breakpoint) becomes a temporary `book.design`
- *    reference (the desktop size) that {@link migrateConstraints} measures the
- *    old fitted rects against before it is dropped.
- *  - a background that carried a `size` hands its desktop override to every
- *    page that uses it as `Page.size` (a fixed dialog surface) and loses it.
- *  - the old `Background.autoHeight` flag is dropped: pages are fluid now.
+ * Upgrade raw book data through the migration chain and stamp the current
+ * version. Throws on a book from a newer build (it may use unknown shapes).
  */
-function migrateSizes(data: unknown): unknown {
+function migrateBook(data: unknown): unknown {
   if (!data || typeof data !== 'object') return data
-  const raw = data as Record<string, unknown>
-  const canvas = raw['canvas']
-  if (canvas && typeof canvas === 'object') {
-    const sizes = canvas as Record<string, unknown>
-    const desktop = (sizes['desktop'] ?? sizes['tablet'] ?? sizes['mobile']) as
-      | Record<string, unknown>
-      | undefined
-    if (desktop && typeof desktop['width'] === 'number' && typeof desktop['height'] === 'number') {
-      raw['design'] = { width: desktop['width'], height: desktop['height'] }
-    }
-    delete raw['canvas']
+  let book = data as Record<string, unknown>
+  const from = versionOf(book)
+  if (from > FORMAT_VERSION) {
+    throw new Error(
+      `This book was made with a newer version of toolback (format ${from}; this build supports ${FORMAT_VERSION}).`,
+    )
   }
-  if (!raw['design']) raw['design'] = { width: 1280, height: 800 }
-  const pages = Array.isArray(raw['pages']) ? (raw['pages'] as Array<Record<string, unknown>>) : []
-  const bgs = Array.isArray(raw['backgrounds'])
-    ? (raw['backgrounds'] as Array<Record<string, unknown>>)
-    : []
-  for (const bg of bgs) {
-    const size = bg['size']
-    if (size && typeof size === 'object') {
-      const sizes = size as Record<string, unknown>
-      const desktop = (sizes['desktop'] ?? sizes['tablet'] ?? sizes['mobile']) as
-        | Record<string, unknown>
-        | undefined
-      if (desktop && typeof desktop['width'] === 'number' && typeof desktop['height'] === 'number') {
-        for (const page of pages) {
-          if (page['backgroundId'] === bg['id'] && !page['size']) {
-            page['size'] = { width: desktop['width'], height: desktop['height'] }
-          }
-        }
-      }
-      delete bg['size']
-    }
-    delete bg['autoHeight']
+  let at = from
+  while (at < FORMAT_VERSION) {
+    const step = MIGRATIONS.find((m) => m.from === at)
+    if (!step) throw new Error(`No migration from book format ${at} to ${at + 1}.`)
+    book = step.run(book)
+    at++
   }
-  return data
+  book['formatVersion'] = FORMAT_VERSION
+  return book
 }
 
 export function parseBook(data: unknown): Book {
-  return BookSchema.parse(migrateConstraints(migrateSizes(migrateObjects(migrateBackgrounds(data)))))
-}
-
-/**
- * Edge-constraint upgrade, run last (after {@link migrateSizes} has produced
- * the reference `design` size): each object's one `rect` + `fit` pair becomes
- * fixed edge distances that freeze its appearance at the reference size.
- *
- *   free / left / top / stretch      -> follows the near edge (left / top)
- *   right / bottom / pin-right / -bottom -> follows the far edge
- *   fill                             -> follows both edges (stretches)
- *   center                           -> centred
- *
- * Objects that already carry `x`/`y` constraints pass through untouched, and
- * `design` is deleted once every object has been measured.
- */
-function migrateConstraints(data: unknown): unknown {
-  if (!data || typeof data !== 'object') return data
-  const raw = data as Record<string, unknown>
-  const rawDesign = raw['design'] as Record<string, unknown> | undefined
-  const design: CanvasSize = {
-    width: typeof rawDesign?.['width'] === 'number' ? (rawDesign['width'] as number) : 1280,
-    height: typeof rawDesign?.['height'] === 'number' ? (rawDesign['height'] as number) : 800,
-  }
-  const mapObjects = (objs: unknown): void => {
-    if (!Array.isArray(objs)) return
-    for (const o of objs) {
-      if (!o || typeof o !== 'object') continue
-      const obj = o as Record<string, unknown>
-      const rect = obj['rect']
-      if (rect && typeof rect === 'object' && !obj['x'] && !obj['y']) {
-        const r = rect as Rect
-        const fit = obj['fit'] as Record<string, unknown> | undefined
-        const fx = typeof fit?.['x'] === 'string' ? (fit['x'] as string) : 'free'
-        const fy = typeof fit?.['y'] === 'string' ? (fit['y'] as string) : 'free'
-        const right = Math.round(design.width - (r.x + r.w))
-        const bottom = Math.round(design.height - (r.y + r.h))
-        obj['x'] =
-          fx === 'right' || fx === 'pin-right'
-            ? { mode: 'right', right, width: r.w }
-            : fx === 'center'
-              ? { mode: 'center', width: r.w }
-              : fx === 'fill'
-                ? { mode: 'both', left: Math.round(r.x), right }
-                : { mode: 'left', left: Math.round(r.x), width: r.w }
-        obj['y'] =
-          fy === 'bottom' || fy === 'pin-bottom'
-            ? { mode: 'bottom', bottom, height: r.h }
-            : fy === 'center'
-              ? { mode: 'center', height: r.h }
-              : fy === 'fill'
-                ? { mode: 'both', top: Math.round(r.y), bottom }
-                : { mode: 'top', top: Math.round(r.y), height: r.h }
-      }
-      delete obj['rect']
-      delete obj['fit']
-      mapObjects(obj['children'])
-    }
-  }
-  if (Array.isArray(raw['pages'])) {
-    for (const p of raw['pages'] as Array<Record<string, unknown>>) mapObjects(p['objects'])
-  }
-  if (Array.isArray(raw['backgrounds'])) {
-    for (const b of raw['backgrounds'] as Array<Record<string, unknown>>) mapObjects(b['objects'])
-  }
-  delete raw['design']
-  return data
-}
-
-/**
- * Legacy object upgrade, applied recursively before validation:
- *  - `rects.tablet` / `rects.mobile` are dropped; the authored layout is
- *    `rect = rects.desktop` (per-breakpoint rects are no longer supported).
- *  - legacy fit tokens: `prop`→`left`/`top`, `middle`→`center`. `left`/`top`
- *    are kept — they name the near edge in the current model.
- */
-const FIT_TOKEN_MAP: Record<'x' | 'y', Record<string, string>> = {
-  x: { prop: 'left' },
-  y: { middle: 'center', prop: 'top' },
-}
-
-function migrateObjects(data: unknown): unknown {
-  if (!data || typeof data !== 'object') return data
-  const raw = data as Record<string, unknown>
-  const mapObjects = (objs: unknown): void => {
-    if (!Array.isArray(objs)) return
-    for (const o of objs) {
-      if (!o || typeof o !== 'object') continue
-      const obj = o as Record<string, unknown>
-      const rects = obj['rects']
-      if (rects && typeof rects === 'object') {
-        const legacy = rects as Record<string, unknown>
-        if (legacy['desktop'] && typeof legacy['desktop'] === 'object') {
-          obj['rect'] = legacy['desktop']
-        }
-        delete obj['rects']
-      }
-      const fit = obj['fit']
-      if (fit && typeof fit === 'object') {
-        const f = fit as Record<string, unknown>
-        for (const axis of ['x', 'y'] as const) {
-          const cur = f[axis]
-          const mapped = typeof cur === 'string' ? FIT_TOKEN_MAP[axis][cur] : undefined
-          if (mapped) f[axis] = mapped
-        }
-      }
-      mapObjects(obj['children'])
-    }
-  }
-  if (Array.isArray(raw['pages'])) {
-    for (const p of raw['pages'] as Array<Record<string, unknown>>) mapObjects(p['objects'])
-  }
-  if (Array.isArray(raw['backgrounds'])) {
-    for (const b of raw['backgrounds'] as Array<Record<string, unknown>>) mapObjects(b['objects'])
-  }
-  return data
+  return BookSchema.parse(migrateBook(data))
 }
 
 export const DEFAULT_SIZES: Record<ControlKind, { w: number; h: number }> = {
@@ -864,10 +707,30 @@ export function randomImageUrl(
   }
 }
 
-export function safeParseBook(data: unknown) {
-  return BookSchema.safeParse(
-    migrateConstraints(migrateSizes(migrateObjects(migrateBackgrounds(data)))),
-  )
+export type SafeParseBookResult =
+  | { success: true; data: Book; error?: never }
+  | {
+      success: false
+      error: { issues: Array<{ path: (string | number)[]; message: string }> }
+      data?: never
+    }
+
+export function safeParseBook(data: unknown): SafeParseBookResult {
+  try {
+    return BookSchema.safeParse(migrateBook(data))
+  } catch (err) {
+    return {
+      success: false,
+      error: {
+        issues: [
+          {
+            path: ['formatVersion'],
+            message: err instanceof Error ? err.message : String(err),
+          },
+        ],
+      },
+    }
+  }
 }
 
 export type IssueSeverity = 'error' | 'warning'
@@ -919,55 +782,6 @@ function allObjectPaths(book: Book): Array<{ obj: PageObject; path: string }> {
     ),
     ...book.pages.flatMap((p, i) => collectObjectPaths(p.objects, `pages[${i}].objects`)),
   ]
-}
-
-function legacyIssues(data: unknown): ValidationIssue[] {
-  const issues: ValidationIssue[] = []
-  if (!data || typeof data !== 'object') return issues
-  const raw = data as Record<string, unknown>
-  if ('canvas' in raw) {
-    issues.push({
-      path: 'canvas',
-      message: 'deprecated `canvas` block — the current format has no per-breakpoint sizes',
-      severity: 'warning',
-    })
-  }
-  const scan = (objs: unknown, base: string): void => {
-    if (!Array.isArray(objs)) return
-    objs.forEach((o, i) => {
-      if (!o || typeof o !== 'object') return
-      const obj = o as Record<string, unknown>
-      for (const key of ['rects', 'fit'] as const) {
-        if (key in obj) {
-          issues.push({
-            path: `${base}[${i}].${key}`,
-            message: `deprecated \`${key}\` — use the canonical \`x\`/\`y\` edge constraints`,
-            severity: 'warning',
-          })
-        }
-      }
-      scan(obj['children'], `${base}[${i}].children`)
-    })
-  }
-  if (Array.isArray(raw['pages'])) {
-    ;(raw['pages'] as Array<Record<string, unknown>>).forEach((p, i) => {
-      if (!p || typeof p !== 'object') return
-      if ('background' in p) {
-        issues.push({
-          path: `pages[${i}].background`,
-          message: 'deprecated page `background` colour — backgrounds live in `book.backgrounds`',
-          severity: 'warning',
-        })
-      }
-      scan(p['objects'], `pages[${i}].objects`)
-    })
-  }
-  if (Array.isArray(raw['backgrounds'])) {
-    ;(raw['backgrounds'] as Array<Record<string, unknown>>).forEach((b, i) => {
-      if (b && typeof b === 'object') scan(b['objects'], `backgrounds[${i}].objects`)
-    })
-  }
-  return issues
 }
 
 function lintBook(book: Book): ValidationIssue[] {
@@ -1109,26 +923,22 @@ function lintBook(book: Book): ValidationIssue[] {
 /**
  * Parse + lint a book for AI generation. Structural failures come back as
  * `error` issues (a repair turn can feed them straight to the model); semantic
- * misses are linted after a successful parse. Unknown props and deprecated
- * shapes are warnings so forward-compatible or legacy books still load.
+ * misses are linted after a successful parse. Unknown props are warnings so
+ * forward-compatible books still load.
  */
 export function validateBook(data: unknown): ValidationResult {
-  const legacy = legacyIssues(data)
   const parsed = safeParseBook(data)
   if (!parsed.success) {
     return {
       ok: false,
-      issues: [
-        ...parsed.error.issues.map((i) => ({
-          path: i.path.join('.') || '(root)',
-          message: i.message,
-          severity: 'error' as const,
-        })),
-        ...legacy,
-      ],
+      issues: parsed.error.issues.map((i) => ({
+        path: i.path.join('.') || '(root)',
+        message: i.message,
+        severity: 'error' as const,
+      })),
     }
   }
-  const issues = [...legacy, ...lintBook(parsed.data)]
+  const issues = lintBook(parsed.data)
   return { ok: !issues.some((i) => i.severity === 'error'), book: parsed.data, issues }
 }
 
@@ -1253,11 +1063,10 @@ export function normalizeBook(data: unknown): NormalizeResult {
         o['name'] = name
       }
       const size = kind ? DEFAULT_SIZES[kind] : { w: 120, h: 40 }
-      const legacyRect = 'rect' in o || 'rects' in o
-      if (!isRecord(o['x']) && !legacyRect) {
+      if (!isRecord(o['x'])) {
         o['x'] = { mode: 'left', left: 0, width: size.w }
       }
-      if (!isRecord(o['y']) && !legacyRect) {
+      if (!isRecord(o['y'])) {
         o['y'] = { mode: 'top', top: 0, height: size.h }
       }
       const props = isRecord(o['props']) ? (o['props'] as Record<string, unknown>) : {}

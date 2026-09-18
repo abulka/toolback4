@@ -1,30 +1,36 @@
 {
+  "formatVersion": 1,
   "id": "book_cc924a911",
   "title": "Hello Toolbook",
-  "canvas": {
-    "desktop": {
-      "width": 1280,
-      "height": 800
+  "backgrounds": [
+    {
+      "id": "bg_accf5e191",
+      "name": "Background 1",
+      "color": "#ffffff",
+      "script": "",
+      "objects": []
     }
-  },
+  ],
   "pages": [
     {
       "id": "page_fb245c3b2",
       "name": "Page 1",
       "script": "function pageEnter() {\n  store.set('andy', 100)\n}",
-      "background": "#ffffff",
+      "backgroundId": "bg_accf5e191",
       "objects": [
         {
           "id": "obj_adee43278",
           "name": "image2",
           "control": "image",
-          "rects": {
-            "desktop": {
-              "x": 216,
-              "y": 328,
-              "w": 280,
-              "h": 200
-            }
+          "x": {
+            "mode": "left",
+            "left": 216,
+            "width": 280
+          },
+          "y": {
+            "mode": "top",
+            "top": 328,
+            "height": 200
           },
           "props": {
             "src": "https://dummyimage.com/600x400/000/fff&text=AA+BB"
@@ -35,13 +41,15 @@
           "id": "obj_1973aa773",
           "name": "helloLabel",
           "control": "label",
-          "rects": {
-            "desktop": {
-              "x": 96,
-              "y": 88,
-              "w": 280,
-              "h": 56
-            }
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 280
+          },
+          "y": {
+            "mode": "top",
+            "top": 88,
+            "height": 56
           },
           "props": {
             "text": "Hello, Toolbook nostalgia!"
@@ -54,13 +62,15 @@
           "id": "obj_474c719f4",
           "name": "myButton",
           "control": "button",
-          "rects": {
-            "desktop": {
-              "x": 96,
-              "y": 176,
-              "w": 176,
-              "h": 48
-            }
+          "x": {
+            "mode": "left",
+            "left": 96,
+            "width": 176
+          },
+          "y": {
+            "mode": "top",
+            "top": 176,
+            "height": 48
           },
           "props": {
             "text": "go page 2"
@@ -73,13 +83,15 @@
           "id": "obj_610bdbd36",
           "name": "image1",
           "control": "image",
-          "rects": {
-            "desktop": {
-              "x": 624,
-              "y": 32,
-              "w": 216,
-              "h": 112
-            }
+          "x": {
+            "mode": "left",
+            "left": 624,
+            "width": 216
+          },
+          "y": {
+            "mode": "top",
+            "top": 32,
+            "height": 112
           },
           "props": {
             "src": "https://dummyimage.com/600x400/000/fff&text=hi+there"
@@ -92,25 +104,15 @@
           "id": "obj_5a4306395",
           "name": "group1",
           "control": "group",
-          "rects": {
-            "desktop": {
-              "x": 95,
-              "y": 350,
-              "w": 262,
-              "h": 147
-            },
-            "tablet": {
-              "x": 0,
-              "y": 0,
-              "w": 176,
-              "h": 128
-            },
-            "mobile": {
-              "x": 0,
-              "y": 0,
-              "w": 176,
-              "h": 128
-            }
+          "x": {
+            "mode": "left",
+            "left": 95,
+            "width": 262
+          },
+          "y": {
+            "mode": "top",
+            "top": 350,
+            "height": 147
           },
           "props": {},
           "on": {
@@ -121,25 +123,15 @@
               "id": "obj_947f84b56",
               "name": "button2",
               "control": "button",
-              "rects": {
-                "desktop": {
-                  "x": 0,
-                  "y": 112,
-                  "w": 262,
-                  "h": 35
-                },
-                "tablet": {
-                  "x": 0,
-                  "y": 80,
-                  "w": 176,
-                  "h": 48
-                },
-                "mobile": {
-                  "x": 0,
-                  "y": 80,
-                  "w": 176,
-                  "h": 48
-                }
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 262
+              },
+              "y": {
+                "mode": "top",
+                "top": 112,
+                "height": 35
               },
               "props": {
                 "text": "Button"
@@ -150,25 +142,15 @@
               "id": "obj_241279d35",
               "name": "button1",
               "control": "button",
-              "rects": {
-                "desktop": {
-                  "x": 0,
-                  "y": 0,
-                  "w": 179,
-                  "h": 73
-                },
-                "tablet": {
-                  "x": 0,
-                  "y": 0,
-                  "w": 176,
-                  "h": 48
-                },
-                "mobile": {
-                  "x": 0,
-                  "y": 0,
-                  "w": 176,
-                  "h": 48
-                }
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 179
+              },
+              "y": {
+                "mode": "top",
+                "top": 0,
+                "height": 73
               },
               "props": {
                 "text": "Button"
@@ -183,19 +165,21 @@
       "id": "page_4d378c595",
       "name": "Page 2",
       "script": "function pageEnter() {\n  console.log('hi from page enter')\n  button2.text = 'back to the first page'\n}\n",
-      "background": "#ffffff",
+      "backgroundId": "bg_accf5e191",
       "objects": [
         {
           "id": "obj_710c31c36",
           "name": "button1",
           "control": "button",
-          "rects": {
-            "desktop": {
-              "x": 112,
-              "y": 136,
-              "w": 176,
-              "h": 48
-            }
+          "x": {
+            "mode": "left",
+            "left": 112,
+            "width": 176
+          },
+          "y": {
+            "mode": "top",
+            "top": 136,
+            "height": 48
           },
           "props": {
             "text": "mess with button below"
@@ -209,13 +193,15 @@
           "id": "obj_d21a2a587",
           "name": "button2",
           "control": "button",
-          "rects": {
-            "desktop": {
-              "x": 112,
-              "y": 208,
-              "w": 176,
-              "h": 48
-            }
+          "x": {
+            "mode": "left",
+            "left": 112,
+            "width": 176
+          },
+          "y": {
+            "mode": "top",
+            "top": 208,
+            "height": 48
           },
           "props": {
             "text": "Back"
@@ -228,25 +214,15 @@
           "id": "obj_ba9556d824",
           "name": "group5",
           "control": "group",
-          "rects": {
-            "desktop": {
-              "x": 104,
-              "y": 512,
-              "w": 408,
-              "h": 160
-            },
-            "tablet": {
-              "x": 160,
-              "y": 312,
-              "w": 424,
-              "h": 160
-            },
-            "mobile": {
-              "x": 160,
-              "y": 312,
-              "w": 424,
-              "h": 160
-            }
+          "x": {
+            "mode": "left",
+            "left": 104,
+            "width": 408
+          },
+          "y": {
+            "mode": "top",
+            "top": 512,
+            "height": 160
           },
           "props": {},
           "on": {},
@@ -255,25 +231,15 @@
               "id": "obj_d760ad038",
               "name": "group1",
               "control": "group",
-              "rects": {
-                "desktop": {
-                  "x": 0,
-                  "y": 0,
-                  "w": 208,
-                  "h": 80
-                },
-                "tablet": {
-                  "x": 0,
-                  "y": 0,
-                  "w": 376,
-                  "h": 112
-                },
-                "mobile": {
-                  "x": 0,
-                  "y": 0,
-                  "w": 376,
-                  "h": 112
-                }
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 208
+              },
+              "y": {
+                "mode": "top",
+                "top": 0,
+                "height": 80
               },
               "props": {},
               "on": {},
@@ -282,25 +248,15 @@
                   "id": "obj_8e1cf8985",
                   "name": "button3",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 0,
-                      "y": 0,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": -160,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": -160,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 0,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 0,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -313,25 +269,15 @@
                   "id": "obj_82a5c9126",
                   "name": "button5",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 122,
-                      "y": 8,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": 40,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": 40,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 122,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 8,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -344,25 +290,15 @@
                   "id": "obj_3e693f265",
                   "name": "button4",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 16,
-                      "y": 56,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": -160,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": -160,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 16,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 56,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -375,25 +311,15 @@
                   "id": "obj_41ae3a357",
                   "name": "button6",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 122,
-                      "y": 48,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": 40,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": 40,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 122,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 48,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -408,25 +334,15 @@
               "id": "obj_82139e1414",
               "name": "group3",
               "control": "group",
-              "rects": {
-                "desktop": {
-                  "x": 224,
-                  "y": 32,
-                  "w": 184,
-                  "h": 56
-                },
-                "tablet": {
-                  "x": 24,
-                  "y": 24,
-                  "w": 376,
-                  "h": 112
-                },
-                "mobile": {
-                  "x": 24,
-                  "y": 24,
-                  "w": 376,
-                  "h": 112
-                }
+              "x": {
+                "mode": "left",
+                "left": 224,
+                "width": 184
+              },
+              "y": {
+                "mode": "top",
+                "top": 32,
+                "height": 56
               },
               "props": {},
               "on": {},
@@ -435,25 +351,15 @@
                   "id": "obj_3846a33615",
                   "name": "button11",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 0,
-                      "y": 0,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": -160,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": -160,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 0,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 0,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -466,25 +372,15 @@
                   "id": "obj_9ee853a316",
                   "name": "button12",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 98,
-                      "y": 0,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": 40,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": 40,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 98,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 0,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -497,25 +393,15 @@
                   "id": "obj_742d53ba17",
                   "name": "button13",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 0,
-                      "y": 32,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": -160,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": -160,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 0,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 32,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -528,25 +414,15 @@
                   "id": "obj_fc75ab9a18",
                   "name": "button14",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 98,
-                      "y": 32,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": 40,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": 40,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 98,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 32,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -561,25 +437,15 @@
               "id": "obj_23cec0eb9",
               "name": "group2",
               "control": "group",
-              "rects": {
-                "desktop": {
-                  "x": 24,
-                  "y": 104,
-                  "w": 184,
-                  "h": 56
-                },
-                "tablet": {
-                  "x": 24,
-                  "y": 24,
-                  "w": 376,
-                  "h": 112
-                },
-                "mobile": {
-                  "x": 24,
-                  "y": 24,
-                  "w": 376,
-                  "h": 112
-                }
+              "x": {
+                "mode": "left",
+                "left": 24,
+                "width": 184
+              },
+              "y": {
+                "mode": "top",
+                "top": 104,
+                "height": 56
               },
               "props": {},
               "on": {},
@@ -588,25 +454,15 @@
                   "id": "obj_ebf5920b10",
                   "name": "button7",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 0,
-                      "y": 0,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": -160,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": -160,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 0,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 0,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -619,25 +475,15 @@
                   "id": "obj_b862dbd611",
                   "name": "button8",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 98,
-                      "y": 0,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": 40,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": 40,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 98,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 0,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -650,25 +496,15 @@
                   "id": "obj_96d8dc3812",
                   "name": "button9",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 0,
-                      "y": 32,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": -160,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": -160,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 0,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 32,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -681,25 +517,15 @@
                   "id": "obj_e1cf8b2413",
                   "name": "button10",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 98,
-                      "y": 32,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": 40,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": 40,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 98,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 32,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -714,25 +540,15 @@
               "id": "obj_05353a9b19",
               "name": "group4",
               "control": "group",
-              "rects": {
-                "desktop": {
-                  "x": 224,
-                  "y": 104,
-                  "w": 184,
-                  "h": 56
-                },
-                "tablet": {
-                  "x": 48,
-                  "y": 48,
-                  "w": 376,
-                  "h": 112
-                },
-                "mobile": {
-                  "x": 48,
-                  "y": 48,
-                  "w": 376,
-                  "h": 112
-                }
+              "x": {
+                "mode": "left",
+                "left": 224,
+                "width": 184
+              },
+              "y": {
+                "mode": "top",
+                "top": 104,
+                "height": 56
               },
               "props": {},
               "on": {},
@@ -741,25 +557,15 @@
                   "id": "obj_b444c7e120",
                   "name": "button15",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 0,
-                      "y": 0,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": -160,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": -160,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 0,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 0,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -772,25 +578,15 @@
                   "id": "obj_d924c82621",
                   "name": "button16",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 98,
-                      "y": 0,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": 40,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": 40,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 98,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 0,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -803,25 +599,15 @@
                   "id": "obj_3ceb89dc22",
                   "name": "button17",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 0,
-                      "y": 32,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": -160,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": -160,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 0,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 32,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -834,25 +620,15 @@
                   "id": "obj_960f9be523",
                   "name": "button18",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 98,
-                      "y": 32,
-                      "w": 86,
-                      "h": 24
-                    },
-                    "tablet": {
-                      "x": 40,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": 40,
-                      "y": -248,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 98,
+                    "width": 86
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 32,
+                    "height": 24
                   },
                   "props": {
                     "text": "Back"
@@ -869,25 +645,15 @@
           "id": "obj_0246c51811",
           "name": "group8",
           "control": "group",
-          "rects": {
-            "desktop": {
-              "x": 128,
-              "y": 328,
-              "w": 360,
-              "h": 112
-            },
-            "tablet": {
-              "x": 128,
-              "y": 376,
-              "w": 200,
-              "h": 136
-            },
-            "mobile": {
-              "x": 128,
-              "y": 376,
-              "w": 200,
-              "h": 136
-            }
+          "x": {
+            "mode": "left",
+            "left": 128,
+            "width": 360
+          },
+          "y": {
+            "mode": "top",
+            "top": 328,
+            "height": 112
           },
           "props": {},
           "on": {
@@ -898,25 +664,15 @@
               "id": "obj_4b0bf7ed8",
               "name": "group7",
               "control": "group",
-              "rects": {
-                "desktop": {
-                  "x": 184,
-                  "y": 0,
-                  "w": 176,
-                  "h": 112
-                },
-                "tablet": {
-                  "x": 24,
-                  "y": 24,
-                  "w": 176,
-                  "h": 112
-                },
-                "mobile": {
-                  "x": 24,
-                  "y": 24,
-                  "w": 176,
-                  "h": 112
-                }
+              "x": {
+                "mode": "left",
+                "left": 184,
+                "width": 176
+              },
+              "y": {
+                "mode": "top",
+                "top": 0,
+                "height": 112
               },
               "props": {},
               "on": {
@@ -927,25 +683,15 @@
                   "id": "obj_75cb435a9",
                   "name": "button21",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 0,
-                      "y": 0,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "tablet": {
-                      "x": -128,
-                      "y": -376,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": -128,
-                      "y": -376,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 0,
+                    "width": 176
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 0,
+                    "height": 48
                   },
                   "props": {
                     "text": "A"
@@ -956,25 +702,15 @@
                   "id": "obj_65aa855310",
                   "name": "button22",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 0,
-                      "y": 64,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "tablet": {
-                      "x": -128,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": -128,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 0,
+                    "width": 176
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 64,
+                    "height": 48
                   },
                   "props": {
                     "text": "B"
@@ -987,25 +723,15 @@
               "id": "obj_7a3cc3207",
               "name": "group6",
               "control": "group",
-              "rects": {
-                "desktop": {
-                  "x": 0,
-                  "y": 0,
-                  "w": 176,
-                  "h": 112
-                },
-                "tablet": {
-                  "x": 0,
-                  "y": 0,
-                  "w": 176,
-                  "h": 112
-                },
-                "mobile": {
-                  "x": 0,
-                  "y": 0,
-                  "w": 176,
-                  "h": 112
-                }
+              "x": {
+                "mode": "left",
+                "left": 0,
+                "width": 176
+              },
+              "y": {
+                "mode": "top",
+                "top": 0,
+                "height": 112
               },
               "props": {},
               "on": {},
@@ -1014,25 +740,15 @@
                   "id": "obj_b72e0db15",
                   "name": "button19",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 0,
-                      "y": 0,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "tablet": {
-                      "x": -128,
-                      "y": -376,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": -128,
-                      "y": -376,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 0,
+                    "width": 176
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 0,
+                    "height": 48
                   },
                   "props": {
                     "text": "A"
@@ -1045,25 +761,15 @@
                   "id": "obj_32c7fe0c6",
                   "name": "button20",
                   "control": "button",
-                  "rects": {
-                    "desktop": {
-                      "x": 0,
-                      "y": 64,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "tablet": {
-                      "x": -128,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    },
-                    "mobile": {
-                      "x": -128,
-                      "y": -312,
-                      "w": 176,
-                      "h": 48
-                    }
+                  "x": {
+                    "mode": "left",
+                    "left": 0,
+                    "width": 176
+                  },
+                  "y": {
+                    "mode": "top",
+                    "top": 64,
+                    "height": 48
                   },
                   "props": {
                     "text": "B"
@@ -1078,13 +784,15 @@
           "id": "obj_28a16e645",
           "name": "button23",
           "control": "button",
-          "rects": {
-            "desktop": {
-              "x": 312,
-              "y": 56,
-              "w": 176,
-              "h": 48
-            }
+          "x": {
+            "mode": "left",
+            "left": 312,
+            "width": 176
+          },
+          "y": {
+            "mode": "top",
+            "top": 56,
+            "height": 48
           },
           "props": {
             "text": "Button {{self.name}}"
@@ -1095,13 +803,15 @@
           "id": "obj_f37b34156",
           "name": "button24",
           "control": "button",
-          "rects": {
-            "desktop": {
-              "x": 312,
-              "y": 112,
-              "w": 176,
-              "h": 48
-            }
+          "x": {
+            "mode": "left",
+            "left": 312,
+            "width": 176
+          },
+          "y": {
+            "mode": "top",
+            "top": 112,
+            "height": 48
           },
           "props": {
             "text": "Button {{self.name}}"
@@ -1112,13 +822,15 @@
           "id": "obj_e791fee17",
           "name": "button25",
           "control": "button",
-          "rects": {
-            "desktop": {
-              "x": 312,
-              "y": 168,
-              "w": 176,
-              "h": 48
-            }
+          "x": {
+            "mode": "left",
+            "left": 312,
+            "width": 176
+          },
+          "y": {
+            "mode": "top",
+            "top": 168,
+            "height": 48
           },
           "props": {
             "text": "Button {{self.name}}"
@@ -1127,5 +839,6 @@
         }
       ]
     }
-  ]
+  ],
+  "store": []
 }
