@@ -539,9 +539,11 @@ async function copyRaw(): Promise<void> {
         <div class="model-row">
           <input
             v-model="apiKey"
-            :type="showKey ? 'text' : 'password'"
+            class="key-input"
+            :class="{ masked: !showKey }"
+            type="text"
             name="tb-ai-key"
-            autocomplete="new-password"
+            autocomplete="off"
             autocapitalize="off"
             data-lpignore="true"
             data-1p-ignore="true"
@@ -758,6 +760,10 @@ async function copyRaw(): Promise<void> {
 .model-row select {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.key-input.masked {
+  -webkit-text-security: disc;
 }
 
 .model-select {
