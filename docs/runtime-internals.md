@@ -809,7 +809,9 @@ step:
   renamed. With `keepExisting` (strict add-only) the existing objects are kept
   verbatim and only new names are added, so an "add a button" request can never
   recolour what is already there. `aiIntent.ts` derives the mode + flag from the
-  prompt text.
+  prompt text; the panel applies that at generate time and, when it differs from
+  the current mode, asks the author to confirm (Switch / Keep) before switching
+  — it never overrides the radio silently.
 - `replace` — swap the whole book.
 
 **Provider layer.** `providers.ts` holds the presets (base URL, API shape,

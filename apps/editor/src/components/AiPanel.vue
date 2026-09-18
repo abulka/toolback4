@@ -6,7 +6,7 @@ import { useBookStore, type LoadGeneratedResult } from '../stores/book'
 import { fetchModels, generateBook, styleGuide, type AiSettings, type ChatMessage } from '../ai'
 import { diffBooks, type LoadMode } from '../aiDiff'
 import { mergeGeneratedBook } from '../mergeBook'
-import { detectIntent } from '../aiIntent'
+import { detectIntent, type Intent } from '../aiIntent'
 import { smokeBook } from '../canvasClient'
 import { SYSTEM_PROMPT } from '../aiPrompt'
 import {
@@ -85,6 +85,7 @@ const session = loadSession()
 const request = ref(session.request)
 const mode = ref<Mode>(session.mode)
 const keepExisting = ref(session.keepExisting ?? false)
+const pendingIntent = ref<Intent | null>(null)
 const raw = ref(session.raw)
 const log = ref<string[]>(session.log)
 const history = ref<ChatMessage[]>(session.history ?? [])
@@ -129,6 +130,7 @@ function newChat(): void {
   history.value = []
   turns.value = []
   lastChange.value = null
+  pendingIntent.value = null
   store.setCompare(null)
   log.value = []
   raw.value = ''
@@ -186,6 +188,7 @@ function changeProvider(id: string): void {
   modelError.value = ''
   history.value = []
   lastChange.value = null
+  pendingIntent.value = null
   store.setCompare(null)
   loadForProvider()
 }
@@ -307,18 +310,7 @@ function buildPrompt(): string {
   )
 }
 
-watch(request, (text) => {
-  const intent = detectIntent(text)
-  if (!intent) return
-  if (intent.mode === mode.value && intent.keepExisting === keepExisting.value) return
-  mode.value = intent.mode
-  keepExisting.value = intent.keepExisting
-  showToast(
-    intent.keepExisting
-      ? 'Mode: Modify this page — existing objects kept'
-      : `Mode: ${mode.value === 'append' ? 'Add pages' : 'Modify this page'}`,
-  )
-})
+watch(request, () => (pendingIntent.value = null))
 
 async function loadModels(): Promise<void> {
   busyModels.value = true
@@ -394,7 +386,38 @@ function undoChange(): void {
   lastChange.value = null
 }
 
-async function run(): Promise<void> {
+function modeName(m: Mode, keep: boolean): string {
+  if (m === 'modify') return keep ? 'Modify this page (keep existing objects)' : 'Modify this page'
+  return m === 'append' ? 'Add pages' : 'Replace project'
+}
+
+/**
+ * Generate entry point. When the request text trips an intent trigger and it
+ * would change the current mode, ask first (a subtle inline strip) instead of
+ * switching silently; the user picks, then generation runs with that mode.
+ */
+function run(): void {
+  if (busy.value || !ready.value) return
+  const intent = detectIntent(request.value)
+  if (intent && (intent.mode !== mode.value || intent.keepExisting !== keepExisting.value)) {
+    pendingIntent.value = intent
+    return
+  }
+  pendingIntent.value = null
+  void startGeneration()
+}
+
+function chooseIntent(use: boolean): void {
+  const intent = pendingIntent.value
+  pendingIntent.value = null
+  if (use && intent) {
+    mode.value = intent.mode
+    keepExisting.value = intent.keepExisting
+  }
+  void startGeneration()
+}
+
+async function startGeneration(): Promise<void> {
   if (busy.value || !ready.value) return
   busy.value = true
   log.value = []
@@ -627,23 +650,37 @@ async function copyRaw(): Promise<void> {
 
     <div class="mode-row">
       <label class="check-row" title="Add the generated pages to the current project">
-        <input v-model="mode" type="radio" value="append" />
+        <input v-model="mode" type="radio" value="append" @change="pendingIntent = null" />
         Add pages
       </label>
       <label class="check-row" title="Send the current page (and background) and replace just that page">
-        <input v-model="mode" type="radio" value="modify" />
+        <input v-model="mode" type="radio" value="modify" @change="pendingIntent = null" />
         Modify this page
       </label>
       <label class="check-row" title="Discard the current project and open the generated book">
-        <input v-model="mode" type="radio" value="replace" />
+        <input v-model="mode" type="radio" value="replace" @change="pendingIntent = null" />
         Replace project
       </label>
     </div>
 
     <label v-if="mode === 'modify'" class="check-row keep-row" title="Existing objects are kept exactly as they are; the model may only add new ones">
-      <input v-model="keepExisting" type="checkbox" />
+      <input v-model="keepExisting" type="checkbox" @change="pendingIntent = null" />
       Keep existing objects unchanged (add only)
     </label>
+
+    <div v-if="pendingIntent" class="intent-confirm" role="alert">
+      <span>
+        This sounds like
+        <strong>{{ modeName(pendingIntent.mode, pendingIntent.keepExisting) }}</strong>. Switch to
+        it for this run?
+      </span>
+      <div class="intent-actions">
+        <button class="primary" @click="chooseIntent(true)">Switch &amp; generate</button>
+        <button class="secondary" @click="chooseIntent(false)">
+          Keep "{{ modeName(mode, keepExisting) }}"
+        </button>
+      </div>
+    </div>
 
     <div class="actions">
       <button class="primary" :disabled="busy || !ready" @click="run">
@@ -887,6 +924,27 @@ async function copyRaw(): Promise<void> {
   align-items: center;
   gap: 6px;
   cursor: pointer;
+}
+
+.intent-confirm {
+  border: 1px solid var(--ed-border);
+  border-radius: 8px;
+  background: var(--ed-bg);
+  padding: 8px 10px;
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--ed-text-dim);
+}
+
+.intent-confirm strong {
+  color: var(--ed-text);
+}
+
+.intent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .actions {
