@@ -508,6 +508,31 @@ export function resolveBorderStyle(value: unknown): BorderStyle {
   return value === 'dashed' ? 'dashed' : 'solid'
 }
 
+export interface BorderDefault {
+  width: number
+  style: BorderStyle
+  color: string
+}
+
+/**
+ * Each control's CSS border baseline, mirroring `styles.ts`. The panel shows
+ * these when the props are unset (so the field never reads blank while a border
+ * is visible) and the renderer uses them for whichever of the three the author
+ * did not set — so changing just the style or colour still takes effect.
+ */
+export const BORDER_DEFAULTS: Record<ControlKind, BorderDefault> = {
+  button: { width: 0, style: 'solid', color: '#d1d5db' },
+  label: { width: 0, style: 'solid', color: '#d1d5db' },
+  input: { width: 1, style: 'solid', color: '#d1d5db' },
+  image: { width: 0, style: 'solid', color: '#d1d5db' },
+  card: { width: 1, style: 'solid', color: '#e5e7eb' },
+  container: { width: 1.5, style: 'dashed', color: '#d1d5db' },
+  switch: { width: 0, style: 'solid', color: '#d1d5db' },
+  group: { width: 0, style: 'solid', color: '#d1d5db' },
+  markdown: { width: 0, style: 'solid', color: '#d1d5db' },
+  html: { width: 0, style: 'solid', color: '#d1d5db' },
+}
+
 export const DEFAULT_PROPS: Record<ControlKind, Record<string, unknown>> = {
   button: { text: 'Button', fontSize: 15 },
   label: { text: 'Label', fontSize: 15 },

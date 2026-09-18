@@ -171,6 +171,31 @@ describe('controls', () => {
     expect(el.style.opacity).toBe('')
   })
 
+  it('a border style or colour alone applies using the control default', () => {
+    // a container's default is 1.5px dashed — changing just the style works
+    const c = renderContainer(createObject('container', 'c1', { x: 0, y: 0, w: 100, h: 100 }, {
+      borderStyle: 'solid',
+    }))
+    expect(c.style.borderWidth).toBe('1.5px')
+    expect(c.style.borderStyle).toBe('solid')
+    expect(c.style.borderColor).toBe('#d1d5db')
+
+    // changing just the colour keeps the default width/style
+    const c2 = renderContainer(createObject('container', 'c2', { x: 0, y: 0, w: 100, h: 100 }, {
+      borderColor: 'red',
+    }))
+    expect(c2.style.borderWidth).toBe('1.5px')
+    expect(c2.style.borderStyle).toBe('dashed')
+    expect(c2.style.borderColor).toBe('#ef4444')
+  })
+
+  it('borderWidth 0 removes a default border', () => {
+    const c = renderContainer(createObject('container', 'c1', { x: 0, y: 0, w: 100, h: 100 }, {
+      borderWidth: 0,
+    }))
+    expect(c.style.borderWidth).toBe('0px')
+  })
+
   it('paints a switch toggle track from trackColor', () => {
     const el = renderSwitch(createObject('switch', 's1', { x: 0, y: 0, w: 160, h: 40 }, { text: 'M', trackColor: 'teal' }))
     expect(el.style.getPropertyValue('--tb-switch-on')).toBe('#0d9488')

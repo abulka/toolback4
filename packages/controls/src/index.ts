@@ -1,6 +1,7 @@
 import { marked } from 'marked'
 import type { ControlKind, PageObject, TextAlign, VerticalAlign } from '@toolback/format'
 import {
+  BORDER_DEFAULTS,
   BOX_KINDS,
   FONT_STACKS,
   resolveBorderStyle,
@@ -106,11 +107,20 @@ export function applyVerticalAlign(el: HTMLElement, obj: PageObject): void {
 
 /** border / corner radius / opacity; absent props fall back to the CSS default */
 export function applyBoxStyle(el: HTMLElement, obj: PageObject): void {
-  const w = numProp(obj, 'borderWidth')
-  if (w !== null) {
+  const touched =
+    obj.props['borderWidth'] !== undefined ||
+    obj.props['borderStyle'] !== undefined ||
+    obj.props['borderColor'] !== undefined
+  if (touched) {
+    // any one of the three switches the border on: the rest take the control's
+    // default, so changing just the style/colour is not a silent no-op
+    const def = BORDER_DEFAULTS[obj.control]
+    const w = numProp(obj, 'borderWidth') ?? def.width
+    const style = obj.props['borderStyle'] !== undefined ? resolveBorderStyle(obj.props['borderStyle']) : def.style
+    const color = resolveColor(obj.props['borderColor']) ?? def.color
     el.style.borderWidth = `${Math.max(0, w)}px`
-    el.style.borderStyle = resolveBorderStyle(obj.props['borderStyle'])
-    el.style.borderColor = resolveColor(obj.props['borderColor']) ?? 'currentColor'
+    el.style.borderStyle = style
+    el.style.borderColor = color
   } else {
     el.style.borderWidth = ''
     el.style.borderStyle = ''

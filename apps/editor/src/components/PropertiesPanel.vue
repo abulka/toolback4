@@ -11,10 +11,12 @@ import { useBookStore } from '../stores/book'
 import { collectStoreKeys } from '../storeKeys'
 import {
   APPEARANCE_KINDS,
+  BORDER_DEFAULTS,
   BOX_KINDS,
   IMAGE_PROVIDERS,
   randomImageUrl,
   styleKindsForProp,
+  type BorderDefault,
   type ImageProvider,
 } from '@toolback/format'
 import { copyText, objectsToJson } from '../copyJson'
@@ -233,10 +235,36 @@ function styleSwatch(key: 'textColor' | 'background' | 'trackColor' | 'borderCol
   const control = [...styleTargets.value, ...boxTargets.value][0]?.control ?? ''
   if (key === 'textColor') return control === 'button' ? '#ffffff' : '#111827'
   if (key === 'trackColor') return '#4f46e5'
-  if (key === 'borderColor') return '#d1d5db'
+  if (key === 'borderColor') return borderDef().color
   if (control === 'button') return '#4f46e5'
   if (control === 'container') return '#f9fafb'
   return '#ffffff'
+}
+
+/** the control whose CSS border baseline the panel shows when props are unset */
+function borderControl(): string {
+  return boxTargets.value[0]?.control ?? ''
+}
+function borderDef(): BorderDefault {
+  return BORDER_DEFAULTS[borderControl() as keyof typeof BORDER_DEFAULTS] ?? BORDER_DEFAULTS.button
+}
+/** effective border values: the stored prop, else the control's default (blank
+ *  only when a multi-selection holds different values) */
+function borderWidthValue(): string {
+  if (styleMixed.value['borderWidth']) return ''
+  const v = styleProp('borderWidth')
+  if (typeof v === 'number' && Number.isFinite(v)) return String(v)
+  return String(borderDef().width)
+}
+function borderStyleValue(): string {
+  if (styleMixed.value['borderStyle']) return ''
+  const v = styleProp('borderStyle')
+  return typeof v === 'string' && v !== '' ? v : borderDef().style
+}
+function borderColorValue(): string {
+  if (styleMixed.value['borderColor']) return ''
+  const v = styleProp('borderColor')
+  return typeof v === 'string' && v !== '' ? v : borderDef().color
 }
 function setStyleProp(key: string, value: unknown): void {
   store.updateSelectedProps({ [key]: value }, styleKindsForProp(key))
@@ -439,9 +467,9 @@ function onPaste(): void {
         />
         <BoxStyleFields
           :caps="styleCaps"
-          :border-width="styleNum('borderWidth')"
-          :border-style="styleStr('borderStyle')"
-          :border-color="styleStr('borderColor')"
+          :border-width="borderWidthValue()"
+          :border-style="borderStyleValue()"
+          :border-color="borderColorValue()"
           :border-color-swatch="styleSwatch('borderColor')"
           :radius="styleNum('radius')"
           :opacity="styleNum('opacity')"
@@ -579,9 +607,9 @@ function onPaste(): void {
     <BoxStyleFields
       v-if="boxTargets.length"
       :caps="styleCaps"
-      :border-width="styleNum('borderWidth')"
-      :border-style="styleStr('borderStyle')"
-      :border-color="styleStr('borderColor')"
+      :border-width="borderWidthValue()"
+      :border-style="borderStyleValue()"
+      :border-color="borderColorValue()"
       :border-color-swatch="styleSwatch('borderColor')"
       :radius="styleNum('radius')"
       :opacity="styleNum('opacity')"
