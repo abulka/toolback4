@@ -808,7 +808,10 @@ step:
   keeping its id, name and background; names colliding with the background are
   renamed. With `keepExisting` (strict add-only) the existing objects are kept
   verbatim and only new names are added, so an "add a button" request can never
-  recolour what is already there. `aiIntent.ts` derives the mode + flag from the
+  recolour what is already there. It walks into a matching group, so a child the
+  model added inside an existing group (a new indicator on an existing widget) is
+  appended to that group rather than the whole group being skipped.
+  `aiIntent.ts` derives the mode + flag from the
   prompt text; the panel applies that at generate time and, when it differs from
   the current mode, asks the author to confirm (Switch / Keep) before switching
   — it never overrides the radio silently.

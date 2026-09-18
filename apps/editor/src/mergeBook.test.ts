@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createBook, createObject, createPage } from '@toolback/format'
+import { createBook, createGroup, createObject, createPage } from '@toolback/format'
 import { applyModifiedPage, mergeGeneratedBook } from './mergeBook'
 
 function incomingWithPage(name: string, goTarget?: string) {
@@ -193,5 +193,81 @@ describe('applyModifiedPage — keepExisting (strict add-only)', () => {
     const report = applyModifiedPage(target, source, [], { keepExisting: true })
     expect(report.addedObjects).toBe(0)
     expect(target.objects.map((o) => o.name)).toEqual(['a'])
+  })
+
+  it('adds a new child inside an existing group, keeping the group and its members', () => {
+    const target = createPage('P', 'bg1')
+    const existingBtn = createObject('button', 'btn7', { x: 0, y: 0, w: 10, h: 10 }, { text: '7' })
+    const group = createGroup('group1', { x: 0, y: 0, w: 100, h: 100 }, [existingBtn])
+    target.objects = [group]
+
+    const source = createPage('P', 'bgx')
+    const recoloured = createObject(
+      'button',
+      'btn7',
+      { x: 0, y: 0, w: 10, h: 10 },
+      { text: '7', background: '#000000' },
+    )
+    const dot = createObject('container', 'memDot', { x: 40, y: 10, w: 16, h: 16 })
+    source.objects = [createGroup('group1', { x: 5, y: 5, w: 100, h: 100 }, [recoloured, dot])]
+
+    const report = applyModifiedPage(target, source, [], { keepExisting: true })
+    expect(target.objects.map((o) => o.name)).toEqual(['group1'])
+    const targetGroup = target.objects[0]!
+    expect(targetGroup.id).toBe(group.id)
+    expect(targetGroup.children!.map((o) => o.name)).toEqual(['btn7', 'memDot'])
+    expect(targetGroup.children![0]!.id).toBe(existingBtn.id)
+    expect(targetGroup.children![0]!.props['background']).toBeUndefined()
+    expect(report.keptObjects).toBe(2)
+    expect(report.addedObjects).toBe(1)
+  })
+
+  it('adds a new subgroup inside an existing group', () => {
+    const target = createPage('P', 'bg1')
+    const existing = createObject('button', 'a', { x: 0, y: 0, w: 10, h: 10 })
+    target.objects = [createGroup('group1', { x: 0, y: 0, w: 100, h: 100 }, [existing])]
+
+    const source = createPage('P', 'bgx')
+    const inner = createGroup('innerGroup', { x: 0, y: 0, w: 20, h: 20 }, [
+      createObject('label', 'note', { x: 0, y: 0, w: 10, h: 10 }, { text: 'hi' }),
+    ])
+    source.objects = [
+      createGroup('group1', { x: 0, y: 0, w: 100, h: 100 }, [
+        createObject('button', 'a', { x: 0, y: 0, w: 10, h: 10 }),
+        inner,
+      ]),
+    ]
+
+    const report = applyModifiedPage(target, source, [], { keepExisting: true })
+    const targetGroup = target.objects[0]!
+    expect(targetGroup.children!.map((o) => o.name)).toEqual(['a', 'innerGroup'])
+    expect(targetGroup.children![1]!.children!.map((o) => o.name)).toEqual(['note'])
+    expect(report.addedObjects).toBe(2)
+  })
+
+  it('renames a new nested child that collides elsewhere and rewrites its handlers', () => {
+    const target = createPage('P', 'bg1')
+    target.objects = [
+      createObject('label', 'memDot', { x: 0, y: 0, w: 5, h: 5 }),
+      createGroup('group1', { x: 0, y: 0, w: 100, h: 100 }, [
+        createObject('button', 'a', { x: 0, y: 0, w: 10, h: 10 }),
+      ]),
+    ]
+
+    const source = createPage('P', 'bgx')
+    const dot = createObject('container', 'memDot', { x: 40, y: 10, w: 16, h: 16 })
+    dot.on = { click: "controls.memDot.visible = false" }
+    source.objects = [
+      createGroup('group1', { x: 0, y: 0, w: 100, h: 100 }, [
+        createObject('button', 'a', { x: 0, y: 0, w: 10, h: 10 }),
+        dot,
+      ]),
+    ]
+
+    const report = applyModifiedPage(target, source, [], { keepExisting: true })
+    const added = target.objects[1]!.children![1]!
+    expect(added.name).toBe('memDot2')
+    expect(added.on['click']).toContain('controls.memDot2')
+    expect(report.renamedObjects).toContain('memDot → memDot2')
   })
 })

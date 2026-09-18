@@ -77,29 +77,47 @@ export function applyModifiedPage(
 
   if (options.keepExisting) {
     const taken = new Set<string>([...reservedNames, ...beforeNames])
-    const build = (objs: PageObject[], top: boolean): PageObject[] => {
-      const out: PageObject[] = []
-      for (const o of objs) {
-        if (top && beforeNames.has(o.name)) continue
+    const created: PageObject[] = []
+    const buildNew = (objs: PageObject[]): PageObject[] =>
+      objs.map((o) => {
         const next = uniqueName(o.name, taken)
         if (next !== o.name) {
           nameMap.set(o.name, next)
           renamedObjects.push(`${o.name} → ${next}`)
         }
-        out.push({
+        const built: PageObject = {
           ...o,
           id: newId('obj'),
           name: next,
-          children: o.children ? build(o.children, false) : undefined,
-        })
+          children: o.children ? buildNew(o.children) : undefined,
+        }
+        created.push(built)
+        return built
+      })
+    // Keep every existing object verbatim, but walk into a matching group so a
+    // child the model added inside it (a new indicator on an existing widget)
+    // is appended instead of the whole group being skipped.
+    const mergeInto = (incoming: PageObject[], existing: PageObject[]): void => {
+      for (const o of incoming) {
+        const match = existing.find((e) => e.name === o.name)
+        if (!match) {
+          existing.push(...buildNew([o]))
+          continue
+        }
+        if (o.children?.length && match.control === 'group') {
+          if (!match.children) match.children = []
+          mergeInto(o.children, match.children)
+        }
       }
-      return out
     }
-    const added = build(source.objects, true)
+    mergeInto(source.objects, target.objects)
     const rewrite = makeRewrite(nameMap)
-    rewriteHandlers(added, rewrite)
+    // `created` holds every new object at every depth, so rewrite each one's own
+    // handlers once (a recursive walk would visit nested ones twice).
+    for (const o of created) {
+      o.on = Object.fromEntries(Object.entries(o.on).map(([ev, src]) => [ev, rewrite(src)]))
+    }
     target.script = rewrite(source.script)
-    target.objects = [...target.objects, ...added]
   } else {
     const taken = new Set<string>(reservedNames)
     const walkNames = (objs: PageObject[]): void => {
